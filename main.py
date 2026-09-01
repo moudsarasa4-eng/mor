@@ -247,8 +247,16 @@ def cmd_daily(args):
 def cmd_zone(args):
     init_db()
     from app.discovery import descubrir_zona
+    from app.promote import promover_candidatas
     resultado = descubrir_zona(args.zona, max_queries=args.max_queries)
+    promocion = promover_candidatas(zona=args.zona)
     print(json.dumps({k: v for k, v in resultado.items() if k != "detalle"}, ensure_ascii=False, indent=2))
+    print(json.dumps(promocion, ensure_ascii=False, indent=2))
+
+
+def cmd_promote(args):
+    from app.promote import promover_candidatas
+    print(json.dumps(promover_candidatas(zona=args.zona, limite=args.limite), ensure_ascii=False, indent=2))
 
 
 def cmd_status(args):
@@ -486,6 +494,11 @@ def main():
 
     sub.add_parser("status").set_defaults(func=cmd_status)
     sub.add_parser("doctor").set_defaults(func=cmd_doctor)
+
+    ppromote = sub.add_parser("promote")
+    ppromote.add_argument("--zona", default=None)
+    ppromote.add_argument("--limite", type=int, default=100)
+    ppromote.set_defaults(func=cmd_promote)
 
     args = p.parse_args()
     if args.cmd is None:

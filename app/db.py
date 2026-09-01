@@ -24,8 +24,19 @@ def init_db():
     conn = get_conn()
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         conn.executescript(f.read())
+    _seed_keywords(conn)
     conn.commit()
     conn.close()
+
+
+def _seed_keywords(conn):
+    from app.keywords import KEYWORDS_SEED
+    for categoria, terminos in KEYWORDS_SEED.items():
+        for termino in terminos:
+            conn.execute(
+                "INSERT OR IGNORE INTO keywords (termino, categoria, origen, creado_en) VALUES (?, ?, 'seed', ?)",
+                (termino, categoria, now()),
+            )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 """Orquestador de la investigación continua: elige zona, corre discovery con
 presupuesto, guarda estado, permite pausar entre queries."""
 import threading
+import time
 from pathlib import Path
 
 import yaml
@@ -8,6 +9,7 @@ import yaml
 from app.db import get_conn, now
 from app.discovery import ejecutar_query
 from app.keywords import KEYWORDS_SEED, plantillas_query
+from app.promote import promover_candidatas
 from app.run_state import get_state, set_status, registrar_queries, queries_restantes_hoy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -104,6 +106,7 @@ def loop_investigacion(max_ciclos: int | None = None):
             r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
             registrar_queries(1)
             ciclos += 1
+            time.sleep(0.4)  # cortesía con la API de búsqueda, evita 429 innecesarios
             if r.get("empresas_nuevas", 0) == 0:
                 racha_sin_nuevas += 1
             else:
@@ -113,17 +116,21 @@ def loop_investigacion(max_ciclos: int | None = None):
             if max_ciclos is not None and ciclos >= max_ciclos:
                 break
 
-    set_status("idle" if not _stop_event.is_set() else "idle")
+        promover_candidatas(zona=zona)
+
+    set_status("idle")
 
 
 _thread: threading.Thread | None = None
+_thread_lock = threading.Lock()
 
 
 def iniciar_en_background(max_ciclos: int | None = None):
     global _thread
-    if _thread is not None and _thread.is_alive():
-        return False  # ya corriendo
-    _pause_event.set()
-    _thread = threading.Thread(target=loop_investigacion, kwargs={"max_ciclos": max_ciclos}, daemon=True)
-    _thread.start()
-    return True
+    with _thread_lock:
+        if _thread is not None and _thread.is_alive():
+            return False  # ya corriendo, evita hilos duplicados por doble-click
+        _pause_event.set()
+        _thread = threading.Thread(target=loop_investigacion, kwargs={"max_ciclos": max_ciclos}, daemon=True)
+        _thread.start()
+        return True

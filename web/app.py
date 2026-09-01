@@ -20,13 +20,14 @@ def _stats():
     conn = get_conn()
     total_discovered = conn.execute("SELECT COUNT(*) c FROM discovered_companies_raw").fetchone()["c"]
     total_companies = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
+    pendientes = conn.execute("SELECT COUNT(*) c FROM companies WHERE estado='candidata'").fetchone()["c"]
     jackpots = conn.execute("SELECT COUNT(*) c FROM companies WHERE estado='jackpot'").fetchone()["c"]
-    verificadas = conn.execute("SELECT COUNT(*) c FROM sources").fetchone()["c"]
     queries_totales = conn.execute("SELECT COUNT(*) c FROM queries_log").fetchone()["c"]
     conn.close()
     return {
         "empresas_descubiertas": total_discovered,
         "empresas_verificadas": total_companies,
+        "candidatas_pendientes_revision": pendientes,
         "jackpots": jackpots,
         "queries_totales": queries_totales,
     }

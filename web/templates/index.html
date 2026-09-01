@@ -34,6 +34,7 @@
     <div class="stats">
       <div class="stat"><div class="num" id="s_descubiertas">0</div><div class="label">descubiertas</div></div>
       <div class="stat"><div class="num" id="s_verificadas">0</div><div class="label">verificadas</div></div>
+      <div class="stat"><div class="num" id="s_pendientes">0</div><div class="label">pendientes de revisión</div></div>
       <div class="stat"><div class="num jackpot" id="s_jackpots">0</div><div class="label">jackpots</div></div>
       <div class="stat"><div class="num" id="s_queries">0</div><div class="label">queries totales</div></div>
     </div>
@@ -62,6 +63,7 @@ async function actualizar() {
   document.getElementById('zona').textContent = d.state.zona_actual || '-';
   document.getElementById('s_descubiertas').textContent = d.stats.empresas_descubiertas;
   document.getElementById('s_verificadas').textContent = d.stats.empresas_verificadas;
+  document.getElementById('s_pendientes').textContent = d.stats.candidatas_pendientes_revision;
   document.getElementById('s_jackpots').textContent = d.stats.jackpots;
   document.getElementById('s_queries').textContent = d.stats.queries_totales;
 
