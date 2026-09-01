@@ -21,6 +21,15 @@ umbrales:
 
 reintentar_descartadas_dias: 90
 
+transporte_prioritario:
+  - {tipo: tren, nombre: "San Martín", prioridad: 1}
+  - {tipo: colectivo, nombre: "182", prioridad: 2}
+  - {tipo: colectivo, nombre: "320", prioridad: 3}
+  - {tipo: colectivo, nombre: "237", prioridad: 4}
+  - {tipo: colectivo, nombre: "463", prioridad: 5}
+  # Prioridad = orden de investigación, no ranking de calidad. El motor puede
+  # aprender con datos reales qué red produce mejores empresas.
+
 zonas:
   cercana: ["Hurlingham", "Moron", "El Palomar", "Caseros", "Martin Coronado", "Villa Tesei"]
   media: ["Haedo", "Ramos Mejia", "William Morris", "Santos Lugares", "Bella Vista", "San Miguel", "Muñiz"]

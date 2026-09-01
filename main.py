@@ -25,7 +25,7 @@ from app.db import init_db, get_conn, now
 from app.company import (
     upsert_company, add_source, add_signal, add_negative_signal,
     add_job_hypothesis, add_cv_match, add_contact, get_company,
-    calcular_y_guardar_score, why_not,
+    calcular_y_guardar_score, why_not, add_transport_access,
 )
 from app.signals import Signal
 from app.negative_signals import NegativeSignal
@@ -217,6 +217,12 @@ def cmd_learning_report(args):
     print(f"Generado: {generar_reporte()}")
 
 
+def cmd_add_transport(args):
+    add_transport_access(args.company_id, args.red, args.tipo, args.minutos_caminata,
+                          args.minutos_viaje_total, args.combinaciones, args.fuente or "")
+    print("Acceso de transporte registrado.")
+
+
 def main():
     p = argparse.ArgumentParser(description="Motor de Jackpots")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -366,6 +372,16 @@ def main():
     pdr.set_defaults(func=cmd_discard_reason)
 
     sub.add_parser("learning-report").set_defaults(func=cmd_learning_report)
+
+    pt = sub.add_parser("add-transport")
+    pt.add_argument("--company-id", type=int, required=True, dest="company_id")
+    pt.add_argument("--red", required=True, help='"San Martín" | "182" | "320" | "237" | "463" | otra')
+    pt.add_argument("--tipo", required=True, choices=["tren", "colectivo"])
+    pt.add_argument("--minutos-caminata", type=int, required=True, dest="minutos_caminata")
+    pt.add_argument("--minutos-viaje-total", type=int, required=True, dest="minutos_viaje_total")
+    pt.add_argument("--combinaciones", type=int, default=0)
+    pt.add_argument("--fuente", default="", help="cómo se estimó, ej 'mapa'")
+    pt.set_defaults(func=cmd_add_transport)
 
     args = p.parse_args()
     args.func(args)

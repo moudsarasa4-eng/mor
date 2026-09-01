@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS outreach (
     actualizado_en TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS transport_access (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL REFERENCES companies(id),
+    red TEXT NOT NULL,             -- "San Martín" | "182" | "320" | "237" | "463" | otra
+    tipo TEXT NOT NULL,            -- "tren" | "colectivo"
+    minutos_caminata INTEGER NOT NULL,
+    minutos_viaje_total INTEGER NOT NULL,
+    combinaciones INTEGER NOT NULL DEFAULT 0,
+    fuente TEXT,
+    creado_en TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS discard_reasons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER NOT NULL REFERENCES companies(id),

@@ -54,19 +54,26 @@ def top_oportunidades(limit: int = 10):
         print("Todavía no hay oportunidades cargadas.")
         return
 
+    from app.transport import resumen_para_tabla
+    from app.company import get_transport_access
+
     print("## 🏆 TOP OPORTUNIDADES\n")
-    print("| Empresa | Ubicación | Rubro | Puesto al que aspiro | Chances | Sueldo estimado |")
-    print("| --- | --- | --- | --- | ---: | ---: |")
+    print("| Empresa | Ubicación | Rubro | Puesto al que aspiro | Chances | Sueldo estimado | Viaje | Transporte |")
+    print("| --- | --- | --- | --- | ---: | ---: | ---: | --- |")
     alertas = []
     for r in rows:
         nivel = _nivel(r["jackpot_score"])
         nombre = f"{nivel} {r['nombre']}".strip()
         puesto = r["puesto_objetivo"] or "(sin puesto objetivo cargado)"
-        print(f"| {nombre} | {r['zona']} | {RUBROS_LEGIBLES.get(r['rubro'], r['rubro'])} | {puesto} | {_fmt_chances(r)} | {_fmt_sueldo(r)} |")
+        accesos = get_transport_access(r["id"])
+        tiempo, transporte = resumen_para_tabla(accesos)
+        print(f"| {nombre} | {r['zona']} | {RUBROS_LEGIBLES.get(r['rubro'], r['rubro'])} | {puesto} | {_fmt_chances(r)} | {_fmt_sueldo(r)} | {tiempo} | {transporte} |")
         if r["chances_baja_confianza"]:
             alertas.append(f"⚠️ {r['nombre']}: estimación de chances con evidencia limitada.")
         if r["sueldo_min"] is None:
             alertas.append(f"⚠️ {r['nombre']}: sueldo no estimable por falta de evidencia.")
+        if not accesos:
+            alertas.append(f"⚠️ {r['nombre']}: sin datos de transporte cargados, accesibilidad estimada por zona.")
 
     print(f"\n**{total} empresas investigadas · {jackpots} JACKPOTS · {descartadas} descartadas**\n")
 
@@ -97,6 +104,11 @@ def detalle(company_id: int):
         print(f"├── Puesto objetivo: {s['puesto_objetivo'] or 'no cargado'}")
         sueldo = "No estimable" if s["sueldo_min"] is None else f"${s['sueldo_min']:,}–${s['sueldo_max']:,} (estimado)"
         print(f"├── Sueldo: {sueldo}")
+    from app.transport import detalle_accesos
+    from app.company import get_transport_access
+    print("├── Transporte:")
+    for linea in detalle_accesos(get_transport_access(company_id)).split("\n"):
+        print(f"│     - {linea}")
     print("├── Señales de contratación:")
     for sig in c["signals"]:
         print(f"│     - [{sig['fuerza']}] {sig['tipo']}: {sig['descripcion']}")

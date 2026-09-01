@@ -89,6 +89,28 @@ def add_cv_match(company_id: int, cv: str, match_score: int, justificacion: str)
     conn.close()
 
 
+def add_transport_access(company_id: int, red: str, tipo: str, minutos_caminata: int,
+                          minutos_viaje_total: int, combinaciones: int = 0, fuente: str = ""):
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO transport_access (company_id, red, tipo, minutos_caminata, minutos_viaje_total, "
+        "combinaciones, fuente, creado_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (company_id, red, tipo, minutos_caminata, minutos_viaje_total, combinaciones, fuente, now()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_transport_access(company_id: int):
+    from app.transport import AccesoTransporte
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM transport_access WHERE company_id=?", (company_id,)).fetchall()
+    conn.close()
+    return [AccesoTransporte(red=r["red"], tipo=r["tipo"], minutos_caminata=r["minutos_caminata"],
+                              minutos_viaje_total=r["minutos_viaje_total"], combinaciones=r["combinaciones"],
+                              fuente=r["fuente"] or "") for r in rows]
+
+
 def add_contact(company_id: int, tipo: str, valor: str, verificado: bool, fuente_id: int | None = None):
     """REGLA DURA: solo contacto a nivel empresa. Nunca nombres/emails de personas individuales."""
     if any(kw in valor.lower() for kw in ["gerente", "rrhh -", "sr.", "sra.", "lic. "]):
@@ -133,6 +155,13 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
                               vacante_confirmada: bool = False,
                               sueldo_min: int | None = None, sueldo_max: int | None = None,
                               sueldo_fuente: str | None = None) -> dict:
+    """`accessibility` es el fallback geográfico (app.geography); si hay datos de
+    transporte cargados (app.transport / add_transport_access), esos reemplazan
+    ese valor por un score multimodal real (San Martín + colectivos 182/320/237/463)."""
+    from app.transport import transport_access_score, resumen_para_tabla
+    accesos = get_transport_access(company_id)
+    if accesos:
+        accessibility = transport_access_score(accesos)
     """Recalcula todo el pipeline de scoring para una empresa y detecta cambios
     respecto del último score guardado (Change Detection)."""
     conn = get_conn()
