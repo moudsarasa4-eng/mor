@@ -12,6 +12,10 @@
   .badge.idle { background: #333; color: #ccc; }
   .badge.running { background: #1b4332; color: #74c69d; }
   .badge.paused { background: #4a3b1b; color: #e0b84a; }
+  .badge.presupuesto_agotado { background: #4a1b1b; color: #e07a7a; }
+  .barra { background: #2a2e37; border-radius: 6px; height: 8px; overflow: hidden; margin-top: 6px; max-width: 300px; }
+  .barra-fill { background: #3b5bdb; height: 100%; }
+  .auto-info { font-size: 12px; color: #8a8f98; margin-top: 6px; }
   .stats { display: flex; gap: 24px; margin: 16px 0; }
   .stat { text-align: center; }
   .stat .num { font-size: 28px; font-weight: 700; }
@@ -39,16 +43,35 @@
       <div class="stat"><div class="num" id="s_queries">0</div><div class="label">queries totales</div></div>
     </div>
     <div>
-      <button id="btn_start">▶ INICIAR BÚSQUEDA</button>
+      <button id="btn_start">▶ INICIAR BÚSQUEDA (una tanda)</button>
       <button id="btn_pause" class="secondary">⏸ PAUSAR</button>
       <button id="btn_continue" class="secondary">↻ CONTINUAR</button>
+    </div>
+    <div style="margin-top:10px;">
+      <button id="btn_auto_start">🔁 MODO AUTOMÁTICO</button>
+      <button id="btn_auto_stop" class="secondary">⏹ DETENER AUTOMÁTICO</button>
+    </div>
+    <div class="auto-info" id="auto_info">Modo automático: apagado</div>
+    <div class="auto-info">
+      Presupuesto de búsquedas usado: <span id="presupuesto_txt">0/0</span>
+      <div class="barra"><div class="barra-fill" id="presupuesto_barra" style="width:0%"></div></div>
     </div>
   </div>
 
   <div class="card">
     <h1>🏆 Top oportunidades</h1>
+    <div class="sub">Empresas ya puntuadas (jackpot / en revisión) — este paso lo hace Claude en una sesión, revisando cada caso.</div>
     <table id="tabla_top">
       <thead><tr><th>Empresa</th><th>Ubicación</th><th>Rubro</th><th>Puesto</th><th>Chances</th><th>Sueldo</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h1>📋 Candidatas descubiertas (pendientes de revisión)</h1>
+    <div class="sub">Encontradas por el motor solo, todavía sin puntuar. <span id="candidatas_total">0</span> en total, mostrando las últimas 50.</div>
+    <table id="tabla_candidatas">
+      <thead><tr><th>#</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Fuente</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -74,14 +97,43 @@ async function actualizar() {
     tr.innerHTML = `<td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.puesto}</td><td>${row.chances}</td><td>${row.sueldo}</td>`;
     tbody.appendChild(tr);
   });
+
+  const autoInfo = document.getElementById('auto_info');
+  if (d.auto.activo) {
+    const prox = d.auto.proxima_tanda ? new Date(d.auto.proxima_tanda).toLocaleTimeString() : '-';
+    autoInfo.textContent = `Modo automático: ENCENDIDO (cada ${d.auto.intervalo_minutos} min) · próxima tanda: ${prox}`;
+  } else {
+    autoInfo.textContent = 'Modo automático: apagado';
+  }
+
+  document.getElementById('presupuesto_txt').textContent = `${d.presupuesto.usado}/${d.presupuesto.total} (${d.presupuesto.pct}%)`;
+  document.getElementById('presupuesto_barra').style.width = Math.min(100, d.presupuesto.pct) + '%';
+}
+
+async function actualizarCandidatas() {
+  const r = await fetch('/api/candidatas');
+  const d = await r.json();
+  document.getElementById('candidatas_total').textContent = d.total;
+  const tbody = document.querySelector('#tabla_candidatas tbody');
+  tbody.innerHTML = '';
+  d.items.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : '-';
+    tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${fuente}</td>`;
+    tbody.appendChild(tr);
+  });
 }
 
 document.getElementById('btn_start').onclick = () => fetch('/api/start', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_pause').onclick = () => fetch('/api/pause', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_continue').onclick = () => fetch('/api/continue', {method: 'POST'}).then(actualizar);
+document.getElementById('btn_auto_start').onclick = () => fetch('/api/auto/start', {method: 'POST'}).then(actualizar);
+document.getElementById('btn_auto_stop').onclick = () => fetch('/api/auto/stop', {method: 'POST'}).then(actualizar);
 
 actualizar();
+actualizarCandidatas();
 setInterval(actualizar, 3000);
+setInterval(actualizarCandidatas, 8000);
 </script>
 </body>
 </html>

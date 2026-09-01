@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS discovered_companies_raw (
 
 CREATE TABLE IF NOT EXISTS run_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    status TEXT NOT NULL DEFAULT 'idle',  -- idle | running | paused
+    status TEXT NOT NULL DEFAULT 'idle',  -- idle | running | paused | presupuesto_agotado
     zona_actual TEXT,
     queries_hoy INTEGER NOT NULL DEFAULT 0,
     fecha_contador TEXT,  -- fecha ISO del contador de queries_hoy (resetea por día)

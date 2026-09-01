@@ -15,6 +15,10 @@ discovery:
   daily:
     max_queries: 300
     max_runtime_minutes: 180
+  scheduler:
+    interval_minutes: 30   # cada cuánto saca una tanda en modo automático
+    batch_size: 15         # queries por tanda (no quema todo de una)
+  lifetime_query_budget: 2400   # tope de por vida, con margen sobre las 2500 gratis de Serper.dev
 
 embudo:
   max_candidatas_por_zona: 15

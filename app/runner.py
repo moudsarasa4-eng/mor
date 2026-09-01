@@ -24,6 +24,17 @@ def orden_zonas() -> list[str]:
     return CONFIG["zonas"]["cercana"] + CONFIG["zonas"]["media"] + CONFIG["zonas"]["extendida"]
 
 
+def queries_lifetime_usadas() -> int:
+    conn = get_conn()
+    n = conn.execute("SELECT COUNT(*) c FROM queries_log").fetchone()["c"]
+    conn.close()
+    return n
+
+
+def presupuesto_lifetime_agotado() -> bool:
+    return queries_lifetime_usadas() >= CONFIG["discovery"]["lifetime_query_budget"]
+
+
 def zona_saturada(zona: str) -> bool:
     conn = get_conn()
     rows = conn.execute(
@@ -84,6 +95,10 @@ def loop_investigacion(max_ciclos: int | None = None):
         if _stop_event.is_set():
             break
 
+        if presupuesto_lifetime_agotado():
+            set_status("presupuesto_agotado")
+            break
+
         zona = siguiente_zona_no_saturada()
         if zona is None:
             set_status("idle")
@@ -101,7 +116,7 @@ def loop_investigacion(max_ciclos: int | None = None):
         racha_sin_nuevas = 0
         for q in queries[:max_zona]:
             _pause_event.wait()
-            if _stop_event.is_set():
+            if _stop_event.is_set() or presupuesto_lifetime_agotado():
                 break
             r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
             registrar_queries(1)
@@ -118,7 +133,8 @@ def loop_investigacion(max_ciclos: int | None = None):
 
         promover_candidatas(zona=zona)
 
-    set_status("idle")
+    if get_state()["status"] not in ("presupuesto_agotado",):
+        set_status("idle")
 
 
 _thread: threading.Thread | None = None

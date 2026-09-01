@@ -10,7 +10,7 @@ from flask import Flask, jsonify, render_template, request
 
 from app.db import get_conn, init_db
 from app.run_state import get_state
-from app import runner
+from app import runner, scheduler
 from app.dashboard import top_oportunidades
 
 app = Flask(__name__)
@@ -66,7 +66,31 @@ def index():
 @app.route("/api/status")
 def api_status():
     st = get_state()
-    return jsonify({"state": dict(st), "stats": _stats(), "top": _top_table_data()})
+    lifetime = runner.queries_lifetime_usadas()
+    presupuesto = runner.CONFIG["discovery"]["lifetime_query_budget"]
+    return jsonify({
+        "state": dict(st),
+        "stats": _stats(),
+        "top": _top_table_data(),
+        "auto": {
+            "activo": scheduler.esta_activo(),
+            "proxima_tanda": scheduler.proxima_tanda_en(),
+            "intervalo_minutos": runner.CONFIG["discovery"]["scheduler"]["interval_minutes"],
+        },
+        "presupuesto": {"usado": lifetime, "total": presupuesto, "pct": round(lifetime / presupuesto * 100, 1)},
+    })
+
+
+@app.route("/api/auto/start", methods=["POST"])
+def api_auto_start():
+    started = scheduler.iniciar()
+    return jsonify({"started": started})
+
+
+@app.route("/api/auto/stop", methods=["POST"])
+def api_auto_stop():
+    scheduler.detener()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/start", methods=["POST"])
@@ -85,6 +109,19 @@ def api_pause():
 def api_continue():
     runner.continuar()
     return jsonify({"ok": True})
+
+
+@app.route("/api/candidatas")
+def api_candidatas():
+    conn = get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM companies WHERE estado='candidata'").fetchone()["c"]
+    rows = conn.execute("""
+        SELECT c.id, c.nombre, c.zona, c.rubro,
+               (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
+        FROM companies c WHERE c.estado='candidata' ORDER BY c.id DESC LIMIT 50
+    """).fetchall()
+    conn.close()
+    return jsonify({"total": total, "items": [dict(r) for r in rows]})
 
 
 @app.route("/api/company/<int:company_id>")
