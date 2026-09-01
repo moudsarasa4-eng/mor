@@ -1,0 +1,129 @@
+"""Orquestador de la investigación continua: elige zona, corre discovery con
+presupuesto, guarda estado, permite pausar entre queries."""
+import threading
+from pathlib import Path
+
+import yaml
+
+from app.db import get_conn, now
+from app.discovery import ejecutar_query
+from app.keywords import KEYWORDS_SEED, plantillas_query
+from app.run_state import get_state, set_status, registrar_queries, queries_restantes_hoy
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG = yaml.safe_load((BASE_DIR / "config.yaml").read_text(encoding="utf-8"))
+
+_pause_event = threading.Event()  # set = correr, clear = pausado
+_pause_event.set()
+_stop_event = threading.Event()
+
+
+def orden_zonas() -> list[str]:
+    return CONFIG["zonas"]["cercana"] + CONFIG["zonas"]["media"] + CONFIG["zonas"]["extendida"]
+
+
+def zona_saturada(zona: str) -> bool:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT empresas_nuevas FROM queries_log WHERE zona=? ORDER BY id DESC LIMIT ?",
+        (zona, CONFIG["discovery"]["saturation_rounds"]),
+    ).fetchall()
+    conn.close()
+    if len(rows) < CONFIG["discovery"]["saturation_rounds"]:
+        return False
+    return all(r["empresas_nuevas"] == 0 for r in rows)
+
+
+def siguiente_zona_no_saturada() -> str | None:
+    for z in orden_zonas():
+        if not zona_saturada(z):
+            return z
+    return None
+
+
+def pausar():
+    _pause_event.clear()
+    set_status("paused")
+
+
+def continuar():
+    _pause_event.set()
+    set_status("running")
+
+
+def detener():
+    _stop_event.set()
+    _pause_event.set()  # despertar si estaba pausado, para que salga del loop
+
+
+def _generar_lote_queries(zona: str) -> list[dict]:
+    todas_keywords = [kw for lista in KEYWORDS_SEED.values() for kw in lista]
+    queries = []
+    for kw in todas_keywords:
+        queries.extend(plantillas_query(zona, kw))
+    queries.extend(plantillas_query(zona))
+    return queries
+
+
+def loop_investigacion(max_ciclos: int | None = None):
+    """Bucle principal: recorre zonas no saturadas ejecutando queries de a una,
+    respetando pausa, límite diario y presupuesto por zona. Pensado para correr
+    en un thread de background desde la web app."""
+    _stop_event.clear()
+    set_status("running")
+    ciclos = 0
+    limite_diario = CONFIG["discovery"]["daily"]["max_queries"]
+
+    while not _stop_event.is_set():
+        if max_ciclos is not None and ciclos >= max_ciclos:
+            break
+
+        _pause_event.wait()  # bloquea acá si está pausado
+        if _stop_event.is_set():
+            break
+
+        zona = siguiente_zona_no_saturada()
+        if zona is None:
+            set_status("idle")
+            break
+
+        set_status("running", zona_actual=zona)
+        restantes_hoy = queries_restantes_hoy(limite_diario)
+        if restantes_hoy <= 0:
+            set_status("idle")
+            break
+
+        queries = _generar_lote_queries(zona)
+        max_zona = min(CONFIG["discovery"]["max_queries_per_zone"], restantes_hoy)
+
+        racha_sin_nuevas = 0
+        for q in queries[:max_zona]:
+            _pause_event.wait()
+            if _stop_event.is_set():
+                break
+            r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
+            registrar_queries(1)
+            ciclos += 1
+            if r.get("empresas_nuevas", 0) == 0:
+                racha_sin_nuevas += 1
+            else:
+                racha_sin_nuevas = 0
+            if racha_sin_nuevas >= CONFIG["discovery"]["saturation_rounds"]:
+                break
+            if max_ciclos is not None and ciclos >= max_ciclos:
+                break
+
+    set_status("idle" if not _stop_event.is_set() else "idle")
+
+
+_thread: threading.Thread | None = None
+
+
+def iniciar_en_background(max_ciclos: int | None = None):
+    global _thread
+    if _thread is not None and _thread.is_alive():
+        return False  # ya corriendo
+    _pause_event.set()
+    _thread = threading.Thread(target=loop_investigacion, kwargs={"max_ciclos": max_ciclos}, daemon=True)
+    _thread.start()
+    return True

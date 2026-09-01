@@ -8,6 +8,14 @@ direccion_base: "Rosas Castillo 1698, Hurlingham, Provincia de Buenos Aires, Arg
 # 2) filtrado: descarte rápido por homónimos, sin rubro compatible, sin ninguna señal
 # 3) verificacion_profunda: solo para las que sobreviven el filtrado (fuentes, señales, negative signals)
 # 4) investigacion_profunda: solo top candidatas (contact info, CV match detallado, redacción de outreach)
+discovery:
+  max_queries_per_zone: 60
+  max_new_companies_per_zone: 200
+  saturation_rounds: 5   # queries consecutivas con 0 empresas nuevas = zona saturada
+  daily:
+    max_queries: 300
+    max_runtime_minutes: 180
+
 embudo:
   max_candidatas_por_zona: 15
   max_verificadas_profundamente_por_zona: 6

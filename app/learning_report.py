@@ -64,6 +64,22 @@ def _motivos_descarte(conn) -> list[dict]:
     return [{"motivo": r["codigo"], "veces": r["veces"]} for r in rows]
 
 
+def _top_keywords(conn, limit=10) -> list[dict]:
+    rows = conn.execute("""
+        SELECT termino, categoria, origen, queries_usadas, empresas_unicas, yield_score
+        FROM keywords WHERE queries_usadas > 0 ORDER BY yield_score DESC LIMIT ?
+    """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _top_queries(conn, limit=10) -> list[dict]:
+    rows = conn.execute("""
+        SELECT query, zona, tipo, resultados, empresas_nuevas, yield
+        FROM queries_log ORDER BY yield DESC, empresas_nuevas DESC LIMIT ?
+    """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def generar_reporte() -> str:
     conn = get_conn()
     total = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
@@ -75,6 +91,10 @@ def generar_reporte() -> str:
     rubros = _mejores_rubros(conn)
     zonas = _mejores_zonas(conn)
     motivos = _motivos_descarte(conn)
+    top_kw = _top_keywords(conn)
+    top_q = _top_queries(conn)
+    queries_totales = conn.execute("SELECT COUNT(*) c FROM queries_log").fetchone()["c"]
+    descubiertas = conn.execute("SELECT COUNT(*) c FROM discovered_companies_raw").fetchone()["c"]
     conn.close()
 
     def tabla(filas, cols, keys):
@@ -91,6 +111,16 @@ Generado: {date.today().isoformat()}
 Empresas analizadas: {total}
 Jackpots: {jackpots}
 Jackpot rate: {jackpot_rate}%
+
+## Search Intelligence
+Queries ejecutadas: {queries_totales}
+Empresas descubiertas (sin verificar todavía): {descubiertas}
+
+### Mejores keywords
+{tabla(top_kw, ["Keyword", "Categoría", "Origen", "Queries", "Empresas únicas", "Yield"], ["termino", "categoria", "origen", "queries_usadas", "empresas_unicas", "yield_score"])}
+
+### Mejores queries
+{tabla(top_q, ["Query", "Zona", "Tipo", "Resultados", "Nuevas", "Yield"], ["query", "zona", "tipo", "resultados", "empresas_nuevas", "yield"])}
 
 ## Rendimiento por tipo de fuente
 {tabla(fuentes, ["Tipo de fuente", "Empresas", "Jackpots", "Jackpot rate"], ["tipo_fuente", "empresas", "jackpots", "jackpot_rate_pct"])}

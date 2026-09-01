@@ -159,5 +159,55 @@ CREATE TABLE IF NOT EXISTS runs (
     creado_en TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    termino TEXT NOT NULL UNIQUE,
+    categoria TEXT NOT NULL,  -- limpieza | administrativo | atencion_cliente | logistica | general
+    origen TEXT NOT NULL DEFAULT 'seed',  -- seed | discovered
+    queries_usadas INTEGER NOT NULL DEFAULT 0,
+    empresas_encontradas INTEGER NOT NULL DEFAULT 0,
+    empresas_unicas INTEGER NOT NULL DEFAULT 0,
+    jackpots INTEGER NOT NULL DEFAULT 0,
+    yield_score REAL NOT NULL DEFAULT 0,
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS queries_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query TEXT NOT NULL,
+    zona TEXT NOT NULL,
+    keyword TEXT,
+    tipo TEXT,              -- TYPE_A..TYPE_G (ver app/search_intelligence.py)
+    resultados INTEGER NOT NULL DEFAULT 0,
+    empresas_nuevas INTEGER NOT NULL DEFAULT 0,
+    duplicados INTEGER NOT NULL DEFAULT 0,
+    yield REAL NOT NULL DEFAULT 0,
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS discovered_companies_raw (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre_crudo TEXT NOT NULL,
+    url TEXT,
+    snippet TEXT,
+    zona TEXT NOT NULL,
+    query_id INTEGER REFERENCES queries_log(id),
+    company_id INTEGER REFERENCES companies(id),  -- null hasta deduplicar/promover
+    estado TEXT NOT NULL DEFAULT 'DISCOVERED',  -- DISCOVERED|VERIFIED|RELEVANT|ACCESSIBLE|CV_MATCH|SCORED|JACKPOT|DESCARTADO
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS run_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    status TEXT NOT NULL DEFAULT 'idle',  -- idle | running | paused
+    zona_actual TEXT,
+    queries_hoy INTEGER NOT NULL DEFAULT 0,
+    fecha_contador TEXT,  -- fecha ISO del contador de queries_hoy (resetea por día)
+    ultima_actividad TEXT,
+    actualizado_en TEXT NOT NULL
+);
+INSERT OR IGNORE INTO run_state (id, status, actualizado_en) VALUES (1, 'idle', datetime('now'));
+
 CREATE INDEX IF NOT EXISTS idx_companies_zona ON companies(zona);
 CREATE INDEX IF NOT EXISTS idx_companies_estado ON companies(estado);
+CREATE INDEX IF NOT EXISTS idx_discovered_zona ON discovered_companies_raw(zona);

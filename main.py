@@ -20,6 +20,7 @@ Claude junto al usuario, zona por zona, y carga los resultados acá.
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from app.db import init_db, get_conn, now
 from app.company import (
@@ -223,9 +224,95 @@ def cmd_add_transport(args):
     print("Acceso de transporte registrado.")
 
 
+def cmd_webapp(args):
+    from web.app import run
+    print("Abriendo http://127.0.0.1:5000 ...")
+    run()
+
+
+def cmd_run(args):
+    init_db()
+    from app.runner import loop_investigacion
+    loop_investigacion(max_ciclos=args.max_ciclos)
+    print("Corrida terminada. Usá 'python3 main.py status' para ver el resultado.")
+
+
+def cmd_daily(args):
+    init_db()
+    from app.runner import loop_investigacion
+    print("Modo diario: investigando con presupuesto del día (ver config.yaml discovery.daily).")
+    loop_investigacion()
+
+
+def cmd_zone(args):
+    init_db()
+    from app.discovery import descubrir_zona
+    resultado = descubrir_zona(args.zona, max_queries=args.max_queries)
+    print(json.dumps({k: v for k, v in resultado.items() if k != "detalle"}, ensure_ascii=False, indent=2))
+
+
+def cmd_status(args):
+    from app.run_state import get_state
+    st = get_state()
+    conn = get_conn()
+    descubiertas = conn.execute("SELECT COUNT(*) c FROM discovered_companies_raw").fetchone()["c"]
+    verificadas = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
+    jackpots = conn.execute("SELECT COUNT(*) c FROM companies WHERE estado='jackpot'").fetchone()["c"]
+    queries = conn.execute("SELECT COUNT(*) c FROM queries_log").fetchone()["c"]
+    conn.close()
+    print(f"Estado: {st['status']} · Zona actual: {st['zona_actual'] or '-'}")
+    print(f"Empresas descubiertas: {descubiertas} · Verificadas: {verificadas} · Jackpots: {jackpots}")
+    print(f"Queries ejecutadas (total): {queries} · Queries hoy: {st['queries_hoy']}")
+
+
+def cmd_doctor(args):
+    import importlib
+    import os
+    checks = []
+
+    checks.append(("Python 3.10+", sys.version_info >= (3, 10)))
+    for mod in ["flask", "requests", "yaml"]:
+        try:
+            importlib.import_module(mod)
+            checks.append((f"Dependencia: {mod}", True))
+        except ImportError:
+            checks.append((f"Dependencia: {mod}", False))
+
+    try:
+        init_db()
+        checks.append(("Base de datos (data/database.sqlite)", True))
+    except Exception as e:
+        checks.append((f"Base de datos: {e}", False))
+
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+    checks.append(("SERPER_API_KEY configurada", bool(os.environ.get("SERPER_API_KEY"))))
+
+    try:
+        from app.search_client import probar_conexion
+        checks.append(("Conexión a Serper.dev", probar_conexion()))
+    except Exception:
+        checks.append(("Conexión a Serper.dev", False))
+
+    cvs_dir = Path(__file__).resolve().parent / "cvs"
+    for cv in ["administrativo.txt", "atencion_cliente.txt", "limpieza.txt", "logistica.txt"]:
+        checks.append((f"CV: {cv}", (cvs_dir / cv).exists()))
+
+    print("MOTOR DE JACKPOTS — DIAGNÓSTICO\n")
+    ok_total = True
+    for nombre, ok in checks:
+        simbolo = "✓" if ok else "✗"
+        print(f"{simbolo} {nombre}")
+        ok_total = ok_total and ok
+    print("\n" + ("Todo OK." if ok_total else "Hay ítems fallando — revisá los ✗ arriba."))
+
+
 def main():
     p = argparse.ArgumentParser(description="Motor de Jackpots")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd", required=False)
 
     sub.add_parser("init-db").set_defaults(func=cmd_init_db)
 
@@ -383,8 +470,28 @@ def main():
     pt.add_argument("--fuente", default="", help="cómo se estimó, ej 'mapa'")
     pt.set_defaults(func=cmd_add_transport)
 
+    pw = sub.add_parser("webapp")
+    pw.set_defaults(func=cmd_webapp)
+
+    prun = sub.add_parser("run")
+    prun.add_argument("--max-ciclos", type=int, default=None, dest="max_ciclos")
+    prun.set_defaults(func=cmd_run)
+
+    sub.add_parser("daily").set_defaults(func=cmd_daily)
+
+    pzone = sub.add_parser("zone")
+    pzone.add_argument("zona")
+    pzone.add_argument("--max-queries", type=int, default=20, dest="max_queries")
+    pzone.set_defaults(func=cmd_zone)
+
+    sub.add_parser("status").set_defaults(func=cmd_status)
+    sub.add_parser("doctor").set_defaults(func=cmd_doctor)
+
     args = p.parse_args()
-    args.func(args)
+    if args.cmd is None:
+        cmd_webapp(args)
+    else:
+        args.func(args)
 
 
 if __name__ == "__main__":

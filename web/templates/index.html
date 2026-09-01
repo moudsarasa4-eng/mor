@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Motor de Jackpots</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 24px; }
+  .card { background: #171a21; border: 1px solid #2a2e37; border-radius: 10px; padding: 20px; margin-bottom: 16px; max-width: 1000px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8a8f98; font-size: 13px; margin-bottom: 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge.idle { background: #333; color: #ccc; }
+  .badge.running { background: #1b4332; color: #74c69d; }
+  .badge.paused { background: #4a3b1b; color: #e0b84a; }
+  .stats { display: flex; gap: 24px; margin: 16px 0; }
+  .stat { text-align: center; }
+  .stat .num { font-size: 28px; font-weight: 700; }
+  .stat .label { font-size: 12px; color: #8a8f98; }
+  button { background: #3b5bdb; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; cursor: pointer; margin-right: 8px; }
+  button.secondary { background: #2a2e37; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2a2e37; }
+  th { color: #8a8f98; font-weight: 600; }
+  .jackpot { color: #d9a441; }
+  .zona-actual { color: #74c69d; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔎 Motor de Jackpots</h1>
+    <div class="sub">B2B Labor Intelligence Engine — Marco Ammazzalorso</div>
+    <div>Estado: <span id="badge" class="badge idle">-</span> · Zona actual: <span id="zona" class="zona-actual">-</span></div>
+    <div class="stats">
+      <div class="stat"><div class="num" id="s_descubiertas">0</div><div class="label">descubiertas</div></div>
+      <div class="stat"><div class="num" id="s_verificadas">0</div><div class="label">verificadas</div></div>
+      <div class="stat"><div class="num jackpot" id="s_jackpots">0</div><div class="label">jackpots</div></div>
+      <div class="stat"><div class="num" id="s_queries">0</div><div class="label">queries totales</div></div>
+    </div>
+    <div>
+      <button id="btn_start">▶ INICIAR BÚSQUEDA</button>
+      <button id="btn_pause" class="secondary">⏸ PAUSAR</button>
+      <button id="btn_continue" class="secondary">↻ CONTINUAR</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>🏆 Top oportunidades</h1>
+    <table id="tabla_top">
+      <thead><tr><th>Empresa</th><th>Ubicación</th><th>Rubro</th><th>Puesto</th><th>Chances</th><th>Sueldo</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+async function actualizar() {
+  const r = await fetch('/api/status');
+  const d = await r.json();
+  const badge = document.getElementById('badge');
+  badge.textContent = d.state.status;
+  badge.className = 'badge ' + d.state.status;
+  document.getElementById('zona').textContent = d.state.zona_actual || '-';
+  document.getElementById('s_descubiertas').textContent = d.stats.empresas_descubiertas;
+  document.getElementById('s_verificadas').textContent = d.stats.empresas_verificadas;
+  document.getElementById('s_jackpots').textContent = d.stats.jackpots;
+  document.getElementById('s_queries').textContent = d.stats.queries_totales;
+
+  const tbody = document.querySelector('#tabla_top tbody');
+  tbody.innerHTML = '';
+  d.top.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.puesto}</td><td>${row.chances}</td><td>${row.sueldo}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('btn_start').onclick = () => fetch('/api/start', {method: 'POST'}).then(actualizar);
+document.getElementById('btn_pause').onclick = () => fetch('/api/pause', {method: 'POST'}).then(actualizar);
+document.getElementById('btn_continue').onclick = () => fetch('/api/continue', {method: 'POST'}).then(actualizar);
+
+actualizar();
+setInterval(actualizar, 3000);
+</script>
+</body>
+</html>
