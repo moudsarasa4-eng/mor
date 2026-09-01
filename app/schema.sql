@@ -88,6 +88,13 @@ CREATE TABLE IF NOT EXISTS scores (
     jackpot_score INTEGER NOT NULL,
     confidence INTEGER NOT NULL,   -- 0-100
     cv_recomendado TEXT,
+    puesto_objetivo TEXT,
+    chances_estimadas INTEGER,     -- 0-100, distinto de opportunity_score (ver scoring.chances_de_entrar)
+    chances_baja_confianza INTEGER NOT NULL DEFAULT 0,  -- 1 si hay que mostrar "~" / "*"
+    sueldo_min INTEGER,            -- null si no hay evidencia suficiente
+    sueldo_max INTEGER,
+    sueldo_es_estimado INTEGER NOT NULL DEFAULT 1,
+    sueldo_fuente TEXT,
     detalle_json TEXT,             -- desglose completo en JSON
     creado_en TEXT NOT NULL
 );
@@ -110,6 +117,25 @@ CREATE TABLE IF NOT EXISTS outreach (
     estado TEXT NOT NULL DEFAULT 'generado', -- generado | enviado | respondio | entrevista | rechazo | no_respondio | contratacion
     creado_en TEXT NOT NULL,
     actualizado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS discard_reasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL REFERENCES companies(id),
+    codigo TEXT NOT NULL,  -- NO_CONTACT | HOMONYM | NEGATIVE_SIGNAL | TOO_SMALL | LOW_STABILITY |
+                            -- LOW_CV_MATCH | NO_RELEVANT_OPERATION | NO_VERIFIABLE_CONTACT |
+                            -- OUTDATED_INFORMATION | DUPLICATE | LOW_OPPORTUNITY
+    detalle TEXT,
+    reintentar_despues TEXT,  -- fecha ISO
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS human_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL REFERENCES companies(id),
+    marca TEXT NOT NULL,  -- EXCELENTE | BUEN_JACKPOT | MALA_EMPRESA | FALSO_POSITIVO | PRIORITARIA | NO_BUSCAR_DE_NUEVO
+    nota TEXT,
+    creado_en TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS runs (

@@ -23,7 +23,7 @@ def test_pipeline_completo(tmp_path, monkeypatch):
     from app.signals import Signal
     from app.scoring import EmployerInputs, Evidencia
     from app.audit import AuditChecklist, auditar
-    from app.outreach import generar_outreach
+    from app.outreach import OutreachRequest, CompanyInput, OpportunityInput, generar_email, guardar_outreach
 
     cid = upsert_company("Distribuidora Test SRL", "logistica", "Hurlingham",
                           localidad="Hurlingham", antiguedad_anios=22, tamano_estimado="grande",
@@ -58,23 +58,30 @@ def test_pipeline_completo(tmp_path, monkeypatch):
     assert resultado_audit == "aprobado"
     assert fallos == []
 
-    exp_file = tmp_path / "exp.txt"
-    exp_file.write_text("Operario de logística y depósito en comercio mayorista: recepción, stock y despacho.", encoding="utf-8")
-
     monkeypatch.chdir(tmp_path)
     (tmp_path / "outreach").mkdir(exist_ok=True)
     import app.outreach as outreach_module
     monkeypatch.setattr(outreach_module, "OUTREACH_DIR", tmp_path / "outreach")
 
-    archivo = generar_outreach(
-        cid, "Distribuidora Test SRL", "logistica", "logistica",
-        why_this_company="tiene operación logística activa y señales recientes de expansión",
-        experiencia_real=exp_file.read_text(encoding="utf-8"),
+    req = OutreachRequest(
+        company=CompanyInput(
+            name="Distribuidora Test SRL", industry="Distribución mayorista", location="Hurlingham",
+            tipo_empresa="distribuidora", contact_email="info@distribuidoratest.com.ar",
+        ),
+        opportunity=OpportunityInput(
+            hypothesized_role="Operario de depósito", role_category="logistica",
+            reasoning="Empresa con expansión de depósito reciente", confidence=80,
+            nivel_evidencia="INFERIDA",
+        ),
+        reason_to_contact="tiene operación logística activa y señales recientes de expansión",
     )
+    resultado = generar_email(req)
+    assert resultado["audit"]["passed"], resultado["audit"]["warnings"]
+    archivo = guardar_outreach(cid, req, resultado, jackpot_score=74)
     assert Path(archivo).exists()
     contenido = Path(archivo).read_text(encoding="utf-8")
     assert "Marco Ammazzalorso" in contenido
-    assert "recepción, stock y despacho" in contenido
+    assert "recepción" in contenido.lower() or "stock" in contenido.lower() or "despacho" in contenido.lower()
 
     print("OK: pipeline completo validado.")
 

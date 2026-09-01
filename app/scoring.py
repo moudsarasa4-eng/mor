@@ -83,6 +83,19 @@ def confidence(evidencias: list[Evidencia], tiene_contacto_verificado: bool, can
     return int(max(0, min(100, base + ajuste_fuentes + ajuste_contacto)))
 
 
+def chances_de_entrar(opportunity_score: int, hiring_signal_score: int, employer_score: int,
+                       vacante_confirmada: bool) -> tuple[int, bool]:
+    """'Chances de entrar' (regla 16): NO es lo mismo que CV match. Combina match,
+    señales de contratación y calidad de empresa, con descuento si no hay vacante
+    confirmada (competencia desconocida). Devuelve (chances, baja_confianza)."""
+    base = opportunity_score * 0.5 + hiring_signal_score * 0.35 + employer_score * 0.15
+    if not vacante_confirmada:
+        base *= 0.85  # sin vacante confirmada, hay incertidumbre de que exista búsqueda activa
+    chances = round(min(100, max(0, base)))
+    baja_confianza = hiring_signal_score < 30 or opportunity_score < 40
+    return chances, baja_confianza
+
+
 def clasificar_jackpot(score: int) -> str:
     if score >= 90:
         return "🟣 JACKPOT"

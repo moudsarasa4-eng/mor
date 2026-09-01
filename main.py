@@ -31,7 +31,7 @@ from app.signals import Signal
 from app.negative_signals import NegativeSignal
 from app.scoring import EmployerInputs, Evidencia
 from app.audit import AuditChecklist, auditar
-from app.outreach import generar_outreach
+from app.outreach import OutreachRequest, CompanyInput, OpportunityInput, generar_email, guardar_outreach
 from app.geography import accessibility_score, LINEA_SAN_MARTIN
 import yaml
 from pathlib import Path
@@ -93,6 +93,8 @@ def cmd_score(args):
     resultado = calcular_y_guardar_score(
         args.company_id, emp_inputs, accessibility=acc,
         contactability=100 if args.contacto_verificado else 0, evidencias=evidencias,
+        puesto_objetivo=args.puesto_objetivo, vacante_confirmada=args.vacante_confirmada,
+        sueldo_min=args.sueldo_min, sueldo_max=args.sueldo_max, sueldo_fuente=args.sueldo_fuente,
     )
     print(json.dumps(resultado, ensure_ascii=False, indent=2))
 
@@ -116,9 +118,40 @@ def cmd_audit(args):
 
 
 def cmd_outreach(args):
-    exp = Path(args.experiencia_file).read_text(encoding="utf-8")
-    archivo = generar_outreach(args.company_id, args.nombre, args.rubro, args.cv, args.why, exp)
+    conn = get_conn()
+    contacto = conn.execute(
+        "SELECT valor FROM contacts WHERE company_id=? AND tipo='email' AND verificado=1 LIMIT 1", (args.company_id,)
+    ).fetchone()
+    fuentes = [r["url"] for r in conn.execute("SELECT url FROM sources WHERE company_id=?", (args.company_id,))]
+    ultimo = conn.execute(
+        "SELECT jackpot_score FROM scores WHERE company_id=? ORDER BY creado_en DESC LIMIT 1", (args.company_id,)
+    ).fetchone()
+    conn.close()
+
+    req = OutreachRequest(
+        company=CompanyInput(
+            name=args.nombre, industry=args.rubro, location=args.zona,
+            tipo_empresa=args.tipo_empresa or "",
+            contact_email=contacto["valor"] if contacto else "",
+        ),
+        opportunity=OpportunityInput(
+            hypothesized_role=args.puesto, role_category=args.cv,
+            reasoning=args.why, confidence=args.confianza,
+            nivel_evidencia=args.nivel_evidencia,
+        ),
+        reason_to_contact=args.why,
+        mode=args.modo,
+    )
+    resultado = generar_email(req)
+    if not resultado["audit"]["passed"]:
+        print("NO GENERADO. Auditoría falló:", resultado["audit"]["warnings"])
+        return
+    archivo = guardar_outreach(args.company_id, req, resultado,
+                                jackpot_score=ultimo["jackpot_score"] if ultimo else None,
+                                evidencias_fuentes=fuentes)
     print(f"Generado: {archivo}")
+    if resultado["audit"]["warnings"]:
+        print("Avisos:", resultado["audit"]["warnings"])
 
 
 def cmd_why_not(args):
@@ -127,8 +160,8 @@ def cmd_why_not(args):
 
 
 def cmd_dashboard(args):
-    from app.dashboard import resumen
-    resumen()
+    from app.dashboard import top_oportunidades
+    top_oportunidades(limit=args.limit)
 
 
 def cmd_detalle(args):
@@ -165,6 +198,23 @@ def cmd_marcar_zona(args):
 def cmd_learning(args):
     from app.learning import analizar_resultados
     print(json.dumps(analizar_resultados(), ensure_ascii=False, indent=2))
+
+
+def cmd_feedback(args):
+    from app.feedback import marcar
+    marcar(args.company_id, args.marca, args.nota or "")
+    print("Feedback registrado.")
+
+
+def cmd_discard_reason(args):
+    from app.feedback import registrar_descarte
+    registrar_descarte(args.company_id, args.codigo, args.detalle or "", args.reintentar_despues)
+    print("Motivo de descarte registrado.")
+
+
+def cmd_learning_report(args):
+    from app.learning_report import generar_reporte
+    print(f"Generado: {generar_reporte()}")
 
 
 def main():
@@ -243,6 +293,11 @@ def main():
     psc.add_argument("--otro-transporte", action="store_true", dest="otro_transporte")
     psc.add_argument("--contacto-verificado", action="store_true", dest="contacto_verificado")
     psc.add_argument("--evidencias", default=None, help='JSON: [{"afirmacion": "...", "nivel": "OBSERVADO"}]')
+    psc.add_argument("--puesto-objetivo", default=None, dest="puesto_objetivo")
+    psc.add_argument("--vacante-confirmada", action="store_true", dest="vacante_confirmada")
+    psc.add_argument("--sueldo-min", type=int, default=None, dest="sueldo_min")
+    psc.add_argument("--sueldo-max", type=int, default=None, dest="sueldo_max")
+    psc.add_argument("--sueldo-fuente", default=None, dest="sueldo_fuente")
     psc.set_defaults(func=cmd_score)
 
     pa = sub.add_parser("audit")
@@ -263,16 +318,25 @@ def main():
     po.add_argument("--company-id", type=int, required=True, dest="company_id")
     po.add_argument("--nombre", required=True)
     po.add_argument("--rubro", required=True, choices=["limpieza", "administrativo", "atencion_cliente", "logistica"])
+    po.add_argument("--zona", required=True)
+    po.add_argument("--tipo-empresa", default="", dest="tipo_empresa",
+                     choices=["", "fabrica", "distribuidora", "sanatorio", "clinica", "supermercado", "retail", "estudio", "comercio"])
     po.add_argument("--cv", required=True, choices=["limpieza", "administrativo", "atencion_cliente", "logistica"])
-    po.add_argument("--why", required=True, help="Explicación WHY_THIS_COMPANY")
-    po.add_argument("--experiencia-file", required=True, dest="experiencia_file")
+    po.add_argument("--puesto", required=True, help="Puesto hipotético, ej 'Operario de depósito'")
+    po.add_argument("--why", required=True, help="Explicación WHY_THIS_COMPANY / motivo de contacto")
+    po.add_argument("--confianza", type=int, default=50)
+    po.add_argument("--nivel-evidencia", default="SIN_EVIDENCIA", dest="nivel_evidencia",
+                     choices=["CONFIRMADA", "INFERIDA", "SIN_EVIDENCIA"])
+    po.add_argument("--modo", default="DRAFT_MODE", choices=["DRAFT_MODE", "SEND_MODE"])
     po.set_defaults(func=cmd_outreach)
 
     pwn = sub.add_parser("why-not")
     pwn.add_argument("--company-id", type=int, required=True, dest="company_id")
     pwn.set_defaults(func=cmd_why_not)
 
-    sub.add_parser("dashboard").set_defaults(func=cmd_dashboard)
+    pdash = sub.add_parser("dashboard")
+    pdash.add_argument("--limit", type=int, default=10)
+    pdash.set_defaults(func=cmd_dashboard)
 
     pd = sub.add_parser("detalle")
     pd.add_argument("--company-id", type=int, required=True, dest="company_id")
@@ -285,6 +349,23 @@ def main():
     pmz.set_defaults(func=cmd_marcar_zona)
 
     sub.add_parser("learning").set_defaults(func=cmd_learning)
+
+    pf = sub.add_parser("feedback")
+    pf.add_argument("--company-id", type=int, required=True, dest="company_id")
+    pf.add_argument("--marca", required=True, choices=["EXCELENTE", "BUEN_JACKPOT", "MALA_EMPRESA", "FALSO_POSITIVO", "PRIORITARIA", "NO_BUSCAR_DE_NUEVO"])
+    pf.add_argument("--nota", default="")
+    pf.set_defaults(func=cmd_feedback)
+
+    pdr = sub.add_parser("discard-reason")
+    pdr.add_argument("--company-id", type=int, required=True, dest="company_id")
+    pdr.add_argument("--codigo", required=True, choices=["NO_CONTACT", "HOMONYM", "NEGATIVE_SIGNAL", "TOO_SMALL",
+                      "LOW_STABILITY", "LOW_CV_MATCH", "NO_RELEVANT_OPERATION", "NO_VERIFIABLE_CONTACT",
+                      "OUTDATED_INFORMATION", "DUPLICATE", "LOW_OPPORTUNITY"])
+    pdr.add_argument("--detalle", default="")
+    pdr.add_argument("--reintentar-despues", default=None, dest="reintentar_despues")
+    pdr.set_defaults(func=cmd_discard_reason)
+
+    sub.add_parser("learning-report").set_defaults(func=cmd_learning_report)
 
     args = p.parse_args()
     args.func(args)

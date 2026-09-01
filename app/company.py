@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from app.db import get_conn, now
 from app.negative_signals import NegativeSignal, debe_descartar
 from app.signals import Signal, hiring_signal_score
-from app.scoring import EmployerInputs, JackpotInputs, employer_score, jackpot_score, confidence, Evidencia
+from app.scoring import EmployerInputs, JackpotInputs, employer_score, jackpot_score, confidence, Evidencia, chances_de_entrar
 
 
 def upsert_company(nombre: str, rubro: str, zona: str, localidad: str = "",
@@ -128,7 +128,11 @@ def ultimo_score(company_id: int) -> dict | None:
 
 def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
                               accessibility: int, contactability: int,
-                              evidencias: list[Evidencia]) -> dict:
+                              evidencias: list[Evidencia],
+                              puesto_objetivo: str | None = None,
+                              vacante_confirmada: bool = False,
+                              sueldo_min: int | None = None, sueldo_max: int | None = None,
+                              sueldo_fuente: str | None = None) -> dict:
     """Recalcula todo el pipeline de scoring para una empresa y detecta cambios
     respecto del último score guardado (Change Detection)."""
     conn = get_conn()
@@ -163,6 +167,10 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
     if descartar:
         jp_score = min(jp_score, 30)  # las señales negativas críticas capan el score
 
+    chances, chances_baja_confianza = chances_de_entrar(mejor_match, hs_score, emp_score, vacante_confirmada)
+    if descartar:
+        chances = min(chances, 15)
+
     detalle = {
         "hiring_signal_score": hs_score,
         "employer_score": emp_score,
@@ -176,10 +184,13 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
 
     conn.execute(
         "INSERT INTO scores (company_id, employer_score, hiring_signal_score, opportunity_score, "
-        "accessibility_score, contactability_score, jackpot_score, confidence, cv_recomendado, detalle_json, creado_en) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "accessibility_score, contactability_score, jackpot_score, confidence, cv_recomendado, "
+        "puesto_objetivo, chances_estimadas, chances_baja_confianza, sueldo_min, sueldo_max, "
+        "sueldo_es_estimado, sueldo_fuente, detalle_json, creado_en) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
         (company_id, emp_score, hs_score, mejor_match, accessibility, contactability,
-         jp_score, conf, cv_recomendado, json.dumps(detalle, ensure_ascii=False), now()),
+         jp_score, conf, cv_recomendado, puesto_objetivo, chances, int(chances_baja_confianza),
+         sueldo_min, sueldo_max, sueldo_fuente, json.dumps(detalle, ensure_ascii=False), now()),
     )
 
     nuevo_estado = "jackpot" if (jp_score >= 90 and not descartar) else (

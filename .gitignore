@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 data/database.sqlite
 .pytest_cache/
+reports/*.md
+outreach/*.md
+!outreach/.gitkeep
