@@ -1,7 +1,7 @@
 """Extrae el texto de los 4 CVs en PDF (carpeta cvs/) a archivos .txt para uso del motor.
 
 Uso:
-    python3 engine/leer_cvs.py
+    python3 app/leer_cvs.py
 """
 from pathlib import Path
 

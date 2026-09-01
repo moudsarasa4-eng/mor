@@ -1,0 +1,35 @@
+# Configuración del Motor de Jackpots
+
+candidato: "Marco Ammazzalorso"
+direccion_base: "Rosas Castillo 1698, Hurlingham, Provincia de Buenos Aires, Argentina"
+
+# Embudo de investigación: dónde gastar esfuerzo.
+# 1) descubrimiento_barato: lista amplia de candidatas por zona (búsqueda simple, sin verificación profunda)
+# 2) filtrado: descarte rápido por homónimos, sin rubro compatible, sin ninguna señal
+# 3) verificacion_profunda: solo para las que sobreviven el filtrado (fuentes, señales, negative signals)
+# 4) investigacion_profunda: solo top candidatas (contact info, CV match detallado, redacción de outreach)
+embudo:
+  max_candidatas_por_zona: 15
+  max_verificadas_profundamente_por_zona: 6
+  max_jackpots_objetivo_por_zona: 4  # rango 2-4, curado, no masivo
+
+umbrales:
+  jackpot: 90
+  muy_interesante: 80
+  investigar: 65
+  # por debajo de 65 -> descartar
+
+reintentar_descartadas_dias: 90
+
+zonas:
+  cercana: ["Hurlingham", "Moron", "El Palomar", "Caseros", "Martin Coronado", "Villa Tesei"]
+  media: ["Haedo", "Ramos Mejia", "William Morris", "Santos Lugares", "Bella Vista", "San Miguel", "Muñiz"]
+  extendida: ["Jose C Paz", "Moreno", "Ciudadela", "Tres de Febrero"]
+
+reglas_duras:
+  - "Nunca inventar ni asumir datos de contacto: solo lo verificado con fuente citable."
+  - "Nunca rastrear ni usar contacto personal de individuos: solo email/teléfono a nivel empresa."
+  - "Nunca inflar o inventar experiencia del candidato en los emails: solo lo que dice el CV real."
+  - "Señal negativa crítica y vigente -> descartar y decirlo explícitamente."
+  - "Homónimo de otra provincia/país -> descartar y aclarar el motivo."
+  - "Nada se envía automáticamente: outreach siempre pasa por revisión humana."
