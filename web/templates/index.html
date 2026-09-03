@@ -52,6 +52,10 @@
       <button id="btn_auto_stop" class="secondary">⏹ DETENER AUTOMÁTICO</button>
     </div>
     <div class="auto-info" id="auto_info">Modo automático: apagado</div>
+    <div style="margin-top:10px;">
+      <button id="btn_export" class="secondary">📄 EXPORTAR CANDIDATAS A TXT (Descargas)</button>
+      <span class="auto-info" id="export_result"></span>
+    </div>
     <div class="auto-info">
       Presupuesto de búsquedas usado: <span id="presupuesto_txt">0/0</span>
       <div class="barra"><div class="barra-fill" id="presupuesto_barra" style="width:0%"></div></div>
@@ -129,6 +133,12 @@ document.getElementById('btn_pause').onclick = () => fetch('/api/pause', {method
 document.getElementById('btn_continue').onclick = () => fetch('/api/continue', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_auto_start').onclick = () => fetch('/api/auto/start', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_auto_stop').onclick = () => fetch('/api/auto/stop', {method: 'POST'}).then(actualizar);
+document.getElementById('btn_export').onclick = async () => {
+  const r = await fetch('/api/export', {method: 'POST'});
+  const d = await r.json();
+  document.getElementById('export_result').textContent = d.archivo ? `Exportado: ${d.archivo}` : 'No hay candidatas nuevas para exportar.';
+  actualizarCandidatas();
+};
 
 actualizar();
 actualizarCandidatas();

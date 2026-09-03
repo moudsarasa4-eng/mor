@@ -24,9 +24,18 @@ def init_db():
     conn = get_conn()
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         conn.executescript(f.read())
+    _migrar_columnas_nuevas(conn)
     _seed_keywords(conn)
     conn.commit()
     conn.close()
+
+
+def _migrar_columnas_nuevas(conn):
+    """Agrega columnas nuevas a bases ya existentes (creadas antes de este cambio)."""
+    try:
+        conn.execute("ALTER TABLE companies ADD COLUMN auto_evaluada INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # ya existe
 
 
 def _seed_keywords(conn):

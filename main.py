@@ -259,6 +259,12 @@ def cmd_promote(args):
     print(json.dumps(promover_candidatas(zona=args.zona, limite=args.limite), ensure_ascii=False, indent=2))
 
 
+def cmd_export(args):
+    from app.export_txt import exportar_candidatas_txt
+    archivo = exportar_candidatas_txt(zona=args.zona)
+    print(archivo or "No hay candidatas nuevas para exportar.")
+
+
 def cmd_status(args):
     from app.run_state import get_state
     st = get_state()
@@ -499,6 +505,10 @@ def main():
     ppromote.add_argument("--zona", default=None)
     ppromote.add_argument("--limite", type=int, default=100)
     ppromote.set_defaults(func=cmd_promote)
+
+    pexport = sub.add_parser("export")
+    pexport.add_argument("--zona", default=None)
+    pexport.set_defaults(func=cmd_export)
 
     args = p.parse_args()
     if args.cmd is None:

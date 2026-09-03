@@ -111,6 +111,13 @@ def api_continue():
     return jsonify({"ok": True})
 
 
+@app.route("/api/export", methods=["POST"])
+def api_export():
+    from app.export_txt import exportar_candidatas_txt
+    archivo = exportar_candidatas_txt()
+    return jsonify({"archivo": archivo})
+
+
 @app.route("/api/candidatas")
 def api_candidatas():
     conn = get_conn()

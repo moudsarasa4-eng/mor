@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS companies (
     tamano_estimado TEXT,          -- "chica" | "mediana" | "grande" | "desconocido"
     actividad TEXT,                -- descripción breve de qué hace
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
+    auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,
     reintentar_despues TEXT,       -- fecha ISO: no reinvestigar antes de esto
     creado_en TEXT NOT NULL,
