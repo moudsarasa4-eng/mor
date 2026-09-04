@@ -18,6 +18,7 @@ from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida
 from app.salarios_referencia import estimar_sueldo
 from app.site_check import sitio_activo, extraer_dominio
+from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -133,6 +134,22 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
                  ts, ts),
             )
             company_id = cur.lastrowid
+
+            # "entramado": la descripción de esta empresa nueva puede mencionar
+            # un término que no está en el diccionario semilla (ej. "limpieza
+            # de trenes") — se registra para que futuras tandas lo prueben.
+            total_descubiertas = conn.execute(
+                "SELECT COUNT(*) c FROM keywords WHERE origen='discovered'"
+            ).fetchone()["c"]
+            if total_descubiertas < MAX_KEYWORDS_DESCUBIERTAS:
+                for frase in extraer_keywords_de_texto(f["snippet"] or ""):
+                    # inline con la misma conexión: abrir una conexión aparte acá
+                    # (como hace registrar_keyword_descubierta) choca con "database
+                    # is locked", porque esta transacción todavía no hizo commit.
+                    conn.execute(
+                        "INSERT OR IGNORE INTO keywords (termino, categoria, origen, creado_en) VALUES (?, ?, 'discovered', ?)",
+                        (frase, rubro, now()),
+                    )
 
         if f["url"]:
             ya_tiene_fuente = conn.execute(

@@ -14,7 +14,8 @@ import re
 
 from app.db import get_conn, now
 from app.discovery import _es_dominio_excluido
-from app.search_client import buscar, SearchClientError
+import app.search_client as search_client
+from app.search_client import SearchClientError
 from app.company import add_contact, add_source
 from app.run_state import registrar_queries
 from app.contact_verify import verificar_email
@@ -46,7 +47,7 @@ def _priorizar_email(emails: list[str]) -> str | None:
 def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | None:
     query = f'"{nombre_empresa}" contacto OR administración OR compras'
     try:
-        crudo = buscar(query)
+        crudo = search_client.buscar(query)
     except SearchClientError:
         return None
 

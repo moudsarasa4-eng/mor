@@ -72,23 +72,27 @@ def detener():
 
 
 def _keywords_por_prioridad() -> list[str]:
-    """Ordena las keywords por rendimiento aprendido (yield_score), para que un
-    presupuesto acotado se gaste primero en lo que ya demostró funcionar.
-    Las que todavía no se probaron (queries_usadas=0) van primero que las de
-    yield bajo confirmado, para no dejar de explorar nunca."""
+    """Ordena TODAS las keywords conocidas (semilla + descubiertas durante la
+    investigación, vía app.discovery.registrar_keyword_descubierta) por
+    rendimiento aprendido (yield_score) — un presupuesto acotado se gasta
+    primero en lo que ya demostró funcionar. Las que todavía no se probaron
+    (queries_usadas=0) van primero que las de yield bajo confirmado, para no
+    dejar de explorar nunca. Antes esta función solo leía el diccionario fijo
+    KEYWORDS_SEED, así que una keyword "descubierta" quedaba guardada en la
+    base pero nunca se usaba de verdad para generar búsquedas futuras."""
     conn = get_conn()
-    filas = {r["termino"]: (r["queries_usadas"], r["yield_score"]) for r in conn.execute(
-        "SELECT termino, queries_usadas, yield_score FROM keywords"
-    )}
+    filas = conn.execute("SELECT termino, queries_usadas, yield_score FROM keywords").fetchall()
     conn.close()
-    todas_keywords = [kw for lista in KEYWORDS_SEED.values() for kw in lista]
 
-    def score(kw: str) -> tuple:
-        usadas, yield_score = filas.get(kw, (0, 0.0))
-        si_no_probada = 0 if usadas == 0 else 1  # 0 = probarla ya, 1 = ya se probó
-        return (si_no_probada, -yield_score)
+    if not filas:  # base recién creada, todavía sin seed cargado (no debería pasar tras init_db, pero por las dudas)
+        return [kw for lista in KEYWORDS_SEED.values() for kw in lista]
 
-    return sorted(todas_keywords, key=score)
+    def score(fila) -> tuple:
+        si_no_probada = 0 if fila["queries_usadas"] == 0 else 1  # 0 = probarla ya, 1 = ya se probó
+        return (si_no_probada, -fila["yield_score"])
+
+    ordenadas = sorted(filas, key=score)
+    return [f["termino"] for f in ordenadas]
 
 
 def _generar_lote_queries(zona: str) -> list[dict]:
@@ -116,10 +120,22 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
     def tiempo_agotado() -> bool:
         return max_minutos is not None and (time.monotonic() - inicio) >= max_minutos * 60
 
+    def _presupuesto_agotado_para_esta_corrida() -> bool:
+        return max_ciclos is not None and ciclos >= max_ciclos
+
+    def _puede_seguir() -> bool:
+        return not (_stop_event.is_set() or tiempo_agotado() or presupuesto_lifetime_agotado()
+                    or _presupuesto_agotado_para_esta_corrida())
+
+    def _gastar(fn, *args, **kwargs):
+        nonlocal ciclos
+        antes = queries_lifetime_usadas()
+        resultado = fn(*args, **kwargs)
+        ciclos += queries_lifetime_usadas() - antes
+        return resultado
+
     while not _stop_event.is_set():
-        if max_ciclos is not None and ciclos >= max_ciclos:
-            break
-        if tiempo_agotado():
+        if not _puede_seguir():
             break
 
         _pause_event.wait()  # bloquea acá si está pausado
@@ -130,67 +146,77 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
             set_status("presupuesto_agotado")
             break
 
+        trabajo_hecho = False
+        zona_actual = None
+
+        # 1) búsqueda geográfica — si HAY zona sin saturar, la corre; si no,
+        # NO corta el ciclo entero: sigue con industrial/proveedores/contacto,
+        # que pueden tener trabajo pendiente aunque la geografía esté agotada.
         zona = siguiente_zona_no_saturada()
-        if zona is None:
-            set_status("idle")
-            break
-
-        set_status("running", zona_actual=zona)
-        restantes_hoy = queries_restantes_hoy(limite_diario)
-        if restantes_hoy <= 0:
-            set_status("idle")
-            break
-
-        queries = _generar_lote_queries(zona)
-        max_zona = min(CONFIG["discovery"]["max_queries_per_zone"], restantes_hoy)
-
-        racha_sin_nuevas = 0
-        for q in queries[:max_zona]:
-            _pause_event.wait()
-            if _stop_event.is_set() or presupuesto_lifetime_agotado() or tiempo_agotado():
-                break
-            r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
-            registrar_queries(1)
-            ciclos += 1
-            time.sleep(0.4)  # cortesía con la API de búsqueda, evita 429 innecesarios
-            if r.get("empresas_nuevas", 0) == 0:
-                racha_sin_nuevas += 1
-            else:
+        if zona is not None and _puede_seguir():
+            zona_actual = zona
+            set_status("running", zona_actual=zona)
+            restantes_hoy = queries_restantes_hoy(limite_diario)
+            if restantes_hoy > 0:
+                queries = _generar_lote_queries(zona)
+                max_zona = min(CONFIG["discovery"]["max_queries_per_zone"], restantes_hoy)
                 racha_sin_nuevas = 0
-            if racha_sin_nuevas >= CONFIG["discovery"]["saturation_rounds"]:
-                break
-            if max_ciclos is not None and ciclos >= max_ciclos:
-                break
+                for q in queries[:max_zona]:
+                    _pause_event.wait()
+                    if not _puede_seguir():
+                        break
+                    r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
+                    registrar_queries(1)
+                    ciclos += 1
+                    trabajo_hecho = True
+                    time.sleep(0.4)  # cortesía con la API de búsqueda, evita 429 innecesarios
+                    if r.get("empresas_nuevas", 0) == 0:
+                        racha_sin_nuevas += 1
+                    else:
+                        racha_sin_nuevas = 0
+                    if racha_sin_nuevas >= CONFIG["discovery"]["saturation_rounds"]:
+                        break
+                promover_candidatas(zona=zona)
 
-        promover_candidatas(zona=zona)
+        # 2) industrial CLAE — corre con lo que quede de presupuesto, tenga o
+        # no tenga trabajo la búsqueda geográfica.
+        if _puede_seguir():
+            from app.industrial_discovery import pendientes as pendientes_industrial, correr_lote as correr_industrial
+            if pendientes_industrial():
+                _gastar(correr_industrial, max_rubros=1)
+                trabajo_hecho = True
 
-        # todas las fuentes en el mismo ciclo, para que un solo botón cubra todo:
-        # búsqueda geográfica (arriba) + industrial CLAE + proveedores de góndola
-        # + contacto — pero TODAS descuentan del mismo presupuesto max_ciclos,
-        # sino una corrida "de 8" podría terminar gastando 25-30 búsquedas reales.
-        def _presupuesto_agotado_para_esta_corrida() -> bool:
-            return max_ciclos is not None and ciclos >= max_ciclos
+        # 3) proveedores de góndola — usa la zona geográfica actual si hubo,
+        # sino la primera zona configurada (para no depender de que la
+        # búsqueda geográfica haya corrido este ciclo).
+        if _puede_seguir():
+            from app.supplier_discovery import pendientes as pendientes_supplier, correr_lote as correr_supplier
+            zona_supplier = zona_actual or orden_zonas()[0]
+            if pendientes_supplier(zona_supplier):
+                _gastar(correr_supplier, zona=zona_supplier, max_categorias=1)
+                trabajo_hecho = True
 
-        def _gastar(fn, *args, **kwargs):
-            nonlocal ciclos
-            antes = queries_lifetime_usadas()
-            resultado = fn(*args, **kwargs)
-            ciclos += queries_lifetime_usadas() - antes
-            return resultado
+        # 4) contacto — para cualquier candidata sin contacto, sin importar zona
+        if _puede_seguir():
+            conn = get_conn()
+            hay_pendientes = conn.execute(
+                "SELECT 1 FROM companies WHERE estado='candidata' "
+                "AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = companies.id) LIMIT 1"
+            ).fetchone() is not None
+            conn.close()
+            if hay_pendientes:
+                from app.contact_finder import correr_lote as correr_contactos
+                _gastar(correr_contactos, zona=None, limite=3)
+                trabajo_hecho = True
 
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
-            from app.industrial_discovery import correr_lote as correr_industrial
-            _gastar(correr_industrial, max_rubros=1)
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
-            from app.supplier_discovery import correr_lote as correr_supplier
-            _gastar(correr_supplier, zona=zona, max_categorias=1)
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
-            from app.contact_finder import correr_lote as correr_contactos
-            _gastar(correr_contactos, zona=zona, limite=3)
-
-        archivo_txt = exportar_candidatas_txt()  # sin filtro de zona: incluye lo que sumaron industrial/supplier
+        archivo_txt = exportar_candidatas_txt()
         if archivo_txt:
             print(f"[Motor de Jackpots] Candidatas exportadas a: {archivo_txt}")
+
+        if not trabajo_hecho:
+            # ninguna de las 4 fuentes tuvo algo para hacer: recién ahí es idle real
+            set_status("idle")
+            break
 
     hacer_backup()
 

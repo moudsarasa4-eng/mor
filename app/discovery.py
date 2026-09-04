@@ -11,7 +11,8 @@ import time
 from datetime import date
 
 from app.db import get_conn, now
-from app.search_client import buscar, SearchClientError
+import app.search_client as search_client
+from app.search_client import SearchClientError
 from app.keywords import KEYWORDS_SEED, DOMINIOS_EXCLUIR, DOMINIOS_RUIDO_NO_EMPRESA, plantillas_query
 
 SUFIJOS_A_LIMPIAR = [
@@ -64,8 +65,23 @@ def _dominio(url: str) -> str:
 
 
 def _es_dominio_excluido(url: str) -> bool:
+    """Coincidencia exacta/subdominio para entradas de solo-dominio (nunca
+    substring suelto — 'x.com' como substring bloqueaba cualquier dominio
+    que terminara en 'x.com...', como 'empresax.com.ar'; bug real encontrado
+    en testing). Para entradas que incluyen una ruta (ej. 'facebook.com/photo'),
+    se compara contra la URL completa, ya que esas nunca podían matchear
+    contra el dominio solo (bug preexistente, separado del anterior)."""
+    if not url:
+        return False
     dom = _dominio(url)
-    return any(excl in dom for excl in DOMINIOS_EXCLUIR + DOMINIOS_RUIDO_NO_EMPRESA)
+    url_l = url.lower()
+    for excl in DOMINIOS_EXCLUIR + DOMINIOS_RUIDO_NO_EMPRESA:
+        if "/" in excl:
+            if excl.lower() in url_l:
+                return True
+        elif dom and (dom == excl or dom.endswith("." + excl)):
+            return True
+    return False
 
 
 def _limpiar_nombre(titulo: str) -> str:
@@ -117,8 +133,19 @@ def ejecutar_query(query: str, zona: str, tipo: str, keyword: str = "") -> dict:
     (deduplicadas). Devuelve métricas de rendimiento de esta query."""
     conn = get_conn()
     try:
-        resultado = buscar(query)
+        resultado = search_client.buscar(query)
     except SearchClientError as e:
+        # Importante: se registra en queries_log IGUAL que una búsqueda exitosa,
+        # aunque haya fallado. Si no se registrara, una falla de red o de API
+        # (key sin cupo, timeout) no descontaría nunca del presupuesto por
+        # corrida (max_ciclos) y el motor podría reintentar sin parar — pasó
+        # en pruebas: con la API caída, el loop se colgaba indefinidamente.
+        conn.execute(
+            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+            "VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?)",
+            (query, zona, keyword, tipo, now()),
+        )
+        conn.commit()
         conn.close()
         return {"query": query, "error": str(e), "resultados": 0, "empresas_nuevas": 0}
 
@@ -190,6 +217,37 @@ def descubrir_zona(zona: str, max_queries: int = 20, pausa_entre_queries: float 
         "zona": zona, "queries_ejecutadas": len(ejecutadas), "empresas_nuevas": total_nuevas,
         "saturada": saturada, "detalle": ejecutadas,
     }
+
+
+_PATRONES_FRASE_DESCUBRIBLE = [
+    re.compile(r"\b(limpieza|mantenimiento|servicio|distribuci[oó]n|fabricaci[oó]n|producci[oó]n|"
+               r"venta|reparaci[oó]n|instalaci[oó]n) de ([a-záéíóúñ]+(?:\s[a-záéíóúñ]+)?)", re.IGNORECASE),
+]
+MAX_KEYWORDS_DESCUBIERTAS = 300  # tope para no crecer sin límite
+
+
+_STOPWORDS_FRASE = {"de", "del", "la", "el", "los", "las", "y", "en", "con", "para", "un", "una"}
+
+
+def extraer_keywords_de_texto(texto: str) -> list[str]:
+    """Detecta frases tipo "servicio de X" / "fabricación de X" en la
+    descripción de una empresa recién encontrada — el "entramado": una
+    búsqueda de limpieza puede traer una empresa cuya descripción menciona
+    "limpieza de trenes", término que no estaba en el diccionario semilla y
+    que ahora se puede probar por su cuenta en futuras búsquedas."""
+    if not texto:
+        return []
+    hallazgos = []
+    for patron in _PATRONES_FRASE_DESCUBRIBLE:
+        for m in patron.finditer(texto):
+            disparador = m.group(1).lower()
+            objeto_palabras = [w for w in m.group(2).lower().split() if w not in _STOPWORDS_FRASE]
+            if not objeto_palabras:
+                continue  # el "objeto" era solo una stopword (ej. capturó "de" solo), no sirve
+            frase = f"{disparador} de {' '.join(objeto_palabras)}"
+            if 8 <= len(frase) <= 40:
+                hallazgos.append(frase)
+    return list(dict.fromkeys(hallazgos))  # dedup preservando orden
 
 
 def registrar_keyword_descubierta(termino: str, categoria: str = "general"):

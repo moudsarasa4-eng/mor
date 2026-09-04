@@ -6,19 +6,27 @@ KEYWORDS_SEED = {
     "logistica": [
         "logística", "depósito", "distribución", "distribuidora", "centro de distribución",
         "centro logístico", "expedición", "despacho", "almacén", "operador logístico",
-        "mayorista",
+        "mayorista", "última milla", "flota de camiones", "transporte de cargas",
+        "depósito fiscal", "cross docking", "operador logístico tercerizado",
     ],
     "administrativo": [
         "administración", "administrativo", "oficina", "gestión", "back office",
         "facturación", "estudio contable", "estudio jurídico", "inmobiliaria",
+        "tercerización administrativa", "outsourcing administrativo", "consultora",
     ],
     "atencion_cliente": [
         "atención al cliente", "recepción", "mostrador", "ventas", "concesionaria",
-        "supermercado", "retail",
+        "supermercado", "retail", "call center", "telemarketing", "servicio postventa",
     ],
     "limpieza": [
         "limpieza", "higiene", "desinfección", "servicios generales", "facility",
         "mantenimiento", "limpieza industrial", "sanatorio", "clínica",
+        # ejemplo de "entramado": una empresa de limpieza de trenes no aparece
+        # buscando "limpieza" a secas, pero investigarla puede llevar a otras
+        # tercerizadas (flota, colectivos, obra) con más rubros dentro
+        "limpieza de trenes", "limpieza de flota", "limpieza de colectivos",
+        "limpieza de vehículos", "limpieza post obra", "limpieza de oficinas",
+        "empresa de limpieza tercerizada",
     ],
     "general": [
         "fábrica", "industria", "planta", "empresa", "comercio", "constructora",
