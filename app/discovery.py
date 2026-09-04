@@ -27,6 +27,36 @@ PALABRAS_EMPRESA_INDICADORAS = [
     "industria", "metalúrgica", "metalurgica", "empresa", "compañía", "grupo",
 ]
 
+# Patrones que NO son una empresa aunque pasen el filtro de dominio: avisos
+# inmobiliarios, pasajes/ómnibus, rankings/notas de prensa, resultados de
+# otros países, y páginas puramente institucionales/genéricas.
+PATRONES_NO_EMPRESA = [
+    r"\ben (alquiler|venta)\b", r"\bm2\b", r"metros de\b", r"\bgalp[oó]n(es)?\b.*\b(venta|alquiler)\b",
+    r"^\d+\s+dep[oó]sitos?\s+en\b",  # "30 Depósitos en Caseros"
+    r"^pasajes?\s+de\b", r"\ba mar del\b", r"\bmnibus\b|\bmicro\b.*\bpasaje",
+    r"^ranking\b", r"merco\s*empresas", r"^gracias por\b",
+    r"^quienes somos\b", r"^qui[eé]nes somos\b", r"^inicio\s*[-|–]",
+    r"\btrabajo de en\b",  # snippet roto típico de portal de empleo que se coló
+    r"\ben (trujillo|lima|per[uú]|m[eé]xico|chile|colombia|espa[ñn]a)\b",  # país equivocado
+]
+_PATRONES_NO_EMPRESA_COMPILADOS = [re.compile(p, re.IGNORECASE) for p in PATRONES_NO_EMPRESA]
+
+
+def _parece_empresa(nombre: str, zona: str) -> bool:
+    nombre_l = nombre.strip().lower()
+    if not nombre_l:
+        return False
+    if nombre_l == zona.strip().lower():
+        return False  # el título es literalmente el nombre de la zona, no una empresa
+    if any(p.search(nombre_l) for p in _PATRONES_NO_EMPRESA_COMPILADOS):
+        return False
+    # Nota: se descartó un filtro de "nombre de persona" (2 palabras Capitalizadas)
+    # porque atrapaba también nombres reales de empresa de 2 palabras (ej.
+    # "Carrefour Argentina"). Un nombre de persona ocasional que se cuele se
+    # descarta en la revisión manual del .txt exportado — es más seguro que
+    # perder empresas reales con ese patrón.
+    return True
+
 
 def _dominio(url: str) -> str:
     m = re.search(r"https?://(?:www\.)?([^/]+)", url or "")
@@ -63,6 +93,8 @@ def extraer_candidatas(resultado_serper: dict, zona: str) -> list[dict]:
             continue
         nombre = _limpiar_nombre(titulo)
         if len(nombre) < 3 or len(nombre) > 90:
+            continue
+        if not _parece_empresa(nombre, zona):
             continue
         candidatas.append({"nombre_crudo": nombre, "url": url, "snippet": snippet, "zona": zona})
     return candidatas

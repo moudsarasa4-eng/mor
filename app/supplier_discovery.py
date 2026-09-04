@@ -9,6 +9,7 @@ Reusa el mismo pipeline de búsqueda/dedupe/promoción que el resto del motor.
 from app.db import get_conn, now
 from app.discovery import ejecutar_query
 from app.promote import promover_candidatas
+from app.keywords import EXCLUSIONES_QUERY
 
 # Categorías de producto típicas de supermercado, mapeadas a por qué generan
 # pistas de fabricantes con necesidad de depósito/logística/administración.
@@ -23,10 +24,11 @@ CATEGORIAS_PRODUCTO = [
 
 
 def _queries_por_categoria(categoria: str, zona: str) -> list[dict]:
+    s = f" {EXCLUSIONES_QUERY}"
     return [
-        {"query": f'"quién fabrica" {categoria} Argentina', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
-        {"query": f'"proveedor de" {categoria} {zona} OR "Buenos Aires"', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
-        {"query": f'fabricante {categoria} "zona oeste" Buenos Aires', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
+        {"query": f'"quién fabrica" {categoria} Argentina{s}', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
+        {"query": f'"proveedor de" {categoria} {zona} OR "Buenos Aires"{s}', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
+        {"query": f'fabricante {categoria} "zona oeste" Buenos Aires{s}', "tipo": "TYPE_SUPPLIER", "keyword": categoria},
     ]
 
 

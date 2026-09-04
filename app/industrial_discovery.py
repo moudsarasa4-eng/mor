@@ -14,13 +14,15 @@ from app.db import get_conn, now
 from app.discovery import ejecutar_query
 from app.promote import promover_candidatas
 from app.rubros_industriales import RUBROS_CLAE, PARTIDOS_DEFAULT
+from app.keywords import EXCLUSIONES_QUERY
 
 
 def _queries_por_rubro(rubro_nombre: str, partido: str) -> list[dict]:
+    s = f" {EXCLUSIONES_QUERY}"
     return [
-        {"query": f'"{rubro_nombre}" {partido} empresa', "tipo": "TYPE_C", "keyword": rubro_nombre},
+        {"query": f'"{rubro_nombre}" {partido} empresa{s}', "tipo": "TYPE_C", "keyword": rubro_nombre},
         {"query": f'{rubro_nombre} {partido} site:cuitonline.com', "tipo": "TYPE_C", "keyword": rubro_nombre},
-        {"query": f'"{rubro_nombre}" "{partido}" fábrica OR planta OR industria', "tipo": "TYPE_C", "keyword": rubro_nombre},
+        {"query": f'"{rubro_nombre}" "{partido}" fábrica OR planta OR industria{s}', "tipo": "TYPE_C", "keyword": rubro_nombre},
     ]
 
 

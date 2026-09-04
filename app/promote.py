@@ -28,6 +28,20 @@ def _limpiar_nombre_final(nombre: str) -> str:
     return nombre[:120]
 
 
+_STOPWORDS_NUCLEO = {"sa", "srl", "sac", "home", "inicio", "buenos", "aires", "argentina",
+                     "empresa", "compañía", "compania", "grupo", "quienes", "somos"}
+
+
+def _nucleo_nombre(nombre: str) -> str:
+    """Primeras 2 palabras significativas (sin sufijos societarios ni palabras
+    genéricas) — agarra duplicados tipo 'Maquinarias Caseros S.A. Perfil de
+    Compañía' vs 'Maquinarias Caseros s.a. | Buenos Aires', que el nombre
+    exacto y el dominio solos no siempre pescan."""
+    palabras = re.findall(r"[a-záéíóúñ0-9]+", nombre.lower())
+    significativas = [p for p in palabras if p not in _STOPWORDS_NUCLEO and len(p) > 1]
+    return " ".join(significativas[:2])
+
+
 def _inferir_rubro(keyword: str | None) -> str:
     if keyword and keyword in _KEYWORD_A_CATEGORIA:
         cat = _KEYWORD_A_CATEGORIA[keyword]
@@ -91,6 +105,16 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
         existente = conn.execute("SELECT id FROM companies WHERE nombre = ?", (nombre,)).fetchone()
         if not existente and dominio:
             existente = conn.execute("SELECT id FROM companies WHERE dominio = ? AND dominio != ''", (dominio,)).fetchone()
+        if not existente:
+            nucleo = _nucleo_nombre(nombre)
+            if nucleo:  # solo si quedaron al menos 1-2 palabras significativas, para no matchear todo con todo
+                candidatas_zona = conn.execute(
+                    "SELECT id, nombre FROM companies WHERE zona = ?", (f["zona"],)
+                ).fetchall()
+                for cand in candidatas_zona:
+                    if _nucleo_nombre(cand["nombre"]) == nucleo:
+                        existente = cand
+                        break
 
         if existente:
             company_id = existente["id"]
