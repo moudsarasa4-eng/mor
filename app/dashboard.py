@@ -99,6 +99,8 @@ def detalle(company_id: int):
         print(f"├── Dirección: {c['direccion']}")
     if c.get("distancia_km") is not None:
         print(f"├── Distancia en línea recta: {c['distancia_km']} km (no es tiempo de viaje real)")
+    if c.get("sitio_activo") is not None:
+        print(f"├── Sitio: {'🟢 responde' if c['sitio_activo'] else '🔴 caído/parkeado'}")
     print(f"├── Rubro: {c['rubro']}")
     if c["scores"]:
         s = c["scores"][0]

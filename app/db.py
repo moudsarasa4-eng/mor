@@ -40,6 +40,7 @@ def _migrar_columnas_nuevas(conn):
         ("direccion", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("distancia_km", "REAL"),
         ("sueldo_ref_min", "INTEGER"), ("sueldo_ref_max", "INTEGER"),
         ("sueldo_ref_fuente", "TEXT"), ("sueldo_ref_confianza", "TEXT"),
+        ("dominio", "TEXT"), ("sitio_activo", "INTEGER"),
     ]:
         try:
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")

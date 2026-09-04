@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS companies (
     sueldo_ref_max INTEGER,
     sueldo_ref_fuente TEXT,
     sueldo_ref_confianza TEXT,      -- alta | media | baja
+    dominio TEXT,                   -- dominio del sitio principal, para deduplicar más allá del nombre
+    sitio_activo INTEGER,           -- 1=responde, 0=caído/parkeado, NULL=no chequeado todavía
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,

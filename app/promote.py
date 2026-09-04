@@ -17,6 +17,7 @@ from app.db import get_conn, now
 from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida
 from app.salarios_referencia import estimar_sueldo
+from app.site_check import sitio_activo, extraer_dominio
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -82,21 +83,29 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
             continue
 
         rubro = _inferir_rubro(f["keyword"])
-
         sueldo_ref = estimar_sueldo(rubro)
+        dominio = extraer_dominio(f["url"]) if f["url"] else ""
 
+        # dedupe: por nombre normalizado O por dominio (agarra casos donde el
+        # nombre varía pero es el mismo sitio, ej. "Empresa SA" vs "Empresa S.A. - Inicio")
         existente = conn.execute("SELECT id FROM companies WHERE nombre = ?", (nombre,)).fetchone()
+        if not existente and dominio:
+            existente = conn.execute("SELECT id FROM companies WHERE dominio = ? AND dominio != ''", (dominio,)).fetchone()
+
         if existente:
             company_id = existente["id"]
         else:
+            sitio_ok = sitio_activo(f["url"]) if f["url"] else None
             ts = now()
             cur = conn.execute(
                 "INSERT INTO companies (nombre, rubro, zona, localidad, actividad, estado, "
-                "sueldo_ref_min, sueldo_ref_max, sueldo_ref_fuente, sueldo_ref_confianza, creado_en, actualizado_en) "
-                "VALUES (?, ?, ?, ?, ?, 'candidata', ?, ?, ?, ?, ?, ?)",
+                "sueldo_ref_min, sueldo_ref_max, sueldo_ref_fuente, sueldo_ref_confianza, dominio, sitio_activo, "
+                "creado_en, actualizado_en) "
+                "VALUES (?, ?, ?, ?, ?, 'candidata', ?, ?, ?, ?, ?, ?, ?, ?)",
                 (nombre, rubro, f["zona"], f["zona"], (f["snippet"] or "")[:300],
                  sueldo_ref["min"] if sueldo_ref else None, sueldo_ref["max"] if sueldo_ref else None,
                  sueldo_ref["fuente"] if sueldo_ref else None, sueldo_ref["confianza"] if sueldo_ref else None,
+                 dominio, (1 if sitio_ok else (0 if sitio_ok is False else None)),
                  ts, ts),
             )
             company_id = cur.lastrowid
