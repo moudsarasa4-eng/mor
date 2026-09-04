@@ -34,7 +34,7 @@
   <div class="card">
     <h1>🔎 Motor de Jackpots</h1>
     <div class="sub">B2B Labor Intelligence Engine — Marco Ammazzalorso</div>
-    <div class="sub">Una sola tanda cubre todo: zonas geográficas + rubros industriales (CLAE) + proveedores de góndola + búsqueda de contacto.</div>
+    <div class="sub">Modo automático cada 1 hora, prendido solo al abrir la app. Cada corrida cubre zonas + industrial + proveedores + contacto, con presupuesto acotado para durar semanas.</div>
     <div>Estado: <span id="badge" class="badge idle">-</span> · Zona actual: <span id="zona" class="zona-actual">-</span></div>
     <div class="stats">
       <div class="stat"><div class="num" id="s_descubiertas">0</div><div class="label">descubiertas</div></div>
@@ -44,7 +44,7 @@
       <div class="stat"><div class="num" id="s_queries">0</div><div class="label">queries totales</div></div>
     </div>
     <div>
-      <button id="btn_start">▶ INICIAR OTRA TANDA (arranca sola al abrir)</button>
+      <button id="btn_start">▶ TANDA EXTRA AHORA (fuera del ciclo horario)</button>
       <button id="btn_pause" class="secondary">⏸ PAUSAR</button>
       <button id="btn_continue" class="secondary">↻ CONTINUAR</button>
     </div>
@@ -60,6 +60,7 @@
     <div class="auto-info">
       Presupuesto de búsquedas usado: <span id="presupuesto_txt">0/0</span>
       <div class="barra"><div class="barra-fill" id="presupuesto_barra" style="width:0%"></div></div>
+      <div id="duracion_estimada"></div>
     </div>
   </div>
 
@@ -113,6 +114,8 @@ async function actualizar() {
 
   document.getElementById('presupuesto_txt').textContent = `${d.presupuesto.usado}/${d.presupuesto.total} (${d.presupuesto.pct}%)`;
   document.getElementById('presupuesto_barra').style.width = Math.min(100, d.presupuesto.pct) + '%';
+  document.getElementById('duracion_estimada').textContent =
+    `Duración estimada al ritmo actual: ~${d.presupuesto.dias_estimados_pc_8h} días (PC prendida 8h/día) · ~${d.presupuesto.dias_estimados_pc_24h} días (PC prendida 24h/día)`;
 }
 
 async function actualizarCandidatas() {

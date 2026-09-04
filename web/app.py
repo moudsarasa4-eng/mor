@@ -68,6 +68,11 @@ def api_status():
     st = get_state()
     lifetime = runner.queries_lifetime_usadas()
     presupuesto = runner.CONFIG["discovery"]["lifetime_query_budget"]
+    sch_cfg = runner.CONFIG["discovery"]["scheduler"]
+    restante = max(0, presupuesto - lifetime)
+    corridas_restantes = restante // sch_cfg["queries_per_run"] if sch_cfg["queries_per_run"] else 0
+    dias_si_8h = round(corridas_restantes / 8, 1) if corridas_restantes else 0
+    dias_si_24h = round(corridas_restantes / 24, 1) if corridas_restantes else 0
     return jsonify({
         "state": dict(st),
         "stats": _stats(),
@@ -75,9 +80,14 @@ def api_status():
         "auto": {
             "activo": scheduler.esta_activo(),
             "proxima_tanda": scheduler.proxima_tanda_en(),
-            "intervalo_minutos": runner.CONFIG["discovery"]["scheduler"]["interval_minutes"],
+            "intervalo_minutos": sch_cfg["interval_minutes"],
         },
-        "presupuesto": {"usado": lifetime, "total": presupuesto, "pct": round(lifetime / presupuesto * 100, 1)},
+        "presupuesto": {
+            "usado": lifetime, "total": presupuesto, "pct": round(lifetime / presupuesto * 100, 1),
+            "corridas_restantes": corridas_restantes,
+            "dias_estimados_pc_8h": dias_si_8h,
+            "dias_estimados_pc_24h": dias_si_24h,
+        },
     })
 
 
@@ -141,9 +151,10 @@ def api_company(company_id):
 
 def run():
     init_db()
-    # arranca la búsqueda sola al abrir la app, sin apretar ningún botón
-    tanda_minutos = runner.CONFIG["discovery"]["tanda_max_minutes"]
-    runner.iniciar_en_background(max_minutos=tanda_minutos)
+    # arranca el modo automático (cada 1 hora) solo al abrir la app, sin apretar
+    # ningún botón — pensado para durar semanas con el presupuesto de por vida,
+    # no para gastarlo todo en una sola sesión larga.
+    scheduler.iniciar()
     app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
 
 

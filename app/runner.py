@@ -70,10 +70,29 @@ def detener():
     _pause_event.set()  # despertar si estaba pausado, para que salga del loop
 
 
-def _generar_lote_queries(zona: str) -> list[dict]:
+def _keywords_por_prioridad() -> list[str]:
+    """Ordena las keywords por rendimiento aprendido (yield_score), para que un
+    presupuesto acotado se gaste primero en lo que ya demostró funcionar.
+    Las que todavía no se probaron (queries_usadas=0) van primero que las de
+    yield bajo confirmado, para no dejar de explorar nunca."""
+    conn = get_conn()
+    filas = {r["termino"]: (r["queries_usadas"], r["yield_score"]) for r in conn.execute(
+        "SELECT termino, queries_usadas, yield_score FROM keywords"
+    )}
+    conn.close()
     todas_keywords = [kw for lista in KEYWORDS_SEED.values() for kw in lista]
+
+    def score(kw: str) -> tuple:
+        usadas, yield_score = filas.get(kw, (0, 0.0))
+        si_no_probada = 0 if usadas == 0 else 1  # 0 = probarla ya, 1 = ya se probó
+        return (si_no_probada, -yield_score)
+
+    return sorted(todas_keywords, key=score)
+
+
+def _generar_lote_queries(zona: str) -> list[dict]:
     queries = []
-    for kw in todas_keywords:
+    for kw in _keywords_por_prioridad():
         queries.extend(plantillas_query(zona, kw))
     queries.extend(plantillas_query(zona))
     return queries
@@ -146,16 +165,27 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
 
         # todas las fuentes en el mismo ciclo, para que un solo botón cubra todo:
         # búsqueda geográfica (arriba) + industrial CLAE + proveedores de góndola
-        # + contacto, en vez de requerir comandos sueltos en otras terminales.
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+        # + contacto — pero TODAS descuentan del mismo presupuesto max_ciclos,
+        # sino una corrida "de 8" podría terminar gastando 25-30 búsquedas reales.
+        def _presupuesto_agotado_para_esta_corrida() -> bool:
+            return max_ciclos is not None and ciclos >= max_ciclos
+
+        def _gastar(fn, *args, **kwargs):
+            nonlocal ciclos
+            antes = queries_lifetime_usadas()
+            resultado = fn(*args, **kwargs)
+            ciclos += queries_lifetime_usadas() - antes
+            return resultado
+
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
             from app.industrial_discovery import correr_lote as correr_industrial
-            correr_industrial(max_rubros=2)
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+            _gastar(correr_industrial, max_rubros=1)
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
             from app.supplier_discovery import correr_lote as correr_supplier
-            correr_supplier(zona=zona, max_categorias=2)
-        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+            _gastar(correr_supplier, zona=zona, max_categorias=1)
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado() and not _presupuesto_agotado_para_esta_corrida():
             from app.contact_finder import correr_lote as correr_contactos
-            correr_contactos(zona=zona, limite=10)
+            _gastar(correr_contactos, zona=zona, limite=3)
 
         archivo_txt = exportar_candidatas_txt()  # sin filtro de zona: incluye lo que sumaron industrial/supplier
         if archivo_txt:

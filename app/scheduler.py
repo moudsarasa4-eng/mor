@@ -28,15 +28,20 @@ def esta_activo() -> bool:
 
 def _loop_scheduler():
     global _proxima_tanda
-    intervalo = CONFIG["discovery"]["scheduler"]["interval_minutes"] * 60
-    tanda_minutos = CONFIG["discovery"]["tanda_max_minutes"]
+    cfg = CONFIG["discovery"]["scheduler"]
+    intervalo = cfg["interval_minutes"] * 60
+    queries_por_corrida = cfg["queries_per_run"]
+    tope_minutos = cfg["max_minutes_per_run"]
 
     while _auto_enabled.is_set():
         if presupuesto_lifetime_agotado():
             set_status("presupuesto_agotado")
             break
 
-        runner.loop_investigacion(max_minutos=tanda_minutos)
+        # acotado por CANTIDAD de queries (lo que realmente gasta presupuesto),
+        # no por tiempo — así una corrida horaria dura lo que tenga que durar
+        # sin quemar más búsquedas de las calculadas para que el motor dure semanas.
+        runner.loop_investigacion(max_ciclos=queries_por_corrida, max_minutos=tope_minutos)
 
         if not _auto_enabled.is_set():
             break

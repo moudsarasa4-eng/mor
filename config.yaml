@@ -15,9 +15,11 @@ discovery:
   daily:
     max_queries: 300
     max_runtime_minutes: 180
-  tanda_max_minutes: 120   # duración máxima de una tanda (corre por tiempo, no por cantidad fija de queries)
+  tanda_max_minutes: 120   # tope de seguridad por tanda manual (botón "Iniciar otra tanda"), no controla el modo automático
   scheduler:
-    interval_minutes: 1    # descanso entre el final de una tanda y el arranque de la siguiente, en modo continuo
+    interval_minutes: 60     # cada cuánto se activa el modo búsqueda automático (1 vez por hora)
+    queries_per_run: 8       # búsquedas por corrida horaria — calculado para durar semanas, no días, con el presupuesto de por vida
+    max_minutes_per_run: 15  # tope de seguridad de tiempo por corrida (por si algo se cuelga)
   lifetime_query_budget: 2400   # tope de por vida, con margen sobre las 2500 gratis de Serper.dev
 
 embudo:
