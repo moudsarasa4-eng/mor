@@ -200,7 +200,7 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
         if _puede_seguir():
             conn = get_conn()
             hay_pendientes = conn.execute(
-                "SELECT 1 FROM companies WHERE estado='candidata' "
+                "SELECT 1 FROM companies WHERE estado='candidata' AND contacto_intentado_sin_resultado=0 "
                 "AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = companies.id) LIMIT 1"
             ).fetchone() is not None
             conn.close()

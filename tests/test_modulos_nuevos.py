@@ -142,6 +142,64 @@ def test_backup_crea_y_limpia_viejos(tmp_path, monkeypatch):
     assert restaurado is not None
 
 
+def test_promote_no_reprocesa_excluidas_en_corridas_futuras(tmp_path, monkeypatch):
+    """Regresión: las candidatas excluidas por cadena/zona quedaban con
+    company_id NULL para siempre, así que se re-evaluaban en cada llamada a
+    promover_candidatas — cada vez más lento a medida que se acumulan."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_no_reproceso.sqlite")
+    db_module.init_db()
+
+    import app.search_client as sc
+    import app.site_check as scheck
+
+    def mock_buscar(query, **kwargs):
+        return {"organic": [{"title": "Carrefour Argentina", "link": "https://carrefour.com.ar/", "snippet": "super"}]}
+    monkeypatch.setattr(sc, "buscar", mock_buscar)
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas
+
+    ejecutar_query("empresas deposito Hurlingham", "Hurlingham", "TYPE_A", "depósito")
+    r1 = promover_candidatas(zona="Hurlingham")
+    assert r1["excluidas_cadena"] == 1
+
+    r2 = promover_candidatas(zona="Hurlingham")  # sin descubrir nada nuevo
+    assert r2["candidatas_evaluadas"] == 0, "no debería re-evaluar la misma excluida de nuevo"
+
+
+def test_contact_finder_no_reintenta_empresa_sin_contacto(tmp_path, monkeypatch):
+    """Regresión: si no se encuentra contacto, la empresa se re-consultaba en
+    cada corrida futura, gastando presupuesto sin avanzar."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_no_reintento.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+
+    cid = upsert_company("Empresa Sin Contacto SA", "logistica", "Hurlingham")
+
+    import app.search_client as sc
+    llamadas = {"n": 0}
+
+    def mock_buscar(query, **kwargs):
+        llamadas["n"] += 1
+        return {"organic": [{"title": "sin info util", "link": "https://x-random.com.ar/", "snippet": "nada de contacto acá"}]}
+    monkeypatch.setattr(sc, "buscar", mock_buscar)
+
+    from app.contact_finder import correr_lote
+
+    r1 = correr_lote(zona="Hurlingham")
+    assert r1["procesadas"] == 1
+    assert r1["contactos_encontrados"] == 0
+    assert llamadas["n"] == 1
+
+    r2 = correr_lote(zona="Hurlingham")  # segunda corrida: no debería re-intentar
+    assert r2["procesadas"] == 0, "no debería volver a elegir la misma empresa sin contacto"
+    assert llamadas["n"] == 1, "no debería haber gastado una query más"
+
+
 def test_loop_investigacion_no_se_queda_idle_si_geo_saturada(tmp_path, monkeypatch):
     """Regresión: si TODAS las zonas geográficas están saturadas, el motor
     antes cortaba el ciclo entero sin llegar a correr industrial/supplier/

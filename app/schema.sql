@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS companies (
     estacion_cercana TEXT,          -- estación de la Línea San Martín más cercana (por coordenadas reales)
     estacion_distancia_metros INTEGER,
     estacion_caminata_min INTEGER,  -- estimado por distancia/velocidad promedio, no es tiempo real de caminata
+    contacto_intentado_sin_resultado INTEGER NOT NULL DEFAULT 0,  -- evita reintentar find-contacts en la misma empresa sin suerte cada corrida
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,

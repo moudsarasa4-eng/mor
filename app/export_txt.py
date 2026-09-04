@@ -35,7 +35,7 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     conn.commit()
 
     query = (
-        "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, "
+        "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, c.contacto_intentado_sin_resultado, "
         "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza FROM companies c "
         "WHERE c.estado='candidata' "
         "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
@@ -98,6 +98,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
                     elif c["mx_verificado"] == 0:
                         mx_txt = " [⚠ dominio SIN registro MX — probablemente no recibe mail]"
                 lineas.append(f"    Contacto ({c['tipo']}, sin confirmar): {c['valor']}{mx_txt}")
+        elif f["contacto_intentado_sin_resultado"]:
+            lineas.append("    Contacto: se buscó y no se encontró ningún email/teléfono público (revisar el sitio a mano)")
         else:
             lineas.append("    Contacto: no encontrado todavía (correr 'find-contacts')")
         lineas.append("")

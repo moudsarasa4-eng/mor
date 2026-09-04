@@ -63,9 +63,13 @@ def _tipo_fuente(url: str, nombre: str) -> str:
 
 def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
     conn = get_conn()
+    # estado='DISCOVERED' (no solo company_id IS NULL): las excluidas por cadena
+    # o zona prohibida quedan con company_id NULL para siempre (nunca se
+    # promueven), y sin este filtro se re-evaluaban en cada corrida, cada vez
+    # más lento a medida que se acumulan.
     query = "SELECT d.*, q.keyword FROM discovered_companies_raw d " \
             "LEFT JOIN queries_log q ON q.id = d.query_id " \
-            "WHERE d.company_id IS NULL"
+            "WHERE d.company_id IS NULL AND d.estado = 'DISCOVERED'"
     params = []
     if zona:
         query += " AND d.zona = ?"

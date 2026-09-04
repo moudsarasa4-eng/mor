@@ -96,6 +96,12 @@ def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | N
             add_contact(company_id, "telefono", tel_match.group(0), verificado=False, fuente_id=fuente_id)
             return {"tipo": "telefono", "valor": tel_match.group(0), "prioridad": "general", "fuente": item.get("link", "")}
 
+    # sin email ni teléfono: marcar como intentado para no gastar presupuesto
+    # reintentando la misma empresa sin suerte en cada corrida futura.
+    conn = get_conn()
+    conn.execute("UPDATE companies SET contacto_intentado_sin_resultado=1 WHERE id=?", (company_id,))
+    conn.commit()
+    conn.close()
     return None
 
 
@@ -104,7 +110,8 @@ def correr_lote(zona: str | None = None, limite: int = 20) -> dict:
     conn = get_conn()
     query = (
         "SELECT c.id, c.nombre, c.zona FROM companies c "
-        "WHERE c.estado='candidata' AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = c.id)"
+        "WHERE c.estado='candidata' AND c.contacto_intentado_sin_resultado=0 "
+        "AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = c.id)"
     )
     params = []
     if zona:
