@@ -36,7 +36,11 @@ def _migrar_columnas_nuevas(conn):
         conn.execute("ALTER TABLE companies ADD COLUMN auto_evaluada INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # ya existe
-    for columna, tipo in [("direccion", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("distancia_km", "REAL")]:
+    for columna, tipo in [
+        ("direccion", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("distancia_km", "REAL"),
+        ("sueldo_ref_min", "INTEGER"), ("sueldo_ref_max", "INTEGER"),
+        ("sueldo_ref_fuente", "TEXT"), ("sueldo_ref_confianza", "TEXT"),
+    ]:
         try:
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")
         except sqlite3.OperationalError:

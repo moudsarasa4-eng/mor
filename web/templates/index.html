@@ -77,7 +77,7 @@
     <h1>📋 Candidatas descubiertas (pendientes de revisión)</h1>
     <div class="sub">Encontradas por el motor solo, todavía sin puntuar. <span id="candidatas_total">0</span> en total, mostrando las últimas 50.</div>
     <table id="tabla_candidatas">
-      <thead><tr><th>#</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Fuente</th></tr></thead>
+      <thead><tr><th>#</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Sueldo estimado (por rubro)</th><th>Fuente</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -127,7 +127,8 @@ async function actualizarCandidatas() {
   d.items.forEach((row, i) => {
     const tr = document.createElement('tr');
     const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : '-';
-    tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${fuente}</td>`;
+    const confianza = row.sueldo_ref_confianza ? ` (${row.sueldo_ref_confianza})` : '';
+    tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.sueldo}${confianza}</td><td>${fuente}</td>`;
     tbody.appendChild(tr);
   });
 }

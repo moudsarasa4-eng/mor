@@ -135,12 +135,20 @@ def api_candidatas():
     filtro = "c.estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     total = conn.execute(f"SELECT COUNT(*) c FROM companies c WHERE {filtro}").fetchone()["c"]
     rows = conn.execute(f"""
-        SELECT c.id, c.nombre, c.zona, c.rubro,
+        SELECT c.id, c.nombre, c.zona, c.rubro, c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_confianza,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
         FROM companies c WHERE {filtro} ORDER BY c.id DESC LIMIT 50
     """).fetchall()
     conn.close()
-    return jsonify({"total": total, "items": [dict(r) for r in rows]})
+    items = []
+    for r in rows:
+        d = dict(r)
+        if d["sueldo_ref_min"] is not None:
+            d["sueldo"] = f"${d['sueldo_ref_min']:,}-${d['sueldo_ref_max']:,}".replace(",", ".")
+        else:
+            d["sueldo"] = "No estimable"
+        items.append(d)
+    return jsonify({"total": total, "items": items})
 
 
 @app.route("/api/company/<int:company_id>")

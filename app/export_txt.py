@@ -35,7 +35,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     conn.commit()
 
     query = (
-        "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad FROM companies c "
+        "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, "
+        "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza FROM companies c "
         "WHERE c.estado='candidata' "
         "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     )
@@ -80,6 +81,14 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
             lineas.append(f"    Fuente: {fuente['url']}")
         if f["actividad"]:
             lineas.append(f"    Descripción: {f['actividad']}")
+        if f["distancia_km"] is not None:
+            lineas.append(f"    Distancia en línea recta: {f['distancia_km']} km")
+        if f["sueldo_ref_min"] is not None:
+            rango = f"${f['sueldo_ref_min']:,}–${f['sueldo_ref_max']:,}".replace(",", ".")
+            lineas.append(
+                f"    Sueldo estimado (por rubro, no específico de esta empresa, confianza {f['sueldo_ref_confianza']}): {rango}"
+            )
+            lineas.append(f"      Fuente: {f['sueldo_ref_fuente']}")
         if contactos:
             for c in contactos:
                 lineas.append(f"    Contacto ({c['tipo']}, sin confirmar): {c['valor']}")

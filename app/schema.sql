@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS companies (
     lat REAL,
     lon REAL,
     distancia_km REAL,              -- línea recta desde el domicilio (haversine, NO tiempo de viaje real)
+    sueldo_ref_min INTEGER,         -- estimación automática por rubro (app.salarios_referencia), no específica de esta empresa
+    sueldo_ref_max INTEGER,
+    sueldo_ref_fuente TEXT,
+    sueldo_ref_confianza TEXT,      -- alta | media | baja
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,
