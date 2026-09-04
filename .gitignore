@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 data/database.sqlite
+data/backups/
 .pytest_cache/
 reports/*.md
 outreach/*.md

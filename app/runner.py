@@ -11,6 +11,7 @@ from app.discovery import ejecutar_query
 from app.keywords import KEYWORDS_SEED, plantillas_query
 from app.promote import promover_candidatas
 from app.export_txt import exportar_candidatas_txt
+from app.backup import hacer_backup
 from app.run_state import get_state, set_status, registrar_queries, queries_restantes_hoy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -190,6 +191,8 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
         archivo_txt = exportar_candidatas_txt()  # sin filtro de zona: incluye lo que sumaron industrial/supplier
         if archivo_txt:
             print(f"[Motor de Jackpots] Candidatas exportadas a: {archivo_txt}")
+
+    hacer_backup()
 
     if get_state()["status"] not in ("presupuesto_agotado",):
         set_status("idle")

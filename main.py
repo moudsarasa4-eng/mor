@@ -219,6 +219,18 @@ def cmd_learning_report(args):
     print(f"Generado: {generar_reporte()}")
 
 
+def cmd_backup(args):
+    from app.backup import hacer_backup
+    archivo = hacer_backup()
+    print(archivo or "No hay base de datos todavía para respaldar.")
+
+
+def cmd_restore(args):
+    from app.backup import restaurar_ultimo_backup
+    archivo = restaurar_ultimo_backup()
+    print(f"Restaurado desde: {archivo}" if archivo else "No hay backups disponibles.")
+
+
 def cmd_geocode(args):
     resultado = set_direccion_y_geocodificar(args.company_id, args.direccion)
     if resultado:
@@ -539,6 +551,9 @@ def main():
     pgeo.add_argument("--company-id", type=int, required=True, dest="company_id")
     pgeo.add_argument("--direccion", required=True)
     pgeo.set_defaults(func=cmd_geocode)
+
+    sub.add_parser("backup").set_defaults(func=cmd_backup)
+    sub.add_parser("restore").set_defaults(func=cmd_restore)
 
     pw = sub.add_parser("webapp")
     pw.set_defaults(func=cmd_webapp)
