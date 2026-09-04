@@ -61,6 +61,33 @@ def test_search_providers_registro():
         pass
 
 
+def test_estacion_mas_cercana(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_estaciones.sqlite")
+    db_module.init_db()
+
+    import app.geocoding as geo
+
+    coords_reales = {
+        "Hurlingham": (-34.6167, -58.6372),
+        "El Palomar": (-34.6122, -58.6161),
+    }
+
+    def mock_geocodificar(direccion):
+        for nombre, (lat, lon) in coords_reales.items():
+            if nombre in direccion:
+                return geo.Coordenadas(lat=lat, lon=lon, direccion_encontrada=direccion)
+        return None
+
+    monkeypatch.setattr(geo, "geocodificar", mock_geocodificar)
+
+    from app.geography import estacion_mas_cercana
+    r = estacion_mas_cercana(-34.6180, -58.6380)  # muy cerca de Hurlingham
+    assert r is not None
+    assert r["estacion"] == "Hurlingham"
+    assert r["distancia_metros"] < 500
+
+
 def test_site_check_extraer_dominio():
     from app.site_check import extraer_dominio
     assert extraer_dominio("https://www.empresa.com.ar/pagina") == "empresa.com.ar"

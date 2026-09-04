@@ -101,6 +101,9 @@ def detalle(company_id: int):
         print(f"├── Distancia en línea recta: {c['distancia_km']} km (no es tiempo de viaje real)")
     if c.get("sitio_activo") is not None:
         print(f"├── Sitio: {'🟢 responde' if c['sitio_activo'] else '🔴 caído/parkeado'}")
+    if c.get("estacion_cercana"):
+        print(f"├── Estación más cercana (por coordenadas): {c['estacion_cercana']} — "
+              f"{c['estacion_distancia_metros']} m, ~{c['estacion_caminata_min']} min caminando (estimado)")
     print(f"├── Rubro: {c['rubro']}")
     if c["scores"]:
         s = c["scores"][0]

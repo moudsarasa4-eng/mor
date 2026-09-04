@@ -267,13 +267,22 @@ def set_direccion_y_geocodificar(company_id: int, direccion: str) -> dict | None
     es un dato objetivo para descartar casos obviamente lejos antes de
     estimar el viaje real a mano con app.transport."""
     from app.geocoding import calcular_distancia_a_empresa
+    from app.geography import estacion_mas_cercana
     resultado = calcular_distancia_a_empresa(direccion)
     conn = get_conn()
     if resultado:
+        estacion = estacion_mas_cercana(resultado["lat"], resultado["lon"])
         conn.execute(
-            "UPDATE companies SET direccion=?, lat=?, lon=?, distancia_km=?, actualizado_en=? WHERE id=?",
-            (direccion, resultado["lat"], resultado["lon"], resultado["distancia_km"], now(), company_id),
+            "UPDATE companies SET direccion=?, lat=?, lon=?, distancia_km=?, "
+            "estacion_cercana=?, estacion_distancia_metros=?, estacion_caminata_min=?, actualizado_en=? WHERE id=?",
+            (direccion, resultado["lat"], resultado["lon"], resultado["distancia_km"],
+             estacion["estacion"] if estacion else None,
+             estacion["distancia_metros"] if estacion else None,
+             estacion["minutos_caminata_estimados"] if estacion else None,
+             now(), company_id),
         )
+        if estacion:
+            resultado["estacion_cercana"] = estacion
     else:
         conn.execute("UPDATE companies SET direccion=?, actualizado_en=? WHERE id=?", (direccion, now(), company_id))
     conn.commit()

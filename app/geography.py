@@ -36,3 +36,55 @@ def zonas_expandidas_ambos_lados(radio_estaciones: int = 6) -> list[str]:
     ini = max(0, HURLINGHAM_IDX - radio_estaciones)
     fin = min(len(LINEA_SAN_MARTIN), HURLINGHAM_IDX + radio_estaciones + 1)
     return LINEA_SAN_MARTIN[ini:fin]
+
+
+VELOCIDAD_CAMINATA_KMH = 5.0  # promedio adulto, para estimar minutos desde metros
+
+
+def _coords_estacion(nombre_estacion: str):
+    """Geocodifica una estación (vía OSM Nominatim, cacheado en estaciones_cache
+    para no re-pedirla cada vez — respeta el límite de 1 req/seg de Nominatim)."""
+    from app.db import get_conn, now
+    from app.geocoding import geocodificar
+
+    conn = get_conn()
+    row = conn.execute("SELECT lat, lon FROM estaciones_cache WHERE nombre=?", (nombre_estacion,)).fetchone()
+    if row:
+        conn.close()
+        return row["lat"], row["lon"]
+
+    coords = geocodificar(f"Estación {nombre_estacion}, Línea San Martín, Buenos Aires, Argentina")
+    conn.close()
+    if coords is None:
+        return None
+    conn = get_conn()
+    conn.execute("INSERT OR REPLACE INTO estaciones_cache (nombre, lat, lon, creado_en) VALUES (?, ?, ?, ?)",
+                 (nombre_estacion, coords.lat, coords.lon, now()))
+    conn.commit()
+    conn.close()
+    return coords.lat, coords.lon
+
+
+def estacion_mas_cercana(lat: float, lon: float) -> dict | None:
+    """Compara la posición dada contra las estaciones de la Línea San Martín
+    (por coordenadas reales, geocodificadas y cacheadas) y devuelve la más
+    cercana con distancia y minutos de caminata ESTIMADOS (velocidad promedio,
+    no tiene en cuenta veredas/cruces reales). NO calcula el viaje en tren en
+    sí ni combinaciones con colectivo — para eso sigue haciendo falta cargar
+    el dato real a mano con app.transport."""
+    from app.geocoding import distancia_haversine_metros
+
+    mejor = None
+    for estacion in LINEA_SAN_MARTIN:
+        coords = _coords_estacion(estacion)
+        if coords is None:
+            continue
+        e_lat, e_lon = coords
+        metros = distancia_haversine_metros(lat, lon, e_lat, e_lon)
+        if mejor is None or metros < mejor["distancia_metros"]:
+            mejor = {
+                "estacion": estacion,
+                "distancia_metros": round(metros),
+                "minutos_caminata_estimados": round(metros / 1000 / VELOCIDAD_CAMINATA_KMH * 60),
+            }
+    return mejor

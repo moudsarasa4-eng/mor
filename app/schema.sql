@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS companies (
     sueldo_ref_confianza TEXT,      -- alta | media | baja
     dominio TEXT,                   -- dominio del sitio principal, para deduplicar más allá del nombre
     sitio_activo INTEGER,           -- 1=responde, 0=caído/parkeado, NULL=no chequeado todavía
+    estacion_cercana TEXT,          -- estación de la Línea San Martín más cercana (por coordenadas reales)
+    estacion_distancia_metros INTEGER,
+    estacion_caminata_min INTEGER,  -- estimado por distancia/velocidad promedio, no es tiempo real de caminata
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,
@@ -140,6 +143,13 @@ CREATE TABLE IF NOT EXISTS transport_access (
     minutos_viaje_total INTEGER NOT NULL,
     combinaciones INTEGER NOT NULL DEFAULT 0,
     fuente TEXT,
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS estaciones_cache (
+    nombre TEXT PRIMARY KEY,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
     creado_en TEXT NOT NULL
 );
 
