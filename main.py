@@ -283,6 +283,17 @@ def cmd_industrial(args):
         print(f"\nExportado: {archivo}")
 
 
+def cmd_find_contacts(args):
+    init_db()
+    from app.contact_finder import correr_lote
+    from app.export_txt import exportar_candidatas_txt
+    resultado = correr_lote(zona=args.zona, limite=args.limite)
+    print(json.dumps(resultado, ensure_ascii=False, indent=2))
+    archivo = exportar_candidatas_txt()
+    if archivo:
+        print(f"\nExportado: {archivo}")
+
+
 def cmd_supplier(args):
     init_db()
     from app.supplier_discovery import correr_lote
@@ -551,6 +562,11 @@ def main():
     psup.add_argument("--zona", default="Hurlingham")
     psup.add_argument("--max-categorias", type=int, default=5, dest="max_categorias")
     psup.set_defaults(func=cmd_supplier)
+
+    pfc = sub.add_parser("find-contacts")
+    pfc.add_argument("--zona", default=None)
+    pfc.add_argument("--limite", type=int, default=20)
+    pfc.set_defaults(func=cmd_find_contacts)
 
     args = p.parse_args()
     if args.cmd is None:

@@ -71,12 +71,20 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         fuente = conn.execute(
             "SELECT url FROM sources WHERE company_id=? ORDER BY id LIMIT 1", (f["id"],)
         ).fetchone()
+        contactos = conn.execute(
+            "SELECT tipo, valor FROM contacts WHERE company_id=? ORDER BY id", (f["id"],)
+        ).fetchall()
         lineas.append(f"[{f['id']}] {f['nombre']}")
         lineas.append(f"    Rubro estimado: {f['rubro']}")
         if fuente:
             lineas.append(f"    Fuente: {fuente['url']}")
         if f["actividad"]:
             lineas.append(f"    Descripción: {f['actividad']}")
+        if contactos:
+            for c in contactos:
+                lineas.append(f"    Contacto ({c['tipo']}, sin confirmar): {c['valor']}")
+        else:
+            lineas.append("    Contacto: no encontrado todavía (correr 'find-contacts')")
         lineas.append("")
 
     contenido = "\n".join(lineas)
