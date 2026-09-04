@@ -17,6 +17,7 @@ from app.discovery import _es_dominio_excluido
 from app.search_client import buscar, SearchClientError
 from app.company import add_contact, add_source
 from app.run_state import registrar_queries
+from app.contact_verify import verificar_email
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 TEL_RE = re.compile(r"(?:\+?54\s?)?(?:0?11|0?[2-9]\d{1,3})[\s.\-]?\d{3,4}[\s.\-]?\d{4}")
@@ -77,12 +78,13 @@ def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | N
     email = _priorizar_email(emails_encontrados)
     if email:
         fuente_id = add_source(company_id, mejor_url or "", tipo="directorio", descripcion="Contacto encontrado por búsqueda")
+        mx_ok = verificar_email(email)  # None si no se pudo chequear (sin red) — nunca se asume
         try:
-            add_contact(company_id, "email", email, verificado=False, fuente_id=fuente_id)
+            add_contact(company_id, "email", email, verificado=False, fuente_id=fuente_id, mx_verificado=mx_ok)
         except ValueError:
             return None  # add_contact rechazó (parece nombre de persona)
         prioridad = "administración/info" if any(p in email.lower() for p in PALABRAS_PRIORIDAD_ALTA) else "general"
-        return {"tipo": "email", "valor": email, "prioridad": prioridad, "fuente": mejor_url}
+        return {"tipo": "email", "valor": email, "prioridad": prioridad, "fuente": mejor_url, "mx_verificado": mx_ok}
 
     # sin email: buscar teléfono como último recurso
     for item in crudo.get("organic", []):

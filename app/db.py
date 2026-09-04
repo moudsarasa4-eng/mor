@@ -46,6 +46,10 @@ def _migrar_columnas_nuevas(conn):
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")
         except sqlite3.OperationalError:
             pass
+    try:
+        conn.execute("ALTER TABLE contacts ADD COLUMN mx_verificado INTEGER")
+    except sqlite3.OperationalError:
+        pass
 
 
 def _seed_keywords(conn):

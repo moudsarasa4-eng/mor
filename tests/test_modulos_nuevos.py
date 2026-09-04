@@ -42,6 +42,25 @@ def test_haversine_distancia_conocida():
     assert 22 < d_km < 27
 
 
+def test_contact_verify_mx():
+    from app.contact_verify import dominio_tiene_mx, verificar_email
+    assert dominio_tiene_mx("") is None
+    assert verificar_email("no-es-un-email") is False
+    assert verificar_email("") is False
+
+
+def test_search_providers_registro():
+    from app.search_providers import get_provider, PROVEEDORES
+    assert "serper" in PROVEEDORES
+    p = get_provider("serper")
+    assert p.nombre == "serper"
+    try:
+        get_provider("inexistente")
+        assert False, "debería haber lanzado ValueError"
+    except ValueError:
+        pass
+
+
 def test_site_check_extraer_dominio():
     from app.site_check import extraer_dominio
     assert extraer_dominio("https://www.empresa.com.ar/pagina") == "empresa.com.ar"

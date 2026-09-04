@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     verificado INTEGER NOT NULL DEFAULT 0,  -- 0/1
     fuente_id INTEGER REFERENCES sources(id),
     es_persona INTEGER NOT NULL DEFAULT 0,  -- debe ser siempre 0; se valida en código
+    mx_verificado INTEGER,          -- 1=dominio tiene MX, 0=no tiene, NULL=no chequeado
     creado_en TEXT NOT NULL
 );
 

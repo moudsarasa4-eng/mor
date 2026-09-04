@@ -111,18 +111,21 @@ def get_transport_access(company_id: int):
                               fuente=r["fuente"] or "") for r in rows]
 
 
-def add_contact(company_id: int, tipo: str, valor: str, verificado: bool, fuente_id: int | None = None):
+def add_contact(company_id: int, tipo: str, valor: str, verificado: bool, fuente_id: int | None = None,
+                 mx_verificado: bool | None = None) -> int:
     """REGLA DURA: solo contacto a nivel empresa. Nunca nombres/emails de personas individuales."""
     if any(kw in valor.lower() for kw in ["gerente", "rrhh -", "sr.", "sra.", "lic. "]):
         raise ValueError("Contacto rechazado: parece referirse a una persona individual, no a la empresa.")
     conn = get_conn()
-    conn.execute(
-        "INSERT INTO contacts (company_id, tipo, valor, verificado, fuente_id, es_persona, creado_en) "
-        "VALUES (?, ?, ?, ?, ?, 0, ?)",
-        (company_id, tipo, valor, int(verificado), fuente_id, now()),
+    cur = conn.execute(
+        "INSERT INTO contacts (company_id, tipo, valor, verificado, fuente_id, es_persona, mx_verificado, creado_en) "
+        "VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+        (company_id, tipo, valor, int(verificado), fuente_id,
+         (None if mx_verificado is None else int(mx_verificado)), now()),
     )
     conn.commit()
     conn.close()
+    return cur.lastrowid
 
 
 def get_company(company_id: int) -> dict:

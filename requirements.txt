@@ -3,3 +3,4 @@ PyYAML
 flask
 requests
 python-dotenv
+dnspython

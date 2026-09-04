@@ -73,7 +73,7 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
             "SELECT url FROM sources WHERE company_id=? ORDER BY id LIMIT 1", (f["id"],)
         ).fetchone()
         contactos = conn.execute(
-            "SELECT tipo, valor FROM contacts WHERE company_id=? ORDER BY id", (f["id"],)
+            "SELECT tipo, valor, mx_verificado FROM contacts WHERE company_id=? ORDER BY id", (f["id"],)
         ).fetchall()
         lineas.append(f"[{f['id']}] {f['nombre']}")
         lineas.append(f"    Rubro estimado: {f['rubro']}")
@@ -91,7 +91,13 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
             lineas.append(f"      Fuente: {f['sueldo_ref_fuente']}")
         if contactos:
             for c in contactos:
-                lineas.append(f"    Contacto ({c['tipo']}, sin confirmar): {c['valor']}")
+                mx_txt = ""
+                if c["tipo"] == "email":
+                    if c["mx_verificado"] == 1:
+                        mx_txt = " [dominio con MX OK]"
+                    elif c["mx_verificado"] == 0:
+                        mx_txt = " [⚠ dominio SIN registro MX — probablemente no recibe mail]"
+                lineas.append(f"    Contacto ({c['tipo']}, sin confirmar): {c['valor']}{mx_txt}")
         else:
             lineas.append("    Contacto: no encontrado todavía (correr 'find-contacts')")
         lineas.append("")
