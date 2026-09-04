@@ -219,6 +219,16 @@ def cmd_learning_report(args):
     print(f"Generado: {generar_reporte()}")
 
 
+def cmd_clean(args):
+    from app.cleanup import limpiar_candidatas_basura
+    r = limpiar_candidatas_basura(zona=args.zona)
+    print(f"Evaluadas: {r['evaluadas']} · Limpiadas: {r['limpiadas']}")
+    for d in r["detalle"][:30]:
+        print(f"  [{d['id']}] {d['nombre']} -> {d['motivo']}")
+    if len(r["detalle"]) > 30:
+        print(f"  ... y {len(r['detalle']) - 30} más")
+
+
 def cmd_backup(args):
     from app.backup import hacer_backup
     archivo = hacer_backup()
@@ -551,6 +561,10 @@ def main():
     pgeo.add_argument("--company-id", type=int, required=True, dest="company_id")
     pgeo.add_argument("--direccion", required=True)
     pgeo.set_defaults(func=cmd_geocode)
+
+    pclean = sub.add_parser("clean")
+    pclean.add_argument("--zona", default=None)
+    pclean.set_defaults(func=cmd_clean)
 
     sub.add_parser("backup").set_defaults(func=cmd_backup)
     sub.add_parser("restore").set_defaults(func=cmd_restore)
