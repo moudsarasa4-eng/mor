@@ -27,6 +27,7 @@ from app.company import (
     upsert_company, add_source, add_signal, add_negative_signal,
     add_job_hypothesis, add_cv_match, add_contact, get_company,
     calcular_y_guardar_score, why_not, add_transport_access,
+    set_direccion_y_geocodificar,
 )
 from app.signals import Signal
 from app.negative_signals import NegativeSignal
@@ -216,6 +217,14 @@ def cmd_discard_reason(args):
 def cmd_learning_report(args):
     from app.learning_report import generar_reporte
     print(f"Generado: {generar_reporte()}")
+
+
+def cmd_geocode(args):
+    resultado = set_direccion_y_geocodificar(args.company_id, args.direccion)
+    if resultado:
+        print(json.dumps(resultado, ensure_ascii=False, indent=2))
+    else:
+        print("No se pudo geocodificar esa dirección (sin resultados en OSM Nominatim).")
 
 
 def cmd_add_transport(args):
@@ -525,6 +534,11 @@ def main():
     pt.add_argument("--combinaciones", type=int, default=0)
     pt.add_argument("--fuente", default="", help="cómo se estimó, ej 'mapa'")
     pt.set_defaults(func=cmd_add_transport)
+
+    pgeo = sub.add_parser("geocode")
+    pgeo.add_argument("--company-id", type=int, required=True, dest="company_id")
+    pgeo.add_argument("--direccion", required=True)
+    pgeo.set_defaults(func=cmd_geocode)
 
     pw = sub.add_parser("webapp")
     pw.set_defaults(func=cmd_webapp)

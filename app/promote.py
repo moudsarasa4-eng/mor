@@ -15,7 +15,7 @@ import re
 
 from app.db import get_conn, now
 from app.keywords import KEYWORDS_SEED
-from app.exclusions import es_cadena_excluida
+from app.exclusions import es_cadena_excluida, es_zona_prohibida
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -69,6 +69,15 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
                 (f"EXCLUIDA_CADENA:{cadena}", f["id"]),
             )
             excluidas_cadena += 1
+            continue
+
+        zona_prohibida = es_zona_prohibida(f["zona"])
+        if zona_prohibida:
+            conn.execute(
+                "UPDATE discovered_companies_raw SET estado=? WHERE id=?",
+                (f"EXCLUIDA_ZONA_PROHIBIDA:{zona_prohibida}", f["id"]),
+            )
+            excluidas_cadena += 1  # se cuenta junto (mismo motivo: destino inviable)
             continue
 
         rubro = _inferir_rubro(f["keyword"])

@@ -157,14 +157,25 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
                               sueldo_fuente: str | None = None) -> dict:
     """`accessibility` es el fallback geográfico (app.geography); si hay datos de
     transporte cargados (app.transport / add_transport_access), esos reemplazan
-    ese valor por un score multimodal real (San Martín + colectivos 182/320/237/463)."""
-    from app.transport import transport_access_score, resumen_para_tabla
+    ese valor por un score multimodal real (San Martín + colectivos 182/320/237/463).
+    Recalcula todo el pipeline de scoring para una empresa y detecta cambios
+    respecto del último score guardado (Change Detection)."""
+    from app.transport import transport_access_score, mejor_acceso
+    from app.exclusions import es_zona_prohibida
+
+    TOPE_MINUTOS_VIAJE = 50  # regla dura: viaje neto en colectivo/tren, no negociable
+
     accesos = get_transport_access(company_id)
+    viaje_excede_tope = False
     if accesos:
         accessibility = transport_access_score(accesos)
-    """Recalcula todo el pipeline de scoring para una empresa y detecta cambios
-    respecto del último score guardado (Change Detection)."""
+        mejor = mejor_acceso(accesos)
+        if mejor and mejor.minutos_viaje_total > TOPE_MINUTOS_VIAJE:
+            viaje_excede_tope = True
+
     conn = get_conn()
+    zona_row = conn.execute("SELECT zona FROM companies WHERE id=?", (company_id,)).fetchone()
+    zona_prohibida = es_zona_prohibida(zona_row["zona"]) if zona_row else None
     signals_rows = conn.execute("SELECT tipo, fuerza, descripcion FROM signals WHERE company_id=?", (company_id,)).fetchall()
     signals = [Signal(tipo=r["tipo"], fuerza=r["fuerza"], descripcion=r["descripcion"], fuente_url="") for r in signals_rows]
     hs_score = hiring_signal_score(signals)
@@ -195,6 +206,13 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
 
     if descartar:
         jp_score = min(jp_score, 30)  # las señales negativas críticas capan el score
+
+    if viaje_excede_tope or zona_prohibida:
+        descartar = True
+        motivo_viaje = f"Viaje neto supera el tope de {TOPE_MINUTOS_VIAJE} min" if viaje_excede_tope else None
+        motivo_zona = f"Zona prohibida: {zona_prohibida}" if zona_prohibida else None
+        motivo = " / ".join(m for m in [motivo, motivo_viaje, motivo_zona] if m)
+        jp_score = min(jp_score, 10)  # regla dura: no negociable, ni siquiera "en revisión"
 
     chances, chances_baja_confianza = chances_de_entrar(mejor_match, hs_score, emp_score, vacante_confirmada)
     if descartar:
@@ -237,6 +255,27 @@ def calcular_y_guardar_score(company_id: int, employer_inputs: EmployerInputs,
         "hiring_signal_score": hs_score, "opportunity_score": mejor_match,
         "cv_recomendado": cv_recomendado, "estado": nuevo_estado, "detalle": detalle,
     }
+
+
+def set_direccion_y_geocodificar(company_id: int, direccion: str) -> dict | None:
+    """Geocodifica una dirección real (vía OSM Nominatim, gratis) y guarda
+    coordenadas + distancia en línea recta desde el domicilio de Marco.
+    No calcula tiempo de viaje real (eso requiere un motor de rutas aparte) —
+    es un dato objetivo para descartar casos obviamente lejos antes de
+    estimar el viaje real a mano con app.transport."""
+    from app.geocoding import calcular_distancia_a_empresa
+    resultado = calcular_distancia_a_empresa(direccion)
+    conn = get_conn()
+    if resultado:
+        conn.execute(
+            "UPDATE companies SET direccion=?, lat=?, lon=?, distancia_km=?, actualizado_en=? WHERE id=?",
+            (direccion, resultado["lat"], resultado["lon"], resultado["distancia_km"], now(), company_id),
+        )
+    else:
+        conn.execute("UPDATE companies SET direccion=?, actualizado_en=? WHERE id=?", (direccion, now(), company_id))
+    conn.commit()
+    conn.close()
+    return resultado
 
 
 def why_not(company_id: int) -> str | None:

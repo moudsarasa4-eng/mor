@@ -30,3 +30,25 @@ def es_cadena_excluida(nombre_empresa: str) -> str | None:
         if cadena_norm and cadena_norm in nombre_norm:
             return cadena
     return None
+
+
+# CABA está prohibida: Marco no puede viajar hasta ahí (regla dura, no de
+# prioridad baja — se descarta automáticamente, no se muestra nunca). Se
+# chequea contra la zona de búsqueda y contra la dirección resuelta por
+# geocodificación (nunca contra el nombre de la empresa, para evitar falsos
+# positivos con apellidos/marcas que coincidan con un barrio).
+ZONAS_PROHIBIDAS = [
+    "CABA", "Capital Federal", "Ciudad Autonoma de Buenos Aires",
+    "Ciudad Autónoma de Buenos Aires", "Ciudad de Buenos Aires",
+]
+
+
+def es_zona_prohibida(zona_o_direccion: str) -> str | None:
+    if not zona_o_direccion:
+        return None
+    texto_norm = _normalizar(zona_o_direccion)
+    for prohibida in ZONAS_PROHIBIDAS:
+        prohibida_norm = _normalizar(prohibida)
+        if prohibida_norm and prohibida_norm in texto_norm:
+            return prohibida
+    return None

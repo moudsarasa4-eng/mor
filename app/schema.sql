@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS companies (
     antiguedad_anios INTEGER,
     tamano_estimado TEXT,          -- "chica" | "mediana" | "grande" | "desconocido"
     actividad TEXT,                -- descripción breve de qué hace
+    direccion TEXT,                 -- dirección completa, si se conoce (para geocodificar)
+    lat REAL,
+    lon REAL,
+    distancia_km REAL,              -- línea recta desde el domicilio (haversine, NO tiempo de viaje real)
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
     motivo_descarte TEXT,
@@ -129,6 +133,13 @@ CREATE TABLE IF NOT EXISTS transport_access (
     minutos_viaje_total INTEGER NOT NULL,
     combinaciones INTEGER NOT NULL DEFAULT 0,
     fuente TEXT,
+    creado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS origen_cache (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
     creado_en TEXT NOT NULL
 );
 

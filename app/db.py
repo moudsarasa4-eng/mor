@@ -36,6 +36,11 @@ def _migrar_columnas_nuevas(conn):
         conn.execute("ALTER TABLE companies ADD COLUMN auto_evaluada INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # ya existe
+    for columna, tipo in [("direccion", "TEXT"), ("lat", "REAL"), ("lon", "REAL"), ("distancia_km", "REAL")]:
+        try:
+            conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")
+        except sqlite3.OperationalError:
+            pass
 
 
 def _seed_keywords(conn):
