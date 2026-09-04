@@ -79,17 +79,27 @@ def _generar_lote_queries(zona: str) -> list[dict]:
     return queries
 
 
-def loop_investigacion(max_ciclos: int | None = None):
+def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None = None):
     """Bucle principal: recorre zonas no saturadas ejecutando queries de a una,
     respetando pausa, límite diario y presupuesto por zona. Pensado para correr
-    en un thread de background desde la web app."""
+    en un thread de background desde la web app.
+
+    max_minutos acota por TIEMPO (ej. tanda de 2 horas) en vez de por cantidad
+    fija de queries — el motor sigue buscando mientras haya tiempo, presupuesto
+    y zonas no saturadas."""
     _stop_event.clear()
     set_status("running")
     ciclos = 0
+    inicio = time.monotonic()
     limite_diario = CONFIG["discovery"]["daily"]["max_queries"]
+
+    def tiempo_agotado() -> bool:
+        return max_minutos is not None and (time.monotonic() - inicio) >= max_minutos * 60
 
     while not _stop_event.is_set():
         if max_ciclos is not None and ciclos >= max_ciclos:
+            break
+        if tiempo_agotado():
             break
 
         _pause_event.wait()  # bloquea acá si está pausado
@@ -117,7 +127,7 @@ def loop_investigacion(max_ciclos: int | None = None):
         racha_sin_nuevas = 0
         for q in queries[:max_zona]:
             _pause_event.wait()
-            if _stop_event.is_set() or presupuesto_lifetime_agotado():
+            if _stop_event.is_set() or presupuesto_lifetime_agotado() or tiempo_agotado():
                 break
             r = ejecutar_query(q["query"], zona, q["tipo"], q.get("keyword", ""))
             registrar_queries(1)
@@ -145,12 +155,16 @@ _thread: threading.Thread | None = None
 _thread_lock = threading.Lock()
 
 
-def iniciar_en_background(max_ciclos: int | None = None):
+def iniciar_en_background(max_ciclos: int | None = None, max_minutos: float | None = None):
     global _thread
     with _thread_lock:
         if _thread is not None and _thread.is_alive():
             return False  # ya corriendo, evita hilos duplicados por doble-click
         _pause_event.set()
-        _thread = threading.Thread(target=loop_investigacion, kwargs={"max_ciclos": max_ciclos}, daemon=True)
+        _thread = threading.Thread(
+            target=loop_investigacion,
+            kwargs={"max_ciclos": max_ciclos, "max_minutos": max_minutos},
+            daemon=True,
+        )
         _thread.start()
         return True

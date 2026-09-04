@@ -34,7 +34,11 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     _asegurar_columna_exportada(conn)
     conn.commit()
 
-    query = "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad FROM companies c WHERE c.estado='candidata'"
+    query = (
+        "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad FROM companies c "
+        "WHERE c.estado='candidata' "
+        "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
+    )
     params = []
     if solo_nuevas:
         query += " AND c.exportada_txt = 0"

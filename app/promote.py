@@ -15,6 +15,7 @@ import re
 
 from app.db import get_conn, now
 from app.keywords import KEYWORDS_SEED
+from app.exclusions import es_cadena_excluida
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -57,8 +58,19 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
 
     filas = conn.execute(query, params).fetchall()
     promovidas = 0
+    excluidas_cadena = 0
     for f in filas:
         nombre = _limpiar_nombre_final(f["nombre_crudo"])
+
+        cadena = es_cadena_excluida(nombre)
+        if cadena:
+            conn.execute(
+                "UPDATE discovered_companies_raw SET estado=? WHERE id=?",
+                (f"EXCLUIDA_CADENA:{cadena}", f["id"]),
+            )
+            excluidas_cadena += 1
+            continue
+
         rubro = _inferir_rubro(f["keyword"])
 
         existente = conn.execute("SELECT id FROM companies WHERE nombre = ?", (nombre,)).fetchone()
@@ -91,4 +103,5 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
 
     conn.commit()
     conn.close()
-    return {"zona": zona, "candidatas_evaluadas": len(filas), "promovidas": promovidas}
+    return {"zona": zona, "candidatas_evaluadas": len(filas), "promovidas": promovidas,
+            "excluidas_cadena": excluidas_cadena}

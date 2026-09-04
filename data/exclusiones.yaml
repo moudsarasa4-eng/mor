@@ -1,0 +1,23 @@
+# Cadenas grandes a excluir de los resultados — Marco ya las conoce/aplicó,
+# no son "mercado oculto". Agregá una línea por cadena, sin tocar código.
+# El motor las sigue usando como PUNTO DE PARTIDA para encontrar a sus
+# proveedores/fabricantes reales (ver app/supplier_discovery.py) — solo se
+# excluyen como destino final del email.
+
+cadenas_excluidas:
+  - Carrefour
+  - Día
+  - Dia
+  - Coto
+  - Jumbo
+  - Disco
+  - Vea
+  - Walmart
+  - Changomas
+  - Easy
+  - Sodimac
+  - La Anonima
+  - La Anónima
+  - Chango Mas
+  - Mercado Libre
+  - MercadoLibre

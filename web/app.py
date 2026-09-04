@@ -95,8 +95,9 @@ def api_auto_stop():
 
 @app.route("/api/start", methods=["POST"])
 def api_start():
-    started = runner.iniciar_en_background()
-    return jsonify({"started": started})
+    tanda_minutos = runner.CONFIG["discovery"]["tanda_max_minutes"]
+    started = runner.iniciar_en_background(max_minutos=tanda_minutos)
+    return jsonify({"started": started, "duracion_minutos": tanda_minutos})
 
 
 @app.route("/api/pause", methods=["POST"])
@@ -121,11 +122,12 @@ def api_export():
 @app.route("/api/candidatas")
 def api_candidatas():
     conn = get_conn()
-    total = conn.execute("SELECT COUNT(*) c FROM companies WHERE estado='candidata'").fetchone()["c"]
-    rows = conn.execute("""
+    filtro = "c.estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
+    total = conn.execute(f"SELECT COUNT(*) c FROM companies c WHERE {filtro}").fetchone()["c"]
+    rows = conn.execute(f"""
         SELECT c.id, c.nombre, c.zona, c.rubro,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
-        FROM companies c WHERE c.estado='candidata' ORDER BY c.id DESC LIMIT 50
+        FROM companies c WHERE {filtro} ORDER BY c.id DESC LIMIT 50
     """).fetchall()
     conn.close()
     return jsonify({"total": total, "items": [dict(r) for r in rows]})

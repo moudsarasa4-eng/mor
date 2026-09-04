@@ -29,14 +29,14 @@ def esta_activo() -> bool:
 def _loop_scheduler():
     global _proxima_tanda
     intervalo = CONFIG["discovery"]["scheduler"]["interval_minutes"] * 60
-    batch = CONFIG["discovery"]["scheduler"]["batch_size"]
+    tanda_minutos = CONFIG["discovery"]["tanda_max_minutes"]
 
     while _auto_enabled.is_set():
         if presupuesto_lifetime_agotado():
             set_status("presupuesto_agotado")
             break
 
-        runner.loop_investigacion(max_ciclos=batch)
+        runner.loop_investigacion(max_minutos=tanda_minutos)
 
         if not _auto_enabled.is_set():
             break

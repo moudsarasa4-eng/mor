@@ -232,8 +232,9 @@ def cmd_webapp(args):
 
 def cmd_run(args):
     init_db()
-    from app.runner import loop_investigacion
-    loop_investigacion(max_ciclos=args.max_ciclos)
+    from app.runner import loop_investigacion, CONFIG
+    minutos = args.max_minutos or CONFIG["discovery"]["tanda_max_minutes"]
+    loop_investigacion(max_ciclos=args.max_ciclos, max_minutos=minutos)
     print("Corrida terminada. Usá 'python3 main.py status' para ver el resultado.")
 
 
@@ -277,6 +278,19 @@ def cmd_industrial(args):
     print(json.dumps({k: v for k, v in resultado.items() if k != "detalle"}, ensure_ascii=False, indent=2))
     for d in resultado["detalle"]:
         print(f"  [{d['partido']}] {d['codigo']} {d['rubro']}: +{d['empresas_nuevas']} nuevas")
+    archivo = exportar_candidatas_txt()
+    if archivo:
+        print(f"\nExportado: {archivo}")
+
+
+def cmd_supplier(args):
+    init_db()
+    from app.supplier_discovery import correr_lote
+    from app.export_txt import exportar_candidatas_txt
+    resultado = correr_lote(zona=args.zona, max_categorias=args.max_categorias)
+    print(json.dumps({k: v for k, v in resultado.items() if k != "detalle"}, ensure_ascii=False, indent=2))
+    for d in resultado["detalle"]:
+        print(f"  {d['categoria']}: +{d['empresas_nuevas']} nuevas")
     archivo = exportar_candidatas_txt()
     if archivo:
         print(f"\nExportado: {archivo}")
@@ -506,6 +520,7 @@ def main():
 
     prun = sub.add_parser("run")
     prun.add_argument("--max-ciclos", type=int, default=None, dest="max_ciclos")
+    prun.add_argument("--max-minutos", type=float, default=None, dest="max_minutos")
     prun.set_defaults(func=cmd_run)
 
     sub.add_parser("daily").set_defaults(func=cmd_daily)
@@ -531,6 +546,11 @@ def main():
     pind.add_argument("--partidos", default=None, help="Ej: 'Moron,Hurlingham,Merlo,Ituzaingo'")
     pind.add_argument("--max-rubros", type=int, default=None, dest="max_rubros")
     pind.set_defaults(func=cmd_industrial)
+
+    psup = sub.add_parser("supplier")
+    psup.add_argument("--zona", default="Hurlingham")
+    psup.add_argument("--max-categorias", type=int, default=5, dest="max_categorias")
+    psup.set_defaults(func=cmd_supplier)
 
     args = p.parse_args()
     if args.cmd is None:
