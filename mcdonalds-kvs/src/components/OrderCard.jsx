@@ -1,5 +1,3 @@
-import { iconFor } from "../lib/icons";
-
 function fmtAge(seconds) {
 	const m = Math.floor(seconds / 60);
 	const s = seconds % 60;
@@ -16,7 +14,7 @@ function OrderCard({ order, ageSeconds, colors, masked }) {
 			</div>
 			{masked && (
 				<div className="bg-yellow-500 text-black text-xs font-extrabold text-center py-0.5 tracking-wide">
-					🔒 RECORDALO — mantené Espacio para chequear
+					RECORDALO — mantené Espacio para chequear
 				</div>
 			)}
 			{masked ? (
@@ -33,7 +31,7 @@ function OrderCard({ order, ageSeconds, colors, masked }) {
 				order.orderArray.map((orderList, i) => (
 					<div key={i} className="px-5 py-0.5">
 						<span className="text-xl font-bold text-black">
-							<span className="inline-block w-5">{orderList.amount}</span> {iconFor(orderList.name)} {orderList.name}
+							<span className="inline-block w-5">{orderList.amount}</span> {orderList.name}
 						</span>
 						{orderList.modifier && (
 							<div className={`text-sm font-semibold ml-6 ${orderList.modifier.prefix === "SIN" ? "text-red-600" : "text-green-700"}`}>
