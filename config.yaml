@@ -42,6 +42,10 @@ transporte_prioritario:
   # Prioridad = orden de investigación, no ranking de calidad. El motor puede
   # aprender con datos reales qué red produce mejores empresas.
 
+caza_industrial:
+  partidos: ["Moron", "Hurlingham", "Merlo", "Ituzaingo"]
+  max_rubros_por_lote: 10   # combinaciones (partido, rubro CLAE) por corrida, para no gastar todo el presupuesto de una
+
 zonas:
   cercana: ["Hurlingham", "Moron", "El Palomar", "Caseros", "Martin Coronado", "Villa Tesei"]
   media: ["Haedo", "Ramos Mejia", "William Morris", "Santos Lugares", "Bella Vista", "San Miguel", "Muñiz"]

@@ -265,6 +265,23 @@ def cmd_export(args):
     print(archivo or "No hay candidatas nuevas para exportar.")
 
 
+def cmd_industrial(args):
+    init_db()
+    from app.industrial_discovery import correr_lote
+    from app.export_txt import exportar_candidatas_txt
+    import yaml as _yaml
+    cfg = _yaml.safe_load((Path(__file__).resolve().parent / "config.yaml").read_text(encoding="utf-8"))
+    partidos = args.partidos.split(",") if args.partidos else cfg["caza_industrial"]["partidos"]
+    max_rubros = args.max_rubros or cfg["caza_industrial"]["max_rubros_por_lote"]
+    resultado = correr_lote(partidos=[p.strip() for p in partidos], max_rubros=max_rubros)
+    print(json.dumps({k: v for k, v in resultado.items() if k != "detalle"}, ensure_ascii=False, indent=2))
+    for d in resultado["detalle"]:
+        print(f"  [{d['partido']}] {d['codigo']} {d['rubro']}: +{d['empresas_nuevas']} nuevas")
+    archivo = exportar_candidatas_txt()
+    if archivo:
+        print(f"\nExportado: {archivo}")
+
+
 def cmd_status(args):
     from app.run_state import get_state
     st = get_state()
@@ -509,6 +526,11 @@ def main():
     pexport = sub.add_parser("export")
     pexport.add_argument("--zona", default=None)
     pexport.set_defaults(func=cmd_export)
+
+    pind = sub.add_parser("industrial")
+    pind.add_argument("--partidos", default=None, help="Ej: 'Moron,Hurlingham,Merlo,Ituzaingo'")
+    pind.add_argument("--max-rubros", type=int, default=None, dest="max_rubros")
+    pind.set_defaults(func=cmd_industrial)
 
     args = p.parse_args()
     if args.cmd is None:
