@@ -23,8 +23,6 @@ const PARES_CONFUNDIBLES = [
 	"McNuggets x10",
 	"McCrispy Classic",
 	"McCrispy Deluxe",
-	"McCrispy Cheddar Bacon",
-	"McCrispy Smoked BBQ",
 	"McCrispy Ranch",
 	"Ensalada Caesar c/Pollo Grille",
 	"Ensalada Caesar c/Pollo Crispy",

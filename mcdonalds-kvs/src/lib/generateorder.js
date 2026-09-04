@@ -37,8 +37,6 @@ const config = {
 		"McPollo",
 		"McCrispy Classic",
 		"McCrispy Deluxe",
-		"McCrispy Cheddar Bacon",
-		"McCrispy Smoked BBQ",
 		"McCrispy Ranch",
 		// Ensaladas (confirmado en mcdonalds.com.ar/menu/ensaladas)
 		"Ensalada Caesar c/Pollo Grille",
