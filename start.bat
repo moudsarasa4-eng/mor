@@ -25,7 +25,7 @@ if not exist ".env" (
 
 python main.py doctor
 echo.
-echo Abriendo la app en http://127.0.0.1:5000 ...
+echo Abriendo la app en http://127.0.0.1:5000 ... (la busqueda arranca sola, no hace falta apretar nada)
 start "" http://127.0.0.1:5000
 python main.py webapp
 pause

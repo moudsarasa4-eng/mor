@@ -143,7 +143,21 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
                 break
 
         promover_candidatas(zona=zona)
-        archivo_txt = exportar_candidatas_txt(zona=zona)
+
+        # todas las fuentes en el mismo ciclo, para que un solo botón cubra todo:
+        # búsqueda geográfica (arriba) + industrial CLAE + proveedores de góndola
+        # + contacto, en vez de requerir comandos sueltos en otras terminales.
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+            from app.industrial_discovery import correr_lote as correr_industrial
+            correr_industrial(max_rubros=2)
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+            from app.supplier_discovery import correr_lote as correr_supplier
+            correr_supplier(zona=zona, max_categorias=2)
+        if not tiempo_agotado() and not presupuesto_lifetime_agotado():
+            from app.contact_finder import correr_lote as correr_contactos
+            correr_contactos(zona=zona, limite=10)
+
+        archivo_txt = exportar_candidatas_txt()  # sin filtro de zona: incluye lo que sumaron industrial/supplier
         if archivo_txt:
             print(f"[Motor de Jackpots] Candidatas exportadas a: {archivo_txt}")
 

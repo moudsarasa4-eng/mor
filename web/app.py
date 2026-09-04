@@ -141,6 +141,9 @@ def api_company(company_id):
 
 def run():
     init_db()
+    # arranca la búsqueda sola al abrir la app, sin apretar ningún botón
+    tanda_minutos = runner.CONFIG["discovery"]["tanda_max_minutes"]
+    runner.iniciar_en_background(max_minutos=tanda_minutos)
     app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
 
 

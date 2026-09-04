@@ -24,5 +24,5 @@ fi
 
 python3 main.py doctor
 echo ""
-echo "Abriendo la app en http://127.0.0.1:5000 ..."
+echo "Abriendo la app en http://127.0.0.1:5000 ... (la búsqueda arranca sola, no hace falta apretar nada)"
 python3 main.py webapp
