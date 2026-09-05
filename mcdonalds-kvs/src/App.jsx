@@ -12,8 +12,6 @@ import { useSelector, useDispatch } from "react-redux"
 
 const AUTO_SPAWN_MIN_MS = 14000;
 const AUTO_SPAWN_MAX_MS = 26000;
-const AGE_YELLOW_S = 60;
-const AGE_RED_S = 120;
 
 // Estándar oficial McDonald's (GE Iniciador/Ensamblador, Ago 2022)
 const STANDARD_MIN_S = 35;
@@ -26,12 +24,6 @@ const SHIFT_SPAWN_MIN_MS = 5000;
 const SHIFT_SPAWN_MAX_MS = 9000;
 
 const SESSION_REMINDER_MS = 15 * 60 * 1000; // Método 2: repetición espaciada
-
-function ageColor(ageSeconds) {
-	if (ageSeconds >= AGE_RED_S) return { border: "border-red-500", bar: "bg-red-500" };
-	if (ageSeconds >= AGE_YELLOW_S) return { border: "border-yellow-400", bar: "bg-yellow-400" };
-	return { border: "border-green-400", bar: "bg-green-400" };
-}
 
 function fmtAge(seconds) {
 	const m = Math.floor(seconds / 60);
@@ -299,19 +291,17 @@ function App() {
 					level={level}
 				/>
 				<div className="min-h-[80vh] flex flex-row flex-wrap content-start">
-					{orders.map((orderObject) => {
+					{orders.map((orderObject, index) => {
 						const ageSeconds = Math.max(0, Math.floor(Date.now() / 1000 - orderObject.timeGenerated));
-						const colors = ageColor(ageSeconds);
 						const masked = memoriaOn && !peeking && ageSeconds >= recallVisibleS(level);
 						return (
-							<OrderCard key={orderObject.id} order={orderObject} ageSeconds={ageSeconds} colors={colors} masked={masked} />
+							<OrderCard key={orderObject.id} order={orderObject} isFront={index === 0} masked={masked} />
 						)
 					})}
 				</div >
 				<footer className=" flex flex-row align-middle justify-between text-xl pr-2">
 					<span className="text-black font-extrabold bg-gray-500 text-2xl">{new Date().toLocaleTimeString()}</span>
 					<span className="text-white">Standard/MFY {SideOnSpan(sideOn)}</span>
-					<span className="text-white">Nivel {level}</span>
 					<span className="text-white">{averageTime} / 120</span>
 				</footer>
 			</div>

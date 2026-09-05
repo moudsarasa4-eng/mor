@@ -1,15 +1,11 @@
-function fmtAge(seconds) {
-	const m = Math.floor(seconds / 60);
-	const s = seconds % 60;
-	return `${m}:${String(s).padStart(2, "0")}`;
-}
+import { Fragment } from "react";
 
-function OrderCard({ order, ageSeconds, colors, masked }) {
+function OrderCard({ order, isFront, masked }) {
 	return (
-		<div className={`border-[6px] ${colors.border} flex flex-col flex-wrap align-top bg-white w-[20rem] m-2 h-min`}>
-			<div className="bg-neutral-900 text-white font-bold text-lg flex flex-row align-middle justify-between px-4 py-1">
+		<div className={`${isFront ? "border-[6px] border-green-400 " : ""}flex flex-col flex-wrap align-top bg-white w-[20rem] m-2 h-min`}>
+			<div className="bg-purple-900 text-white font-bold text-xl flex flex-row align-middle justify-between px-5">
+				<h1>Side →</h1>
 				<h1>{order.orderType}</h1>
-				<h1>AGE {fmtAge(ageSeconds)}</h1>
 				<h1>{order.randomCode}</h1>
 			</div>
 			{masked && (
@@ -29,19 +25,19 @@ function OrderCard({ order, ageSeconds, colors, masked }) {
 				</div>
 			) : (
 				order.orderArray.map((orderList, i) => (
-					<div key={i} className="px-5 py-0.5">
-						<span className="text-xl font-bold text-black">
-							<span className="inline-block w-5">{orderList.amount}</span> {orderList.name}
+					<Fragment key={i}>
+						<span className="text-xl font-semibold px-5">
+							<span>{orderList.amount}</span>  {orderList.name}
 						</span>
 						{orderList.modifier && (
-							<div className={`text-sm font-semibold ml-6 ${orderList.modifier.prefix === "SIN" ? "text-red-600" : "text-green-700"}`}>
+							<div className={`text-sm font-semibold px-5 ml-6 ${orderList.modifier.prefix === "SIN" ? "text-red-600" : "text-green-700"}`}>
 								{orderList.modifier.prefix} <span className="text-black">{orderList.modifier.ing}</span>
 							</div>
 						)}
-					</div>
+					</Fragment>
 				))
 			)}
-			<div className={`${colors.bar} text-black font-bold text-lg px-3 flex flex-row align-middle justify-between mt-1`}>
+			<div className="bg-red-400 text-white font-bold text-xl px-2 flex flex-row align-middle justify-between">
 				<h1>{order.orderStorage}</h1>
 				<h1>{order.randomTime}</h1>
 			</div>
