@@ -43,6 +43,32 @@ ZONAS_PROHIBIDAS = [
 ]
 
 
+# Agencias de RRHH / staffing / búsqueda de personal: son intermediarias,
+# no el empleador real. Detección por patrón (no por marca fija) para que
+# agarre cualquiera — chica, mediana o grande —, no solo una lista cerrada
+# de nombres. Las grandes genéricas (Randstad, Adecco, Manpower, Bayton,
+# Gestión Compartida...) suelen caer solas por estos mismos patrones, así
+# que no hace falta nombrarlas aparte.
+PALABRAS_AGENCIA_RRHH = [
+    "recursos humanos", "rrhh", "seleccion de personal", "selección de personal",
+    "busqueda de personal", "búsqueda de personal", "busqueda y seleccion",
+    "búsqueda y selección", "consultora de rrhh", "consultora de recursos humanos",
+    "headhunter", "headhunting", "bolsa de empleo", "bolsa de trabajo",
+    "outsourcing de personal", "provision de personal", "provisión de personal",
+    "personal eventual", "personal temporario", "servicios eventuales",
+    "empresa de servicios eventuales", "staffing", "reclutamiento y seleccion",
+    "reclutamiento y selección",
+]
+
+
+def es_agencia_rrhh(nombre_o_descripcion: str) -> bool:
+    """True si el texto (nombre o descripción de la empresa) parece una
+    agencia de RRHH/staffing — se busca activamente para poder descartarla,
+    no se asume que nunca va a aparecer."""
+    texto_norm = _normalizar(nombre_o_descripcion or "")
+    return any(_normalizar(p) in texto_norm for p in PALABRAS_AGENCIA_RRHH)
+
+
 def es_zona_prohibida(zona_o_direccion: str) -> str | None:
     if not zona_o_direccion:
         return None

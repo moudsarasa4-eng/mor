@@ -31,6 +31,9 @@ KEYWORDS_SEED = {
     "general": [
         "fábrica", "industria", "planta", "empresa", "comercio", "constructora",
         "hotel", "colegio privado", "centro médico",
+        # se buscan activamente para poder descartarlas (no son el empleador
+        # real) — no una lista fija de marcas, un patrón genérico de rubro
+        "agencia de recursos humanos", "empresa de personal eventual", "staffing",
     ],
 }
 

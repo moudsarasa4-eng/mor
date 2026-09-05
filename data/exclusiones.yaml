@@ -21,3 +21,10 @@ cadenas_excluidas:
   - Chango Mas
   - Mercado Libre
   - MercadoLibre
+  # Agencias de RRHH/staffing confirmadas por nombre (además del detector
+  # genérico por patrón en app/exclusions.es_agencia_rrhh, que agarra
+  # cualquier agencia aunque no esté en esta lista):
+  - Grupo Gestión
+  - Grupo Gestion
+  - Tempo Empleo
+  - Tempo RH

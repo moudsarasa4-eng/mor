@@ -8,13 +8,13 @@ generado — nunca borra ni reclasifica algo que ya se auditó o contactó.
 """
 from app.db import get_conn, now
 from app.discovery import _parece_empresa
-from app.exclusions import es_cadena_excluida, es_zona_prohibida
+from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 
 
 def limpiar_candidatas_basura(zona: str | None = None) -> dict:
     conn = get_conn()
     query = (
-        "SELECT id, nombre, zona FROM companies "
+        "SELECT id, nombre, zona, actividad FROM companies "
         "WHERE estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = companies.id)"
     )
     params = []
@@ -31,6 +31,8 @@ def limpiar_candidatas_basura(zona: str | None = None) -> dict:
             motivo = f"Limpieza retroactiva: cadena excluida ({cadena})"
         elif es_zona_prohibida(f["zona"]):
             motivo = f"Limpieza retroactiva: zona prohibida ({f['zona']})"
+        elif es_agencia_rrhh(f["nombre"]) or es_agencia_rrhh(f["actividad"] or ""):
+            motivo = "Limpieza retroactiva: agencia de RRHH/staffing, no es el empleador real"
         elif not _parece_empresa(f["nombre"], f["zona"]):
             motivo = "Limpieza retroactiva: no parece una empresa real (filtro de calidad actualizado)"
 

@@ -14,6 +14,17 @@ def test_exclusion_cadena_detecta_variantes():
     assert es_cadena_excluida("Distribuidora El Roble SRL") is None
 
 
+def test_es_agencia_rrhh_por_patron_generico():
+    """No es una lista fija de marcas: detecta cualquier agencia de RRHH/
+    staffing (chica, mediana o grande) por patrón en el nombre/descripción."""
+    from app.exclusions import es_agencia_rrhh
+    assert es_agencia_rrhh("Consultora XYZ de Recursos Humanos") is True
+    assert es_agencia_rrhh("Personal Temporario del Oeste SRL") is True
+    assert es_agencia_rrhh("Bolsa de Trabajo Zona Oeste") is True
+    assert es_agencia_rrhh("Distribuidora Real del Oeste SRL") is False
+    assert es_agencia_rrhh("") is False
+
+
 def test_exclusion_zona_prohibida_caba():
     from app.exclusions import es_zona_prohibida
     assert es_zona_prohibida("CABA") == "CABA"

@@ -4,6 +4,7 @@ data/database.sqlite
 data/backups/
 .pytest_cache/
 reports/*.md
+reports/*.txt
 outreach/*.md
 !outreach/.gitkeep
 .env

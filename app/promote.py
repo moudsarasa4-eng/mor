@@ -15,7 +15,7 @@ import re
 
 from app.db import get_conn, now
 from app.keywords import KEYWORDS_SEED
-from app.exclusions import es_cadena_excluida, es_zona_prohibida
+from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 from app.salarios_referencia import estimar_sueldo
 from app.site_check import sitio_activo, extraer_dominio
 from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS
@@ -99,6 +99,14 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
                 (f"EXCLUIDA_ZONA_PROHIBIDA:{zona_prohibida}", f["id"]),
             )
             excluidas_cadena += 1  # se cuenta junto (mismo motivo: destino inviable)
+            continue
+
+        if es_agencia_rrhh(nombre) or es_agencia_rrhh(f["snippet"] or ""):
+            conn.execute(
+                "UPDATE discovered_companies_raw SET estado='EXCLUIDA_AGENCIA_RRHH' WHERE id=?",
+                (f["id"],),
+            )
+            excluidas_cadena += 1  # mismo motivo: no es el empleador real
             continue
 
         rubro = _inferir_rubro(f["keyword"])
