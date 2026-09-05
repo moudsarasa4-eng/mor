@@ -56,6 +56,18 @@ DOMINIOS_RUIDO_NO_EMPRESA = [
     "plataforma10.com", "omnilineas.com", "central-de-pasajes.com.ar",
     # rankings / prensa genérica, no la empresa en sí
     "rankia.com", "merco.info",
+    # diccionarios / definiciones (el nombre de una zona puede coincidir con
+    # una palabra común del español, ej. "Caseros" = "casero" = "de la casa")
+    "wordreference.com", "wiktionary.org", "merriam-webster.com", "dle.rae.es",
+    "significados.com", "definicion.de", "collinsdictionary.com",
+    # blogs de SaaS / marketing genéricos, no son un empleador real
+    "zendesk.com", "wix.com", "hubspot.com", "shopify.com",
+    # contenido educativo de EEUU sin relación (se cuela con keywords de salud)
+    "bestcolleges.com", "nursingprocess.org", "nursingschoolhub.com",
+    # medios/radio genéricos, no una empresa
+    "los40.com", "enter.co",
+    # instagram: perfiles y posts (antes solo se excluía /p/, no el perfil general)
+    "instagram.com",
 ]
 
 

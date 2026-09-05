@@ -99,6 +99,45 @@ def test_estacion_mas_cercana(tmp_path, monkeypatch):
     assert r["distancia_metros"] < 500
 
 
+def test_filtra_basura_real_encontrada_en_produccion():
+    """Regresión: estos 17 casos exactos aparecieron en una corrida real del
+    usuario y pasaban el filtro viejo — diccionarios, listicles, spam
+    educativo en inglés, un aviso de empleo colado, un homónimo de otra
+    provincia (Caseros = calle en Salta), perfil de Instagram, directorios."""
+    from app.discovery import extraer_candidatas
+    casos_basura = [
+        ("Concesionaria en Caseros en Cylex", "https://www.cylex.com.ar/x"),
+        ("Shouer (@shouer.arg) • Instagram photos and videos", "https://www.instagram.com/shouer.arg/"),
+        ("principales - Definición - WordReference.com", "https://www.wordreference.com/x"),
+        ("principales - Wiktionary, the free dictionary", "https://en.wiktionary.org/wiki/principales"),
+        ("PRINCIPALES Definition & Meaning - Merriam-Webster", "https://www.merriam-webster.com/x"),
+        ("LOS40: noticias musicales y radio online con todos los éxitos", "https://los40.com/"),
+        ("Definición - principal | Diccionario de la lengua española", "https://dle.rae.es/principal"),
+        ("52 Cosas Rentables para Fabricar y Vender desde Casa en 2026", "https://blog.com/negocios"),
+        ("Las 32 mejores ideas de negocios pequeños rentables en 2026", "https://blog.com/ideas"),
+        ("20 ideas de negocios caseros y de bajo costo - ENTER.CO", "https://enter.co/x"),
+        ("Vendedor tecnico de Mostrador - Zona Caseros", "https://algunportal.com.ar/aviso/123"),
+        ("Hotel Caseros Salta | Alojamiento con encanto en el centro", "https://hotelcaserossalta.com.ar/"),
+        ("10 tipos de servicio al cliente que debes conocer - Zendesk", "https://www.zendesk.com/blog/x"),
+        ("Empresas", "https://algunsitio.com.ar/"),
+        ("Contacto para empresas", "https://algunsitio.com.ar/contacto"),
+        ("Best Affordable Online Nursing Programs of 2026 - BestColleges", "https://www.bestcolleges.com/x"),
+        ("Abogados y Estudios Jurídicos en Caseros - CercanoOeste.com", "https://www.cercanooeste.com/x"),
+    ]
+    mock = {"organic": [{"title": t, "link": u, "snippet": ""} for t, u in casos_basura]}
+    r = extraer_candidatas(mock, "Caseros")
+    assert len(r) == 0, f"basura que no se filtró: {[c['nombre_crudo'] for c in r]}"
+
+    casos_reales = [
+        ("Metalúrgica Tesei S.A.", "https://www.metalurgicatesei.com.ar/"),
+        ("Distribuidora Real del Oeste SRL", "https://distrealoeste.com.ar/"),
+        ("Empresa X SA", "https://empresax.com.ar/"),
+    ]
+    mock2 = {"organic": [{"title": t, "link": u, "snippet": ""} for t, u in casos_reales]}
+    r2 = extraer_candidatas(mock2, "Caseros")
+    assert len(r2) == 3, "no debería filtrar empresas reales por error"
+
+
 def test_dominio_excluido_no_hace_falsos_positivos():
     """Regresión: 'x.com' (Twitter/X) como substring bloqueaba cualquier
     dominio que terminara en 'x.com...', como 'empresax.com.ar'."""

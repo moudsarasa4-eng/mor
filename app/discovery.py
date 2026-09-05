@@ -39,7 +39,25 @@ PATRONES_NO_EMPRESA = [
     r"^quienes somos\b", r"^qui[eé]nes somos\b", r"^inicio\s*[-|–]",
     r"\btrabajo de en\b",  # snippet roto típico de portal de empleo que se coló
     r"\ben (trujillo|lima|per[uú]|m[eé]xico|chile|colombia|espa[ñn]a)\b",  # país equivocado
+    r"\b(salta|jujuy|misiones|neuqu[eé]n|chubut)\b",  # otra provincia (ej. "Hotel Caseros Salta" — Caseros es homónimo de una calle en Salta)
+    # artículos tipo listicle / guía / definición — nunca son una empresa
+    r"\b\d+\s+(mejores\s+)?(consejos|maneras|tipos|ideas|cosas|pasos|trucos)\b",
+    r"^(c[oó]mo|qu[eé] es)\b.*\b(crear|hacer|abordar|mejorar|abrir)\b",
+    # títulos de aviso de empleo que se colaron fuera de un portal excluido
+    r"^(vendedor|cajero|operario|empleado|auxiliar|administrativo)\b.*\bzona\b",
+    r"\bgu[ií]a para\b", r"\bgu[ií]a de\b",
+    r"^definici[oó]n\b", r"^significado\b", r"\bdiccionario de la lengua\b",
+    r"\bdefinition\s*&?\s*meaning\b", r"free dictionary\b", r"spanish to english\b",
+    r"\b(best|most affordable|top)\b.*\b(programs?|degree|colleges?|schools?)\b",  # spam educativo en inglés
+    r"instagram photos and videos\b",
+    r"\b(cylex|guiaurbana|cercanooeste)\b",  # nombres de directorio, distintivos, no aparecen en nombres reales de empresa
 ]
+
+# títulos que son solo una palabra genérica suelta — no aportan nada como nombre
+PALABRAS_GENERICAS_SOLAS = {
+    "empresas", "sucursales", "contacto", "inicio", "nosotros", "servicios",
+    "productos", "novedades", "noticias", "contacto para empresas",
+}
 _PATRONES_NO_EMPRESA_COMPILADOS = [re.compile(p, re.IGNORECASE) for p in PATRONES_NO_EMPRESA]
 
 
@@ -49,6 +67,8 @@ def _parece_empresa(nombre: str, zona: str) -> bool:
         return False
     if nombre_l == zona.strip().lower():
         return False  # el título es literalmente el nombre de la zona, no una empresa
+    if nombre_l in PALABRAS_GENERICAS_SOLAS:
+        return False  # "Empresas", "Contacto", "Inicio"... no es un nombre real
     if any(p.search(nombre_l) for p in _PATRONES_NO_EMPRESA_COMPILADOS):
         return False
     # Nota: se descartó un filtro de "nombre de persona" (2 palabras Capitalizadas)
