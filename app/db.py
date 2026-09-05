@@ -43,6 +43,7 @@ def _migrar_columnas_nuevas(conn):
         ("dominio", "TEXT"), ("sitio_activo", "INTEGER"),
         ("estacion_cercana", "TEXT"), ("estacion_distancia_metros", "INTEGER"), ("estacion_caminata_min", "INTEGER"),
         ("contacto_intentado_sin_resultado", "INTEGER NOT NULL DEFAULT 0"),
+        ("exportada_txt", "INTEGER NOT NULL DEFAULT 0"),
     ]:
         try:
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")
@@ -50,6 +51,10 @@ def _migrar_columnas_nuevas(conn):
             pass
     try:
         conn.execute("ALTER TABLE contacts ADD COLUMN mx_verificado INTEGER")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE run_state ADD COLUMN ultima_tanda_inicio TEXT")
     except sqlite3.OperationalError:
         pass
 

@@ -27,7 +27,7 @@ from app.company import (
     upsert_company, add_source, add_signal, add_negative_signal,
     add_job_hypothesis, add_cv_match, add_contact, get_company,
     calcular_y_guardar_score, why_not, add_transport_access,
-    set_direccion_y_geocodificar,
+    set_direccion_y_geocodificar, marcar_jackpot,
 )
 from app.signals import Signal
 from app.negative_signals import NegativeSignal
@@ -99,6 +99,15 @@ def cmd_score(args):
         sueldo_min=args.sueldo_min, sueldo_max=args.sueldo_max, sueldo_fuente=args.sueldo_fuente,
     )
     print(json.dumps(resultado, ensure_ascii=False, indent=2))
+
+
+def cmd_mark_jackpot(args):
+    sid = marcar_jackpot(
+        args.company_id, args.puesto, args.chances, args.motivo,
+        sueldo_min=args.sueldo_min, sueldo_max=args.sueldo_max, sueldo_fuente=args.sueldo_fuente or "",
+        estado=args.estado, chances_baja_confianza=args.baja_confianza,
+    )
+    print(f"Marcada como {args.estado}. score_id={sid}")
 
 
 def cmd_audit(args):
@@ -412,6 +421,18 @@ def main():
     pc.add_argument("--tamano", default="desconocido", choices=["chica", "mediana", "grande", "desconocido"])
     pc.add_argument("--actividad", default="")
     pc.set_defaults(func=cmd_add_company)
+
+    pmj = sub.add_parser("mark-jackpot", help="registra un score simplificado tras revisar el .txt exportado a mano")
+    pmj.add_argument("--company-id", type=int, required=True, dest="company_id")
+    pmj.add_argument("--puesto", required=True)
+    pmj.add_argument("--chances", type=int, required=True, help="0-100")
+    pmj.add_argument("--motivo", required=True, help="por qué, con qué evidencia (fuentes citadas)")
+    pmj.add_argument("--estado", default="jackpot", choices=["jackpot", "en_revision"])
+    pmj.add_argument("--sueldo-min", type=int, default=None, dest="sueldo_min")
+    pmj.add_argument("--sueldo-max", type=int, default=None, dest="sueldo_max")
+    pmj.add_argument("--sueldo-fuente", default="", dest="sueldo_fuente")
+    pmj.add_argument("--baja-confianza", action="store_true", dest="baja_confianza")
+    pmj.set_defaults(func=cmd_mark_jackpot)
 
     ps = sub.add_parser("add-source")
     ps.add_argument("--company-id", type=int, required=True, dest="company_id")

@@ -5,7 +5,6 @@ de Claude y que haga el análisis real (contacto, seriedad, señales, CV match).
 Solo exporta las que no se exportaron todavía (columna exportada_txt), para no
 repetir la misma lista larga en cada tanda.
 """
-import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
@@ -22,17 +21,8 @@ def _carpeta_descargas() -> Path:
     return DOWNLOADS_FALLBACK
 
 
-def _asegurar_columna_exportada(conn):
-    try:
-        conn.execute("ALTER TABLE companies ADD COLUMN exportada_txt INTEGER NOT NULL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-
 def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -> str | None:
     conn = get_conn()
-    _asegurar_columna_exportada(conn)
-    conn.commit()
 
     query = (
         "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, c.contacto_intentado_sin_resultado, "

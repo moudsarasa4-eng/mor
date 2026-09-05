@@ -329,6 +329,81 @@ def test_promote_excluye_cadena_y_zona_prohibida(tmp_path, monkeypatch):
     assert not any("Carrefour" in n for n in nombres)
 
 
+def test_marcar_jackpot_simplificado(tmp_path, monkeypatch):
+    """El comando main.py score requiere ~15 parámetros que nadie llena a
+    mano — por eso 'jackpots' quedaba siempre en 0. marcar_jackpot() es el
+    camino simplificado real: se usa después de revisar el .txt exportado."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company, marcar_jackpot
+    cid = upsert_company("Metalúrgica Tesei SRL", "logistica", "Hurlingham")
+
+    marcar_jackpot(cid, puesto="Ayudante de depósito", chances_estimadas=70,
+                    motivo="Sitio propio activo, email de administración con MX OK, sin señales negativas",
+                    sueldo_min=900000, sueldo_max=1200000, sueldo_fuente="salarios_referencia.py")
+
+    conn = db_module.get_conn()
+    row = conn.execute("SELECT estado FROM companies WHERE id=?", (cid,)).fetchone()
+    score = conn.execute("SELECT chances_estimadas, puesto_objetivo FROM scores WHERE company_id=?", (cid,)).fetchone()
+    conn.close()
+    assert row["estado"] == "jackpot"
+    assert score["chances_estimadas"] == 70
+    assert score["puesto_objetivo"] == "Ayudante de depósito"
+
+
+def test_ultima_tanda_inicio_se_registra_y_filtra(tmp_path, monkeypatch):
+    """runner.loop_investigacion debe marcar el inicio de cada tanda en
+    run_state para que el dashboard pueda mostrar 'solo lo de esta corrida'."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    conn = db_module.get_conn()
+    antes = conn.execute("SELECT ultima_tanda_inicio FROM run_state WHERE id=1").fetchone()
+    assert antes["ultima_tanda_inicio"] is None
+    conn.close()
+
+    import app.runner as runner
+    runner.loop_investigacion(max_ciclos=0)  # 0 ciclos: solo debe marcar inicio y salir
+
+    conn = db_module.get_conn()
+    despues = conn.execute("SELECT ultima_tanda_inicio FROM run_state WHERE id=1").fetchone()
+    conn.close()
+    assert despues["ultima_tanda_inicio"] is not None
+
+
+def test_export_manual_no_se_bloquea_por_auto_export_previo(tmp_path, monkeypatch):
+    """Bug real: el botón manual de exportar usaba solo_nuevas=True, así que
+    si el ciclo automático ya había exportado (y marcado exportada_txt=1),
+    el botón devolvía 'nada para exportar' aunque hubiera candidatas
+    pendientes de revisión sin outreach todavía."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    cid = upsert_company("Distribuidora Real del Oeste SRL", "logistica", "Hurlingham")
+    conn = db_module.get_conn()
+    conn.execute("UPDATE companies SET estado='candidata', exportada_txt=1 WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+
+    from app.export_txt import exportar_candidatas_txt
+    import app.export_txt as et
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    monkeypatch.setattr(et, "_carpeta_descargas", lambda: downloads)
+
+    sin_filtro = exportar_candidatas_txt(solo_nuevas=True)
+    assert sin_filtro is None  # reproduce el bug: ya estaba marcada como exportada
+
+    con_fix = exportar_candidatas_txt(solo_nuevas=False)
+    assert con_fix is not None
+    assert "Distribuidora Real del Oeste" in Path(con_fix).read_text(encoding="utf-8")
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -290,6 +290,32 @@ def set_direccion_y_geocodificar(company_id: int, direccion: str) -> dict | None
     return resultado
 
 
+def marcar_jackpot(company_id: int, puesto: str, chances_estimadas: int, motivo: str,
+                    sueldo_min: int | None = None, sueldo_max: int | None = None,
+                    sueldo_fuente: str = "", estado: str = "jackpot",
+                    chances_baja_confianza: bool = False) -> int:
+    """Registro simplificado de score, pensado para usarse DESPUÉS de que el
+    usuario pega el .txt exportado en una sesión de Claude y este audita cada
+    empresa a mano (contacto real, seriedad, señales) — no reemplaza esa
+    auditoría, solo evita tener que llenar los ~15 parámetros de
+    calcular_y_guardar_score cuando la mayoría no aplican todavía.
+    estado: 'jackpot' (alta confianza) o 'en_revision' (dudosa, seguir mirando)."""
+    conn = get_conn()
+    cur = conn.execute(
+        "INSERT INTO scores (company_id, employer_score, hiring_signal_score, opportunity_score, "
+        "accessibility_score, contactability_score, jackpot_score, confidence, puesto_objetivo, "
+        "chances_estimadas, chances_baja_confianza, sueldo_min, sueldo_max, sueldo_es_estimado, "
+        "sueldo_fuente, detalle_json, creado_en) "
+        "VALUES (?, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+        (company_id, puesto, chances_estimadas, 1 if chances_baja_confianza else 0,
+         sueldo_min, sueldo_max, sueldo_fuente, json.dumps({"motivo": motivo}, ensure_ascii=False), now()),
+    )
+    conn.execute("UPDATE companies SET estado=?, actualizado_en=? WHERE id=?", (estado, now(), company_id))
+    conn.commit()
+    conn.close()
+    return cur.lastrowid
+
+
 def why_not(company_id: int) -> str | None:
     conn = get_conn()
     row = conn.execute("SELECT estado, motivo_descarte, nombre FROM companies WHERE id=?", (company_id,)).fetchone()

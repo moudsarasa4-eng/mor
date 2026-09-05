@@ -125,7 +125,11 @@ def api_continue():
 @app.route("/api/export", methods=["POST"])
 def api_export():
     from app.export_txt import exportar_candidatas_txt
-    archivo = exportar_candidatas_txt()
+    # el botón manual siempre exporta TODO lo pendiente, no solo lo nuevo desde
+    # el último export — la tanda automática ya marca todo como exportado al
+    # cerrar el ciclo, así que con solo_nuevas=True el botón podía devolver
+    # "nada nuevo" aunque hubiera 100 candidatas esperando revisión.
+    archivo = exportar_candidatas_txt(solo_nuevas=False)
     return jsonify({"archivo": archivo})
 
 
@@ -149,6 +153,25 @@ def api_candidatas():
             d["sueldo"] = "No estimable"
         items.append(d)
     return jsonify({"total": total, "items": items})
+
+
+@app.route("/api/ultima-tanda")
+def api_ultima_tanda():
+    conn = get_conn()
+    st = conn.execute("SELECT ultima_tanda_inicio FROM run_state WHERE id=1").fetchone()
+    inicio = st["ultima_tanda_inicio"] if st else None
+    if not inicio:
+        conn.close()
+        return jsonify({"inicio": None, "items": []})
+    rows = conn.execute("""
+        SELECT c.id, c.nombre, c.zona, c.rubro, c.estado, c.motivo_descarte,
+               (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
+        FROM companies c WHERE c.creado_en >= ? ORDER BY c.id DESC
+    """, (inicio,)).fetchall()
+    conn.close()
+    aceptadas = [dict(r) for r in rows if r["estado"] != "descartada"]
+    descartadas = [dict(r) for r in rows if r["estado"] == "descartada"]
+    return jsonify({"inicio": inicio, "items": aceptadas, "descartadas": descartadas})
 
 
 @app.route("/api/company/<int:company_id>")

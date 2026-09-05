@@ -74,6 +74,15 @@
   </div>
 
   <div class="card">
+    <h1>🆕 Última tanda</h1>
+    <div class="sub">Resultado de la corrida más reciente (empezó: <span id="tanda_inicio">-</span>), ya pasado por el filtro de calidad. <span id="tanda_aceptadas">0</span> aceptadas, <span id="tanda_descartadas">0</span> descartadas por el filtro.</div>
+    <table id="tabla_tanda">
+      <thead><tr><th>#</th><th>Empresa</th><th>Zona</th><th>Rubro</th><th>Estado</th><th>Fuente</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h1>📋 Candidatas descubiertas (pendientes de revisión)</h1>
     <div class="sub">Encontradas por el motor solo, todavía sin puntuar. <span id="candidatas_total">0</span> en total, mostrando las últimas 50.</div>
     <table id="tabla_candidatas">
@@ -133,6 +142,22 @@ async function actualizarCandidatas() {
   });
 }
 
+async function actualizarUltimaTanda() {
+  const r = await fetch('/api/ultima-tanda');
+  const d = await r.json();
+  document.getElementById('tanda_inicio').textContent = d.inicio ? new Date(d.inicio).toLocaleString() : '-';
+  document.getElementById('tanda_aceptadas').textContent = d.items.length;
+  document.getElementById('tanda_descartadas').textContent = d.descartadas.length;
+  const tbody = document.querySelector('#tabla_tanda tbody');
+  tbody.innerHTML = '';
+  d.items.forEach(row => {
+    const tr = document.createElement('tr');
+    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : '-';
+    tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.estado}</td><td>${fuente}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 document.getElementById('btn_start').onclick = () => fetch('/api/start', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_pause').onclick = () => fetch('/api/pause', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_continue').onclick = () => fetch('/api/continue', {method: 'POST'}).then(actualizar);
@@ -147,8 +172,10 @@ document.getElementById('btn_export').onclick = async () => {
 
 actualizar();
 actualizarCandidatas();
+actualizarUltimaTanda();
 setInterval(actualizar, 3000);
 setInterval(actualizarCandidatas, 8000);
+setInterval(actualizarUltimaTanda, 8000);
 </script>
 </body>
 </html>

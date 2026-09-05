@@ -117,6 +117,11 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
     inicio = time.monotonic()
     limite_diario = CONFIG["discovery"]["daily"]["max_queries"]
 
+    conn = get_conn()
+    conn.execute("UPDATE run_state SET ultima_tanda_inicio=? WHERE id=1", (now(),))
+    conn.commit()
+    conn.close()
+
     def tiempo_agotado() -> bool:
         return max_minutos is not None and (time.monotonic() - inicio) >= max_minutos * 60
 
@@ -208,6 +213,12 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
                 from app.contact_finder import correr_lote as correr_contactos
                 _gastar(correr_contactos, zona=None, limite=3)
                 trabajo_hecho = True
+
+        # pasa lo recién descubierto por el filtro de calidad retroactivo antes
+        # de mostrarlo/exportarlo — así una tanda no muestra basura que el
+        # filtro de discovery.py no atajó en el momento pero sí atrapa ahora.
+        from app.cleanup import limpiar_candidatas_basura
+        limpiar_candidatas_basura()
 
         archivo_txt = exportar_candidatas_txt()
         if archivo_txt:
