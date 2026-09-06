@@ -986,6 +986,22 @@ def test_export_aclara_origen_overpass_cuando_no_hay_fuente_web(tmp_path, monkey
     assert "OpenStreetMap" in contenido
 
 
+def test_dominios_gobierno_y_agregadores_turismo_excluidos():
+    """Del análisis del archivo real de 1787 candidatas: agregadores de
+    turismo/reseñas (hoteles, alquileres temporarios) y dominios .gob.ar/.gov
+    se colaban como candidatas."""
+    from app.discovery import _es_dominio_excluido
+    casos = [
+        "https://www.trip.com/hotels/x",
+        "https://www.glassdoor.com.ar/x",
+        "https://www.airbnb.com/rooms/x",
+        "https://www.argentina.gob.ar/x",
+        "https://archive.epa.gov/x",  # ya cubierto por dominio específico, pero también por .gov
+    ]
+    for url in casos:
+        assert _es_dominio_excluido(url), f"debería excluirse: {url}"
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

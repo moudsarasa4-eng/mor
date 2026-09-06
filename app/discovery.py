@@ -112,6 +112,10 @@ TLDS_EXTRANJEROS = (
     ".pa", ".do", ".es", ".us", ".br", ".ve", ".hn", ".sv", ".ni",
 )
 
+# organismos estatales/gobierno: no son empleadores privados accionables por
+# postulación espontánea, el ingreso funciona distinto (concurso público, etc.)
+DOMINIOS_GOBIERNO = (".gob.ar", ".gov")
+
 
 def _es_dominio_excluido(url: str) -> bool:
     """Coincidencia exacta/subdominio para entradas de solo-dominio (nunca
@@ -125,6 +129,8 @@ def _es_dominio_excluido(url: str) -> bool:
     dom = _dominio(url)
     url_l = url.lower()
     if dom and dom.endswith(TLDS_EXTRANJEROS):
+        return True
+    if dom and dom.endswith(DOMINIOS_GOBIERNO):
         return True
     for excl in DOMINIOS_EXCLUIR + DOMINIOS_RUIDO_NO_EMPRESA:
         if "/" in excl:

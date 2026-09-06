@@ -96,6 +96,10 @@ DOMINIOS_RUIDO_NO_EMPRESA = [
     "oerproject.com", "archive.epa.gov", "mapcarta.com",
     # blogs / artículos genéricos, no una empresa
     "substack.com", "opcionempleo.com",
+    # agregadores de turismo/reseñas/empleo que se colaron en el análisis de
+    # un archivo real de 1787 candidatas (zona Martín Coronado/Morón/Ramos
+    # Mejía): hoteles, alquileres temporarios, rankings de "mejores empresas"
+    "trip.com", "glassdoor.com", "glassdoor.com.ar", "airbnb.com", "habitissimo.com.ar",
 ]
 
 
