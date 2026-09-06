@@ -70,7 +70,10 @@ def correr_lote(partidos: list[str] | None = None, max_rubros: int = 10) -> dict
     resultados = [procesar_rubro(*t) for t in tareas]
     return {
         "procesados": len(resultados),
-        "pendientes_restantes": len(pendientes(partidos)) - len(resultados),
+        # pendientes(partidos) ya excluye lo recién procesado (industrial_progress
+        # se actualiza en procesar_rubro) — restar len(resultados) de nuevo
+        # duplicaba el descuento y subestimaba lo que falta.
+        "pendientes_restantes": len(pendientes(partidos)),
         "empresas_nuevas_totales": sum(r["empresas_nuevas"] for r in resultados),
         "detalle": resultados,
     }

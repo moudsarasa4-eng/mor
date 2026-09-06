@@ -17,7 +17,7 @@ from app.db import get_conn, now
 from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 from app.salarios_referencia import estimar_sueldo
-from app.site_check import sitio_activo, extraer_dominio
+import app.site_check as site_check
 from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
@@ -111,7 +111,7 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
 
         rubro = _inferir_rubro(f["keyword"])
         sueldo_ref = estimar_sueldo(rubro)
-        dominio = extraer_dominio(f["url"]) if f["url"] else ""
+        dominio = site_check.extraer_dominio(f["url"]) if f["url"] else ""
 
         # dedupe: por nombre normalizado O por dominio (agarra casos donde el
         # nombre varía pero es el mismo sitio, ej. "Empresa SA" vs "Empresa S.A. - Inicio")
@@ -132,7 +132,7 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
         if existente:
             company_id = existente["id"]
         else:
-            sitio_ok = sitio_activo(f["url"]) if f["url"] else None
+            sitio_ok = site_check.sitio_activo(f["url"]) if f["url"] else None
             ts = now()
             cur = conn.execute(
                 "INSERT INTO companies (nombre, rubro, zona, localidad, actividad, estado, "

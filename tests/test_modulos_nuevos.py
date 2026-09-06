@@ -168,15 +168,20 @@ def test_site_check_extraer_dominio():
 
 
 def test_backup_crea_y_limpia_viejos(tmp_path, monkeypatch):
+    """Bug real encontrado en esta auditoría: backup.py fijaba DB_PATH/
+    BACKUPS_DIR una sola vez al importar el módulo (from app.db import
+    DB_PATH), así que monkeypatchear app.db.DB_PATH en un test no lo movía —
+    hacer_backup() seguía usando la base REAL del repo. De hecho quedó un
+    backup huérfano real en data/backups/ de una corrida de tests anterior,
+    confirmando que pasaba de verdad. Ahora backup.py resuelve db.DB_PATH en
+    cada llamada, así que alcanza con monkeypatchear app.db.DB_PATH, sin
+    tocar nada dentro de app.backup."""
     import app.db as db_module
     db_path = tmp_path / "database.sqlite"
-    db_module.init_db.__globals__  # no-op, solo para claridad
     monkeypatch.setattr(db_module, "DB_PATH", db_path)
     db_module.init_db()
 
     import app.backup as backup_module
-    monkeypatch.setattr(backup_module, "DB_PATH", db_path)
-    monkeypatch.setattr(backup_module, "BACKUPS_DIR", tmp_path / "backups")
     monkeypatch.setattr(backup_module, "MAX_BACKUPS", 3)
 
     import time
@@ -187,6 +192,8 @@ def test_backup_crea_y_limpia_viejos(tmp_path, monkeypatch):
 
     restantes = list((tmp_path / "backups").glob("database_*.sqlite"))
     assert len(restantes) == 3, "debería quedarse solo con los últimos MAX_BACKUPS"
+    for a in archivos:
+        assert str(tmp_path) in a  # confirma que escribió en la base de TEST, no en la real
 
     restaurado = backup_module.restaurar_ultimo_backup()
     assert restaurado is not None
@@ -542,6 +549,86 @@ def test_loop_investigacion_corre_overpass_y_no_lo_repite(tmp_path, monkeypatch)
     conn.close()
     assert "Depósito Overpass SRL" in nombres
     assert len(zonas_corridas) == 1  # una sola zona por ciclo, no todas de una
+
+
+def test_loop_investigacion_no_corre_dos_veces_en_paralelo(tmp_path, monkeypatch):
+    """Bug real: el modo automático (scheduler.py) y el botón manual
+    (iniciar_en_background) llamaban a loop_investigacion desde threads
+    distintos sin ningún lock compartido — podían pisarse sobre el mismo
+    SQLite. Ahora un segundo llamado mientras el primero sigue activo debe
+    ser un no-op inmediato."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.runner as runner_module
+    runner_module._loop_activo.acquire()  # simula que ya hay una tanda corriendo
+    try:
+        runner_module.loop_investigacion(max_ciclos=5)  # no debería tocar nada
+    finally:
+        runner_module._loop_activo.release()
+
+    from app.run_state import get_state
+    assert get_state()["ultima_tanda_inicio"] is None  # ni siquiera llegó a marcar el inicio
+
+
+def test_contact_finder_marca_intentado_si_falla_la_busqueda(tmp_path, monkeypatch):
+    """Bug real: si search_client.buscar fallaba (SearchClientError), la
+    empresa quedaba elegible para reintento en TODAS las corridas futuras
+    para siempre, sin gastar presupuesto ni marcarse como intentada."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    cid = upsert_company("Empresa Sin Contacto SA", "logistica", "Hurlingham")
+
+    import app.contact_finder as cf
+    import app.search_client as sc
+
+    def falla(query, **kw):
+        raise sc.SearchClientError("timeout simulado")
+    monkeypatch.setattr(sc, "buscar", falla)
+
+    resultado = cf.buscar_contacto(cid, "Empresa Sin Contacto SA", "Hurlingham")
+    assert resultado is None
+
+    conn = db_module.get_conn()
+    row = conn.execute("SELECT contacto_intentado_sin_resultado FROM companies WHERE id=?", (cid,)).fetchone()
+    queries = conn.execute("SELECT COUNT(*) c FROM queries_log").fetchone()["c"]
+    conn.close()
+    assert row["contacto_intentado_sin_resultado"] == 1
+    assert queries == 1  # la falla debe contar contra el presupuesto igual que un éxito
+
+
+def test_correr_lote_no_duplica_descuento_de_pendientes_restantes(tmp_path, monkeypatch):
+    """Bug real (industrial_discovery y supplier_discovery, mismo patrón):
+    pendientes_restantes restaba len(resultados) de un pendientes() que YA
+    excluía lo recién procesado, subestimando (o directamente diciendo mal)
+    cuánto queda."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.supplier_discovery as sd
+    monkeypatch.setattr(sd, "CATEGORIAS_PRODUCTO", ["a", "b", "c", "d", "e"])
+
+    def mock_ejecutar_query(query, zona, tipo, keyword):
+        conn = db_module.get_conn()
+        conn.execute(
+            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+            "VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?)",
+            (query, zona, keyword, tipo, db_module.now()),
+        )
+        conn.commit()
+        conn.close()
+        return {"empresas_nuevas": 0}
+    monkeypatch.setattr(sd, "ejecutar_query", mock_ejecutar_query)
+    monkeypatch.setattr(sd, "promover_candidatas", lambda zona: None)
+
+    r = sd.correr_lote("Hurlingham", max_categorias=2)
+    assert r["procesadas"] == 2
+    assert r["pendientes_restantes"] == 3  # 5 totales - 2 procesadas, no 5-2-2=1
 
 
 if __name__ == "__main__":

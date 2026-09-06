@@ -11,7 +11,6 @@ from flask import Flask, jsonify, render_template, request
 from app.db import get_conn, init_db
 from app.run_state import get_state
 from app import runner, scheduler
-from app.dashboard import top_oportunidades
 
 app = Flask(__name__)
 

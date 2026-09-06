@@ -58,7 +58,10 @@ def correr_lote(zona: str, max_categorias: int = 5) -> dict:
     resultados = [procesar_categoria(c, zona) for c in tareas]
     return {
         "procesadas": len(resultados),
-        "pendientes_restantes": len(pendientes(zona)) - len(resultados),
+        # pendientes(zona) ya excluye lo recién procesado (queries_log se
+        # actualiza en cada llamada) — restar len(resultados) de nuevo
+        # duplicaba el descuento y subestimaba lo que falta.
+        "pendientes_restantes": len(pendientes(zona)),
         "empresas_nuevas_totales": sum(r["empresas_nuevas"] for r in resultados),
         "detalle": resultados,
     }

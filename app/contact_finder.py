@@ -49,6 +49,20 @@ def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | N
     try:
         crudo = search_client.buscar(query)
     except SearchClientError:
+        # Igual que en discovery.ejecutar_query: si esto no se registra ni se
+        # marca como intentada, una falla de red/API reintenta la MISMA
+        # empresa en cada corrida futura para siempre, sin gastar presupuesto
+        # nunca (por eso nunca se descartaba sola).
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+            "VALUES (?, ?, '', 'TYPE_CONTACT', 0, 0, 0, 0, ?)",
+            (query, zona, now()),
+        )
+        conn.execute("UPDATE companies SET contacto_intentado_sin_resultado=1 WHERE id=?", (company_id,))
+        conn.commit()
+        conn.close()
+        registrar_queries(1)
         return None
 
     conn = get_conn()
@@ -83,7 +97,15 @@ def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | N
         try:
             add_contact(company_id, "email", email, verificado=False, fuente_id=fuente_id, mx_verificado=mx_ok)
         except ValueError:
-            return None  # add_contact rechazó (parece nombre de persona)
+            # add_contact rechazó (parece nombre de persona) — sin marcar esto
+            # como intentado, la empresa se reevaluaría en cada corrida futura
+            # aunque el único email que aparece en los resultados sea siempre
+            # el mismo rechazado.
+            conn = get_conn()
+            conn.execute("UPDATE companies SET contacto_intentado_sin_resultado=1 WHERE id=?", (company_id,))
+            conn.commit()
+            conn.close()
+            return None
         prioridad = "administración/info" if any(p in email.lower() for p in PALABRAS_PRIORIDAD_ALTA) else "general"
         return {"tipo": "email", "valor": email, "prioridad": prioridad, "fuente": mejor_url, "mx_verificado": mx_ok}
 

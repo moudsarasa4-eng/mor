@@ -20,6 +20,12 @@ CONFIG = yaml.safe_load((BASE_DIR / "config.yaml").read_text(encoding="utf-8"))
 _pause_event = threading.Event()  # set = correr, clear = pausado
 _pause_event.set()
 _stop_event = threading.Event()
+# el modo automático (scheduler.py, su propio thread) y el botón manual
+# "iniciar tanda" (iniciar_en_background, otro thread) llaman a
+# loop_investigacion por separado, sin lock compartido entre sí — sin este
+# guard podían correr los dos a la vez sobre el mismo SQLite (riesgo real de
+# "database is locked" y de gastar presupuesto duplicado en la misma zona).
+_loop_activo = threading.Lock()
 
 
 def orden_zonas() -> list[str]:
@@ -111,6 +117,15 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
     max_minutos acota por TIEMPO (ej. tanda de 2 horas) en vez de por cantidad
     fija de queries — el motor sigue buscando mientras haya tiempo, presupuesto
     y zonas no saturadas."""
+    if not _loop_activo.acquire(blocking=False):
+        return  # ya hay una tanda corriendo (automática o manual), no duplicar
+    try:
+        _loop_investigacion_interna(max_ciclos, max_minutos)
+    finally:
+        _loop_activo.release()
+
+
+def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | None):
     _stop_event.clear()
     set_status("running")
     ciclos = 0
