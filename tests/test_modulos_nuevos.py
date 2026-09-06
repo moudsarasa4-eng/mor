@@ -704,6 +704,42 @@ def test_contact_finder_usa_sitio_propio_antes_que_buscar_por_snippet(tmp_path, 
     assert llamo_serper["n"] == 0  # no debió gastar presupuesto de Serper
 
 
+def test_no_repite_queries_ya_ejecutadas_en_la_misma_zona(tmp_path, monkeypatch):
+    """Bug real: la lista de queries generada para una zona sale siempre en
+    el mismo orden (keywords por prioridad), y cada corrida solo toma las
+    primeras N (max_queries_per_zone) — sin filtrar lo ya ejecutado, el motor
+    volvía a preguntar EXACTAMENTE lo mismo en cada corrida futura mientras
+    la zona no llegara a saturarse, gastando presupuesto por resultados ya
+    vistos."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.runner as runner_module
+    from app.db import get_conn, now
+
+    zona = "Hurlingham"
+    lote_completo = runner_module._generar_lote_queries(zona)
+    assert len(lote_completo) > 5
+
+    # simular que ya se ejecutaron las primeras 3 queries de la lista
+    conn = get_conn()
+    for q in lote_completo[:3]:
+        conn.execute(
+            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+            "VALUES (?, ?, '', 'TYPE_A', 1, 0, 0, 0, ?)",
+            (q["query"], zona, now()),
+        )
+    conn.commit()
+    conn.close()
+
+    lote_filtrado = runner_module._generar_lote_queries(zona)
+    queries_filtradas = {q["query"] for q in lote_filtrado}
+    for q in lote_completo[:3]:
+        assert q["query"] not in queries_filtradas, "no debería repetir una query ya ejecutada para esta zona"
+    assert len(lote_filtrado) == len(lote_completo) - 3
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

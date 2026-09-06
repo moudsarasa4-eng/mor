@@ -101,12 +101,26 @@ def _keywords_por_prioridad() -> list[str]:
     return [f["termino"] for f in ordenadas]
 
 
+def _queries_ya_ejecutadas(zona: str) -> set[str]:
+    conn = get_conn()
+    ya = {r["query"] for r in conn.execute("SELECT DISTINCT query FROM queries_log WHERE zona=?", (zona,))}
+    conn.close()
+    return ya
+
+
 def _generar_lote_queries(zona: str) -> list[dict]:
+    """Genera el lote completo y saca las que YA se ejecutaron para esta zona
+    (queries_log). Sin este filtro, como la lista sale siempre en el mismo
+    orden (keywords por prioridad) y cada corrida solo toma las primeras
+    max_queries_per_zone, el motor terminaba re-preguntando exactamente lo
+    mismo en cada corrida futura mientras la zona no llegara a saturarse —
+    gastando presupuesto de Serper por resultados que ya había visto."""
     queries = []
     for kw in _keywords_por_prioridad():
         queries.extend(plantillas_query(zona, kw))
     queries.extend(plantillas_query(zona))
-    return queries
+    ya_ejecutadas = _queries_ya_ejecutadas(zona)
+    return [q for q in queries if q["query"] not in ya_ejecutadas]
 
 
 def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None = None):

@@ -87,16 +87,22 @@ def plantillas_query(zona: str, keyword: str = "") -> list[dict]:
     if kw:
         q.append({"query": f"empresas {kw} {zona}{sufijo}", "tipo": "TYPE_A", "keyword": kw})
         q.append({"query": f"\"{kw}\" {zona} -{' -'.join(NOISE_TERMS_INICIALES[:4])}{sufijo}", "tipo": "TYPE_A", "keyword": kw})
-    q.append({"query": f"principales empresas {zona}{sufijo}", "tipo": "TYPE_B", "keyword": kw})
-    q.append({"query": f"fábricas industrias {zona}{sufijo}", "tipo": "TYPE_C", "keyword": kw})
-    q.append({"query": f"empresa {zona} expansión OR inversión OR \"nueva planta\" OR ampliación{sufijo}", "tipo": "TYPE_E", "keyword": kw})
-    q.append({"query": f"empresa {zona} depósito OR planta OR sucursal OR \"centro logístico\"{sufijo}", "tipo": "TYPE_F", "keyword": kw})
-    q.append({"query": f"\"parque industrial\" {zona} empresas instaladas{sufijo}", "tipo": "TYPE_F", "keyword": kw})
-    # directorios de empresas argentinos (Páginas Amarillas, CUIT Online no
-    # tienen API gratuita masiva para descubrir por rubro, pero sus páginas
-    # SÍ están indexadas — sin este site: el buscador de texto normal casi
-    # nunca las trae arriba de los resultados).
-    if kw:
+        # directorios de empresas argentinos (Páginas Amarillas, CUIT Online no
+        # tienen API gratuita masiva para descubrir por rubro, pero sus páginas
+        # SÍ están indexadas — sin este site: el buscador de texto normal casi
+        # nunca las trae arriba de los resultados).
         q.append({"query": f"site:paginasamarillas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
         q.append({"query": f"site:cuitonline.com {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+    else:
+        # estas NO dependen de la keyword (el texto de la query es siempre el
+        # mismo) — antes se generaban igual dentro del bloque de arriba, así
+        # que se armaban una vez POR CADA keyword (70+ veces, todas con el
+        # mismo texto): un desperdicio real de presupuesto, ya que la llamada
+        # sin keyword (una sola vez por zona, en runner._generar_lote_queries)
+        # alcanza para cubrirlas.
+        q.append({"query": f"principales empresas {zona}{sufijo}", "tipo": "TYPE_B", "keyword": kw})
+        q.append({"query": f"fábricas industrias {zona}{sufijo}", "tipo": "TYPE_C", "keyword": kw})
+        q.append({"query": f"empresa {zona} expansión OR inversión OR \"nueva planta\" OR ampliación{sufijo}", "tipo": "TYPE_E", "keyword": kw})
+        q.append({"query": f"empresa {zona} depósito OR planta OR sucursal OR \"centro logístico\"{sufijo}", "tipo": "TYPE_F", "keyword": kw})
+        q.append({"query": f"\"parque industrial\" {zona} empresas instaladas{sufijo}", "tipo": "TYPE_F", "keyword": kw})
     return q
