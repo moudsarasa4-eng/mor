@@ -404,6 +404,61 @@ def test_export_manual_no_se_bloquea_por_auto_export_previo(tmp_path, monkeypatc
     assert "Distribuidora Real del Oeste" in Path(con_fix).read_text(encoding="utf-8")
 
 
+def test_origen_contacto_presencial_se_prioriza_en_export(tmp_path, monkeypatch):
+    """Históricamente el canal de mayor conversión para estos rubros es
+    referido/presencial, no un hallazgo web frío — el export debe listar
+    primero las marcadas como 'presencial'."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    upsert_company("Encontrada Por Web SRL", "logistica", "Hurlingham", origen_contacto="web")
+    conn = db_module.get_conn()
+    conn.execute("UPDATE companies SET estado='candidata' WHERE nombre='Encontrada Por Web SRL'")
+    conn.commit()
+    conn.close()
+
+    upsert_company("Grupo OL", "administrativo", "Hurlingham", origen_contacto="presencial")
+    conn = db_module.get_conn()
+    conn.execute("UPDATE companies SET estado='candidata' WHERE nombre='Grupo OL'")
+    conn.commit()
+    conn.close()
+
+    from app.export_txt import exportar_candidatas_txt
+    import app.export_txt as et
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    monkeypatch.setattr(et, "_carpeta_descargas", lambda: downloads)
+
+    ruta = exportar_candidatas_txt(solo_nuevas=False)
+    contenido = Path(ruta).read_text(encoding="utf-8")
+    assert contenido.index("Grupo OL") < contenido.index("Encontrada Por Web SRL")
+    assert "[REFERIDO/PRESENCIAL]" in contenido
+
+
+def test_ronda_presencial_ordena_por_distancia(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    for nombre, dist in [("Lejos SRL", 8.0), ("Cerca SRL", 1.5)]:
+        cid = upsert_company(nombre, "logistica", "Hurlingham")
+        conn = db_module.get_conn()
+        conn.execute(
+            "UPDATE companies SET estado='candidata', direccion=?, distancia_km=?, "
+            "contacto_intentado_sin_resultado=1 WHERE id=?",
+            (f"Calle Falsa {dist}", dist, cid),
+        )
+        conn.commit()
+        conn.close()
+
+    from app.ronda_presencial import generar_ronda
+    ronda = generar_ronda()
+    assert [r["nombre"] for r in ronda] == ["Cerca SRL", "Lejos SRL"]
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

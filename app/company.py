@@ -12,23 +12,27 @@ from app.scoring import EmployerInputs, JackpotInputs, employer_score, jackpot_s
 
 def upsert_company(nombre: str, rubro: str, zona: str, localidad: str = "",
                     antiguedad_anios: int | None = None, tamano_estimado: str = "desconocido",
-                    actividad: str = "") -> int:
+                    actividad: str = "", origen_contacto: str = "web") -> int:
+    """origen_contacto: 'web' (descubierta por el motor) o 'presencial' (Marco
+    la visitó/le dieron el dato a mano) — históricamente el canal de mayor
+    conversión para estos rubros es referido/presencial, no aviso publicado,
+    así que se distingue para priorizarlo en exports y rondas de visita."""
     conn = get_conn()
     row = conn.execute("SELECT id FROM companies WHERE nombre = ?", (nombre,)).fetchone()
     ts = now()
     if row:
         conn.execute(
             "UPDATE companies SET rubro=?, zona=?, localidad=?, antiguedad_anios=?, "
-            "tamano_estimado=?, actividad=?, actualizado_en=? WHERE id=?",
-            (rubro, zona, localidad, antiguedad_anios, tamano_estimado, actividad, ts, row["id"]),
+            "tamano_estimado=?, actividad=?, origen_contacto=?, actualizado_en=? WHERE id=?",
+            (rubro, zona, localidad, antiguedad_anios, tamano_estimado, actividad, origen_contacto, ts, row["id"]),
         )
         company_id = row["id"]
     else:
         cur = conn.execute(
             "INSERT INTO companies (nombre, rubro, zona, localidad, antiguedad_anios, "
-            "tamano_estimado, actividad, estado, creado_en, actualizado_en) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, 'candidata', ?, ?)",
-            (nombre, rubro, zona, localidad, antiguedad_anios, tamano_estimado, actividad, ts, ts),
+            "tamano_estimado, actividad, origen_contacto, estado, creado_en, actualizado_en) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'candidata', ?, ?)",
+            (nombre, rubro, zona, localidad, antiguedad_anios, tamano_estimado, actividad, origen_contacto, ts, ts),
         )
         company_id = cur.lastrowid
     conn.commit()

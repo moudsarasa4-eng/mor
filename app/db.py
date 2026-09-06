@@ -44,6 +44,7 @@ def _migrar_columnas_nuevas(conn):
         ("estacion_cercana", "TEXT"), ("estacion_distancia_metros", "INTEGER"), ("estacion_caminata_min", "INTEGER"),
         ("contacto_intentado_sin_resultado", "INTEGER NOT NULL DEFAULT 0"),
         ("exportada_txt", "INTEGER NOT NULL DEFAULT 0"),
+        ("origen_contacto", "TEXT NOT NULL DEFAULT 'web'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")

@@ -48,7 +48,7 @@ def cmd_init_db(args):
 
 def cmd_add_company(args):
     cid = upsert_company(args.nombre, args.rubro, args.zona, args.localidad or "",
-                          args.antiguedad, args.tamano, args.actividad or "")
+                          args.antiguedad, args.tamano, args.actividad or "", args.origen)
     print(f"Empresa registrada/actualizada. id={cid}")
 
 
@@ -108,6 +108,12 @@ def cmd_mark_jackpot(args):
         estado=args.estado, chances_baja_confianza=args.baja_confianza,
     )
     print(f"Marcada como {args.estado}. score_id={sid}")
+
+
+def cmd_ronda_presencial(args):
+    from app.ronda_presencial import generar_ronda, formatear_ronda_txt
+    ronda = generar_ronda(limite=args.limite, max_km=args.max_km)
+    print(formatear_ronda_txt(ronda))
 
 
 def cmd_audit(args):
@@ -420,6 +426,8 @@ def main():
     pc.add_argument("--antiguedad", type=int, default=None)
     pc.add_argument("--tamano", default="desconocido", choices=["chica", "mediana", "grande", "desconocido"])
     pc.add_argument("--actividad", default="")
+    pc.add_argument("--origen", default="web", choices=["web", "presencial"],
+                     help="'presencial' = referido/dato conseguido a mano, se prioriza en export y ronda de visita")
     pc.set_defaults(func=cmd_add_company)
 
     pmj = sub.add_parser("mark-jackpot", help="registra un score simplificado tras revisar el .txt exportado a mano")
@@ -433,6 +441,11 @@ def main():
     pmj.add_argument("--sueldo-fuente", default="", dest="sueldo_fuente")
     pmj.add_argument("--baja-confianza", action="store_true", dest="baja_confianza")
     pmj.set_defaults(func=cmd_mark_jackpot)
+
+    prp = sub.add_parser("ronda-presencial", help="lista para ir a golpear puertas: candidatas cercanas sin contacto online")
+    prp.add_argument("--limite", type=int, default=8)
+    prp.add_argument("--max-km", type=float, default=None, dest="max_km")
+    prp.set_defaults(func=cmd_ronda_presencial)
 
     ps = sub.add_parser("add-source")
     ps.add_argument("--company-id", type=int, required=True, dest="company_id")

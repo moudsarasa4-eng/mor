@@ -74,6 +74,15 @@
   </div>
 
   <div class="card">
+    <h1>🚶 Ronda de visita presencial</h1>
+    <div class="sub">Candidatas sin contacto online encontrado, ordenadas por distancia real — para ir a golpear la puerta con el CV impreso. Es históricamente el canal de mayor conversión para estos rubros.</div>
+    <table id="tabla_ronda">
+      <thead><tr><th>#</th><th>Empresa</th><th>Distancia</th><th>Dirección</th><th>Rubro</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h1>🆕 Última tanda</h1>
     <div class="sub">Resultado de la corrida más reciente (empezó: <span id="tanda_inicio">-</span>), ya pasado por el filtro de calidad. <span id="tanda_aceptadas">0</span> aceptadas, <span id="tanda_descartadas">0</span> descartadas por el filtro.</div>
     <table id="tabla_tanda">
@@ -158,6 +167,18 @@ async function actualizarUltimaTanda() {
   });
 }
 
+async function actualizarRonda() {
+  const r = await fetch('/api/ronda-presencial');
+  const d = await r.json();
+  const tbody = document.querySelector('#tabla_ronda tbody');
+  tbody.innerHTML = '';
+  d.items.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td>${row.nombre}</td><td>${row.distancia_km} km</td><td>${row.direccion || '-'}</td><td>${row.rubro}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 document.getElementById('btn_start').onclick = () => fetch('/api/start', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_pause').onclick = () => fetch('/api/pause', {method: 'POST'}).then(actualizar);
 document.getElementById('btn_continue').onclick = () => fetch('/api/continue', {method: 'POST'}).then(actualizar);
@@ -173,9 +194,11 @@ document.getElementById('btn_export').onclick = async () => {
 actualizar();
 actualizarCandidatas();
 actualizarUltimaTanda();
+actualizarRonda();
 setInterval(actualizar, 3000);
 setInterval(actualizarCandidatas, 8000);
 setInterval(actualizarUltimaTanda, 8000);
+setInterval(actualizarRonda, 15000);
 </script>
 </body>
 </html>

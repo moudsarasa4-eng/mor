@@ -26,7 +26,7 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
 
     query = (
         "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, c.contacto_intentado_sin_resultado, "
-        "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza FROM companies c "
+        "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza, c.origen_contacto FROM companies c "
         "WHERE c.estado='candidata' "
         "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     )
@@ -36,7 +36,9 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     if zona:
         query += " AND c.zona = ?"
         params.append(zona)
-    query += " ORDER BY c.zona, c.id"
+    # los referidos/presenciales van primero: históricamente convierten mucho
+    # mejor que un descubrimiento web frío, así que se auditan antes.
+    query += " ORDER BY (c.origen_contacto = 'presencial') DESC, c.zona, c.id"
 
     filas = conn.execute(query, params).fetchall()
     if not filas:
@@ -50,6 +52,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         "",
         "Pegá este archivo completo en una conversación con Claude para que audite cada",
         "empresa (seriedad, señales, contacto, CV match) y genere los emails.",
+        "Las marcadas [REFERIDO/PRESENCIAL] van primero: son contactos reales conseguidos",
+        "a mano, con mayor probabilidad de conversión que un hallazgo web frío.",
         "=" * 70,
         "",
     ]
@@ -59,6 +63,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         if f["zona"] != zona_actual:
             zona_actual = f["zona"]
             lineas.append(f"\n### ZONA: {zona_actual}\n")
+        if f["origen_contacto"] == "presencial":
+            lineas.append("[REFERIDO/PRESENCIAL]")
         fuente = conn.execute(
             "SELECT url FROM sources WHERE company_id=? ORDER BY id LIMIT 1", (f["id"],)
         ).fetchone()

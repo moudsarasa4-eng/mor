@@ -155,6 +155,12 @@ def api_candidatas():
     return jsonify({"total": total, "items": items})
 
 
+@app.route("/api/ronda-presencial")
+def api_ronda_presencial():
+    from app.ronda_presencial import generar_ronda
+    return jsonify({"items": generar_ronda(limite=10)})
+
+
 @app.route("/api/ultima-tanda")
 def api_ultima_tanda():
     conn = get_conn()
