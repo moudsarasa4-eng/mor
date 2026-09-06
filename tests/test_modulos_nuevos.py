@@ -631,6 +631,79 @@ def test_correr_lote_no_duplica_descuento_de_pendientes_restantes(tmp_path, monk
     assert r["pendientes_restantes"] == 3  # 5 totales - 2 procesadas, no 5-2-2=1
 
 
+def test_site_crawler_extrae_mailto_y_ldjson():
+    """El crawler debe preferir datos schema.org (publicados explícitamente
+    por la empresa) y si no hay, el primer mailto: real del HTML — nunca
+    inventa ni adivina un email por patrón (ej. info@dominio.com)."""
+    import app.site_crawler as sitecrawler
+
+    html_con_ldjson = '''
+    <html><body>
+    <script type="application/ld+json">{"@type": "Organization", "email": "administracion@fabrica.com.ar", "telephone": "+54 11 4444-5555"}</script>
+    <a href="mailto:otro@fabrica.com.ar">Escribinos</a>
+    </body></html>
+    '''
+    monkeypatched = sitecrawler._fetch
+    sitecrawler._fetch = lambda url: html_con_ldjson if url == "https://fabrica.com.ar" else None
+    try:
+        r = sitecrawler.extraer_contacto_de_sitio("fabrica.com.ar")
+    finally:
+        sitecrawler._fetch = monkeypatched
+
+    assert r["email"] == "administracion@fabrica.com.ar"  # ld+json gana sobre el mailto:
+    assert r["telefono"] == "+54 11 4444-5555"
+
+
+def test_site_crawler_prueba_rutas_de_contacto_si_home_no_tiene_nada(monkeypatch):
+    import app.site_crawler as sitecrawler
+
+    def fake_fetch(url):
+        if url == "https://taller.com.ar/contacto":
+            return '<html><a href="mailto:info@taller.com.ar">mail</a></html>'
+        return "<html>sin nada de contacto</html>"
+    monkeypatch.setattr(sitecrawler, "_fetch", fake_fetch)
+
+    r = sitecrawler.extraer_contacto_de_sitio("taller.com.ar")
+    assert r["email"] == "info@taller.com.ar"
+    assert r["fuente_url"] == "https://taller.com.ar/contacto"
+
+
+def test_site_crawler_no_inventa_nada_si_no_hay_publicado(monkeypatch):
+    import app.site_crawler as sitecrawler
+    monkeypatch.setattr(sitecrawler, "_fetch", lambda url: "<html>nada de contacto acá</html>")
+    assert sitecrawler.extraer_contacto_de_sitio("empresa-sin-contacto.com.ar") is None
+
+
+def test_contact_finder_usa_sitio_propio_antes_que_buscar_por_snippet(tmp_path, monkeypatch):
+    """El crawl al sitio propio debe intentarse primero (más preciso, gratis,
+    sin gastar presupuesto de Serper) — solo cae a la búsqueda por snippet si
+    no hay dominio conocido o el sitio no publica nada."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    cid = upsert_company("Metalúrgica Tesei SRL", "logistica", "Hurlingham")
+
+    import app.contact_finder as cf
+    monkeypatch.setattr(cf, "extraer_contacto_de_sitio", lambda dominio: {
+        "email": "administracion@tesei.com.ar", "telefono": None, "fuente_url": "https://tesei.com.ar/contacto",
+    })
+
+    import app.search_client as sc
+    llamo_serper = {"n": 0}
+
+    def no_deberia_llamarse(query, **kw):
+        llamo_serper["n"] += 1
+        return {"organic": []}
+    monkeypatch.setattr(sc, "buscar", no_deberia_llamarse)
+
+    r = cf.buscar_contacto(cid, "Metalúrgica Tesei SRL", "Hurlingham", dominio="tesei.com.ar")
+    assert r["valor"] == "administracion@tesei.com.ar"
+    assert r["prioridad"] == "sitio propio"
+    assert llamo_serper["n"] == 0  # no debió gastar presupuesto de Serper
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

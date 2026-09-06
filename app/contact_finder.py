@@ -19,6 +19,7 @@ from app.search_client import SearchClientError
 from app.company import add_contact, add_source
 from app.run_state import registrar_queries
 from app.contact_verify import verificar_email
+from app.site_crawler import extraer_contacto_de_sitio
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 TEL_RE = re.compile(r"(?:\+?54\s?)?(?:0?11|0?[2-9]\d{1,3})[\s.\-]?\d{3,4}[\s.\-]?\d{4}")
@@ -44,7 +45,31 @@ def _priorizar_email(emails: list[str]) -> str | None:
     return emails[0]
 
 
-def buscar_contacto(company_id: int, nombre_empresa: str, zona: str) -> dict | None:
+def buscar_contacto(company_id: int, nombre_empresa: str, zona: str, dominio: str = "") -> dict | None:
+    # 1) crawlear el sitio propio primero: mucho más preciso que un snippet
+    # de búsqueda cortado (mailto:/tel: reales, o datos schema.org
+    # publicados por la empresa) — no gasta presupuesto de Serper.
+    if dominio:
+        directo = extraer_contacto_de_sitio(dominio)
+        if directo and (directo.get("email") or directo.get("telefono")):
+            fuente_id = add_source(company_id, directo["fuente_url"], tipo="sitio_propio",
+                                    descripcion="Contacto encontrado en el sitio propio de la empresa")
+            if directo.get("email"):
+                email = directo["email"]
+                mx_ok = verificar_email(email)
+                try:
+                    add_contact(company_id, "email", email, verificado=False, fuente_id=fuente_id, mx_verificado=mx_ok)
+                    return {"tipo": "email", "valor": email, "prioridad": "sitio propio",
+                            "fuente": directo["fuente_url"], "mx_verificado": mx_ok}
+                except ValueError:
+                    pass  # parece nombre de persona, seguir con teléfono/fallback
+            if directo.get("telefono"):
+                add_contact(company_id, "telefono", directo["telefono"], verificado=False, fuente_id=fuente_id)
+                return {"tipo": "telefono", "valor": directo["telefono"], "prioridad": "sitio propio",
+                        "fuente": directo["fuente_url"]}
+
+    # 2) fallback: búsqueda por snippet (menos preciso, pero cubre empresas
+    # sin sitio propio detectado o cuyo sitio no publica contacto visible).
     query = f'"{nombre_empresa}" contacto OR administración OR compras'
     try:
         crudo = search_client.buscar(query)
@@ -131,7 +156,7 @@ def correr_lote(zona: str | None = None, limite: int = 20) -> dict:
     """Busca contacto para candidatas que todavía no tienen ninguno."""
     conn = get_conn()
     query = (
-        "SELECT c.id, c.nombre, c.zona FROM companies c "
+        "SELECT c.id, c.nombre, c.zona, c.dominio FROM companies c "
         "WHERE c.estado='candidata' AND c.contacto_intentado_sin_resultado=0 "
         "AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = c.id)"
     )
@@ -147,7 +172,7 @@ def correr_lote(zona: str | None = None, limite: int = 20) -> dict:
     encontrados = 0
     detalle = []
     for f in filas:
-        r = buscar_contacto(f["id"], f["nombre"], f["zona"])
+        r = buscar_contacto(f["id"], f["nombre"], f["zona"], dominio=f["dominio"] or "")
         if r:
             encontrados += 1
             detalle.append({"empresa": f["nombre"], **r})
