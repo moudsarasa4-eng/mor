@@ -47,11 +47,28 @@ def _nucleo_nombre(nombre: str) -> str:
     return " ".join(significativas[:2])
 
 
-def _inferir_rubro(keyword: str | None) -> str:
+# tag de OSM (ver overpass_discovery.TAGS_RELEVANTES) -> categoría real. Bug
+# real encontrado: las candidatas de Overpass no tienen keyword (vienen sin
+# query_id, query_id=NULL), así que _inferir_rubro(None) les asignaba
+# "logistica" a TODAS por defecto, sin importar que el tag real fuera
+# supermarket, laundry, etc.
+_TAG_OSM_A_CATEGORIA = {
+    "supermarket": "atencion_cliente", "wholesale": "atencion_cliente",
+    "department_store": "atencion_cliente", "laundry": "limpieza",
+    "cleaning": "limpieza", "logistics": "logistica", "industrial": "logistica",
+    "company": "administrativo",
+}
+_TAG_OSM_RE = re.compile(r"OpenStreetMap \(([a-z_]+)\)")
+
+
+def _inferir_rubro(keyword: str | None, snippet: str = "") -> str:
     if keyword and keyword in _KEYWORD_A_CATEGORIA:
         cat = _KEYWORD_A_CATEGORIA[keyword]
         if cat != "general":
             return cat
+    m = _TAG_OSM_RE.search(snippet or "")
+    if m and m.group(1) in _TAG_OSM_A_CATEGORIA:
+        return _TAG_OSM_A_CATEGORIA[m.group(1)]
     return "logistica"  # default conservador; se corrige en la revisión real
 
 
@@ -113,7 +130,7 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
             excluidas_cadena += 1  # mismo motivo: no es el empleador real
             continue
 
-        rubro = _inferir_rubro(f["keyword"])
+        rubro = _inferir_rubro(f["keyword"], f["snippet"])
         sueldo_ref = estimar_sueldo(rubro)
         dominio = site_check.extraer_dominio(f["url"]) if f["url"] else ""
 

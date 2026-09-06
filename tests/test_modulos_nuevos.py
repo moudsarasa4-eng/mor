@@ -945,6 +945,47 @@ def test_provincia_chaco_y_ruc_peruano_detectados():
     assert not _parece_empresa("Empresa con RUC: 20525979947", "Martin Coronado")
 
 
+def test_inferir_rubro_de_candidatas_overpass_por_tag_osm():
+    """Bug real encontrado auditando: las candidatas de Overpass no tienen
+    keyword (query_id=NULL), así que _inferir_rubro(None) les asignaba
+    'logistica' a TODAS por defecto sin importar el tag real de OSM."""
+    from app.promote import _inferir_rubro
+    assert _inferir_rubro(None, "OpenStreetMap (supermarket)") == "atencion_cliente"
+    assert _inferir_rubro(None, "OpenStreetMap (laundry)") == "limpieza"
+    assert _inferir_rubro(None, "OpenStreetMap (cleaning)") == "limpieza"
+    assert _inferir_rubro(None, "OpenStreetMap (industrial)") == "logistica"
+    assert _inferir_rubro(None, "") == "logistica"  # sin snippet, default conservador
+
+
+def test_export_aclara_origen_overpass_cuando_no_hay_fuente_web(tmp_path, monkeypatch):
+    """Las candidatas de Overpass no tienen fila en `sources` (promote.py no
+    inserta una si f['url'] es None) — antes el .txt simplemente omitía
+    cualquier mención de 'Fuente', dejando ambiguo si el dato no se buscó
+    o si vino de otro lado. Ahora aclara que viene de OpenStreetMap."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    cid = upsert_company("Almacén Don José", "atencion_cliente", "Bella Vista",
+                          actividad="OpenStreetMap (convenience) — Avenida Senador Morón")
+    conn = db_module.get_conn()
+    conn.execute("UPDATE companies SET estado='candidata' WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+
+    from app.export_txt import exportar_candidatas_txt
+    import app.export_txt as et
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    monkeypatch.setattr(et, "_carpeta_descargas", lambda: downloads)
+
+    ruta = exportar_candidatas_txt(solo_nuevas=False)
+    contenido = Path(ruta).read_text(encoding="utf-8")
+    assert "Fuente: None" not in contenido
+    assert "OpenStreetMap" in contenido
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

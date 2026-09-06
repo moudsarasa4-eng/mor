@@ -45,6 +45,9 @@ PATRONES_NO_EMPRESA = [
     r"\b(per[uú]|peruano|peruana|mexicano|mexicana|colombiano|colombiana|brasil|brasile[ñn]o)\b",
     r"\b(salta|jujuy|misiones|neuqu[eé]n|chubut|chaco|resistencia)\b",  # otra provincia (ej. "Hotel Caseros Salta" — Caseros es homónimo de una calle en Salta)
     r"\bruc\s*:?\s*\d",  # RUC es el identificador tributario de Perú/otros países — Argentina usa CUIT
+    # organismos estatales / licitaciones públicas: no son empleadores privados
+    # accionables por postulación espontánea, el ingreso funciona distinto
+    r"\b(anses|afip|licitaci[oó]n p[uú]blica|poder judicial|ministerio de)\b",
     # "Bella Vista" es homónimo de ciudades en EEUU (Arkansas/Missouri), Chile,
     # Guatemala — el bloqueo por ccTLD (.cl, .gt) no alcanza cuando el sitio usa
     # .com genérico (fedex.com, att.com, uber.com)

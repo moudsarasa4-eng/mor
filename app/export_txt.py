@@ -73,8 +73,15 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         ).fetchall()
         lineas.append(f"[{f['id']}] {f['nombre']}")
         lineas.append(f"    Rubro estimado: {f['rubro']}")
-        if fuente:
+        if fuente and fuente["url"]:
             lineas.append(f"    Fuente: {fuente['url']}")
+        elif f["actividad"] and "OpenStreetMap" in f["actividad"]:
+            # bug real: las candidatas de Overpass tienen una fila en `sources`
+            # con url=NULL (promote.py inserta la fuente igual, sin URL real
+            # porque no viene de una búsqueda web) — "if fuente:" chequeaba
+            # solo que la fila existiera, no que tuviera URL, y terminaba
+            # imprimiendo literalmente "Fuente: None".
+            lineas.append("    Fuente: OpenStreetMap (sin URL — descubierta por ubicación/categoría, no por búsqueda web)")
         if f["actividad"]:
             lineas.append(f"    Descripción: {f['actividad']}")
         if f["distancia_km"] is not None:
@@ -84,7 +91,13 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
             lineas.append(
                 f"    Sueldo estimado (por rubro, no específico de esta empresa, confianza {f['sueldo_ref_confianza']}): {rango}"
             )
-            lineas.append(f"      Fuente: {f['sueldo_ref_fuente']}")
+            # "Fuente del sueldo" (no "Fuente" a secas): reutilizar la misma
+            # etiqueta que la fuente de la empresa (línea de arriba) generaba
+            # ambigüedad real al leer/parsear el archivo — encontrado
+            # auditando con un archivo real, donde una candidata sin fuente
+            # propia (ej. de Overpass) terminaba pareciendo tener como
+            # "Fuente" el convenio salarial en vez de su origen real.
+            lineas.append(f"      Fuente del sueldo: {f['sueldo_ref_fuente']}")
         if contactos:
             for c in contactos:
                 mx_txt = ""
