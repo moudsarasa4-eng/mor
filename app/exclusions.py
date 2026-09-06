@@ -23,11 +23,27 @@ def _normalizar(texto: str) -> str:
 
 
 def es_cadena_excluida(nombre_empresa: str) -> str | None:
-    """Devuelve el nombre de la cadena que matcheó, o None si no está excluida."""
+    """Devuelve el nombre de la cadena que matcheó, o None si no está excluida.
+
+    Bug real encontrado: "Dia" (la cadena Día) matcheaba como substring
+    contra "Diaz"/"Díaz" — CUALQUIER empresa con ese apellido (muy común en
+    Argentina) se excluía por error, pensando que era el supermercado.
+    Coincidencia por palabra completa, no substring suelto."""
     nombre_norm = _normalizar(nombre_empresa)
+    palabras_nombre = set(nombre_norm.split())
     for cadena in _cargar_cadenas():
         cadena_norm = _normalizar(cadena)
-        if cadena_norm and cadena_norm in nombre_norm:
+        if not cadena_norm:
+            continue
+        palabras_cadena = cadena_norm.split()
+        if len(palabras_cadena) == 1:
+            # cadena de una sola palabra (ej. "Dia", "Coto"): debe coincidir
+            # como palabra completa, no como substring de otra palabra
+            if palabras_cadena[0] in palabras_nombre:
+                return cadena
+        elif cadena_norm in nombre_norm:
+            # cadena de varias palabras (ej. "Mercado Libre", "La Anonima"):
+            # substring de frase completa sigue siendo seguro
             return cadena
     return None
 

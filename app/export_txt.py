@@ -26,7 +26,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
 
     query = (
         "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, c.contacto_intentado_sin_resultado, "
-        "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza, c.origen_contacto FROM companies c "
+        "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza, c.origen_contacto, "
+        "c.tamano_estimado FROM companies c "
         "WHERE c.estado='candidata' "
         "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     )
@@ -36,9 +37,10 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     if zona:
         query += " AND c.zona = ?"
         params.append(zona)
-    # los referidos/presenciales van primero: históricamente convierten mucho
-    # mejor que un descubrimiento web frío, así que se auditan antes.
-    query += " ORDER BY (c.origen_contacto = 'presencial') DESC, c.zona, c.id"
+    # los referidos/presenciales van primero (convierten mejor que un
+    # hallazgo web frío); los negocios unipersonales/muy chicos van al final
+    # (misma zona, pero no se los quiere mezclado con candidatas serias).
+    query += " ORDER BY (c.origen_contacto = 'presencial') DESC, (c.tamano_estimado = 'chica') ASC, c.zona, c.id"
 
     filas = conn.execute(query, params).fetchall()
     if not filas:
@@ -65,6 +67,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
             lineas.append(f"\n### ZONA: {zona_actual}\n")
         if f["origen_contacto"] == "presencial":
             lineas.append("[REFERIDO/PRESENCIAL]")
+        if f["tamano_estimado"] == "chica":
+            lineas.append("[NEGOCIO CHICO/UNIPERSONAL — revisar con cautela, puede no tener capacidad de sumar personal]")
         fuente = conn.execute(
             "SELECT url FROM sources WHERE company_id=? ORDER BY id LIMIT 1", (f["id"],)
         ).fetchone()

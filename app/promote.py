@@ -18,7 +18,7 @@ from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 from app.salarios_referencia import estimar_sueldo
 import app.site_check as site_check
-from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS, _quitar_acentos
+from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS, _quitar_acentos, _parece_negocio_unipersonal
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -154,13 +154,14 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
             company_id = existente["id"]
         else:
             sitio_ok = site_check.sitio_activo(f["url"]) if f["url"] else None
+            tamano = "chica" if _parece_negocio_unipersonal(nombre, f["snippet"]) else "desconocido"
             ts = now()
             cur = conn.execute(
-                "INSERT INTO companies (nombre, rubro, zona, localidad, actividad, estado, "
+                "INSERT INTO companies (nombre, rubro, zona, localidad, actividad, estado, tamano_estimado, "
                 "sueldo_ref_min, sueldo_ref_max, sueldo_ref_fuente, sueldo_ref_confianza, dominio, sitio_activo, "
                 "creado_en, actualizado_en) "
-                "VALUES (?, ?, ?, ?, ?, 'candidata', ?, ?, ?, ?, ?, ?, ?, ?)",
-                (nombre, rubro, f["zona"], f["zona"], (f["snippet"] or "")[:300],
+                "VALUES (?, ?, ?, ?, ?, 'candidata', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (nombre, rubro, f["zona"], f["zona"], (f["snippet"] or "")[:300], tamano,
                  sueldo_ref["min"] if sueldo_ref else None, sueldo_ref["max"] if sueldo_ref else None,
                  sueldo_ref["fuente"] if sueldo_ref else None, sueldo_ref["confianza"] if sueldo_ref else None,
                  dominio, (1 if sitio_ok else (0 if sitio_ok is False else None)),

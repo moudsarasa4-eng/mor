@@ -1002,6 +1002,59 @@ def test_dominios_gobierno_y_agregadores_turismo_excluidos():
         assert _es_dominio_excluido(url), f"debería excluirse: {url}"
 
 
+def test_detecta_negocio_unipersonal_sin_confundir_empresas_reales():
+    """Feedback real del usuario: el filtro dejaba pasar mezclado un estudio
+    de un solo abogado o un mecánico solo junto con empresas medianas reales
+    ('encuentra comercios bajos'). Se agrega detección de negocio
+    unipersonal — sin excluir (podría igual interesar), pero sin
+    confundirlo con una candidata seria."""
+    from app.discovery import _parece_negocio_unipersonal
+    assert _parece_negocio_unipersonal("Juan Pérez", "Juan Pérez, Abogado en Caseros, consultas por WhatsApp")
+    assert _parece_negocio_unipersonal("Maria Lopez", "Contador Público matriculado, atiendo en mi estudio")
+    # NO debe confundir una empresa real de 2 palabras con un nombre de persona
+    assert not _parece_negocio_unipersonal("Carrefour Argentina", "supermercado")
+    assert not _parece_negocio_unipersonal("Estudio Jurídico D&S Abogados", "Estudio Jurídico D&S Abogados, teléfono")
+    assert not _parece_negocio_unipersonal("Logistica Caseros", "empresa con flota y depósito propio")
+
+
+def test_promote_marca_tamano_chica_para_unipersonales(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.search_client as sc
+    import app.site_check as scheck
+
+    def mock_buscar(query, **kwargs):
+        return {"organic": [
+            {"title": "Roberto Diaz", "link": "https://robertodiaz.com.ar/", "snippet": "Roberto Diaz, Abogado en Caseros, atención con turno previo"},
+        ]}
+    monkeypatch.setattr(sc, "buscar", mock_buscar)
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas
+    ejecutar_query("abogado Caseros", "Caseros", "TYPE_A", "administrativo")
+    promover_candidatas(zona="Caseros")
+
+    conn = db_module.get_conn()
+    row = conn.execute("SELECT tamano_estimado FROM companies WHERE nombre='Roberto Diaz'").fetchone()
+    conn.close()
+    assert row["tamano_estimado"] == "chica"
+
+
+def test_cadena_dia_no_confunde_con_apellido_diaz():
+    """Bug real encontrado auditando: 'Dia' (la cadena Día) matcheaba como
+    substring contra 'Diaz'/'Díaz' — cualquier empresa con ese apellido (muy
+    común en Argentina) se excluía por error, pensando que era el
+    supermercado. Detectado al debuggear por qué 'Roberto Diaz' no se
+    promovía en un test de negocio unipersonal."""
+    from app.exclusions import es_cadena_excluida
+    assert es_cadena_excluida("Roberto Diaz") is None
+    assert es_cadena_excluida("Distribuidora Díaz Hermanos SRL") is None
+    assert es_cadena_excluida("Supermercados DIA Argentina") == "Dia"  # el caso real sigue andando
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

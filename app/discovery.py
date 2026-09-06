@@ -73,6 +73,40 @@ PALABRAS_GENERICAS_SOLAS = {
 _PATRONES_NO_EMPRESA_COMPILADOS = [re.compile(p, re.IGNORECASE) for p in PATRONES_NO_EMPRESA]
 
 
+# Detección de negocio unipersonal/muy chico: el motor filtraba "¿es real?
+# ¿zona correcta? ¿no es cadena/agencia?" pero nunca "¿tiene tamaño para
+# necesitar sumar personal?" — dejaba pasar mezclado un estudio de un solo
+# abogado o un mecánico solo junto con empresas medianas reales. No se
+# descarta (podría igual interesarle a Marco un puesto chico), pero se marca
+# aparte para no confundirlo con una candidata seria.
+PALABRAS_PROFESION_SOLO = [
+    "abogado", "contador", "escribano", "kinesiologo", "kinesiólogo", "psicologo",
+    "psicólogo", "profesor particular", "personal trainer", "coach ", "traductor",
+    "medico a domicilio", "médico a domicilio", "asesor de imagen",
+]
+PALABRAS_INDICIO_ESTRUCTURA = [
+    # "estudio" a secas es ambiguo (puede ser "atiendo en mi estudio" de un
+    # solo profesional) — solo cuenta como indicio de estructura combinado
+    # con socios/plural
+    "asociados", "estudio jurídico", "estudio contable", "sucursales", "empleados",
+    "equipo de", "planta", "depósito", "deposito", "flota", "sa ", "srl", "s.a",
+    "s.r.l", "& ", " y asociados",
+]
+
+
+def _parece_negocio_unipersonal(nombre: str, descripcion: str = "") -> bool:
+    palabras_nombre = nombre.strip().split()
+    es_nombre_persona = len(palabras_nombre) == 2 and all(p[:1].isupper() for p in palabras_nombre)
+    texto = (descripcion or "").lower()
+    nombre_l = nombre.lower()
+    tiene_marca_profesion_solo = any(p in texto for p in PALABRAS_PROFESION_SOLO)
+    tiene_indicio_estructura = (
+        any(ind in texto for ind in PALABRAS_INDICIO_ESTRUCTURA)
+        or any(ind in nombre_l for ind in PALABRAS_INDICIO_ESTRUCTURA)
+    )
+    return es_nombre_persona and tiene_marca_profesion_solo and not tiene_indicio_estructura
+
+
 def _parece_empresa(nombre: str, zona: str, texto_extra: str = "") -> bool:
     """texto_extra: snippet/descripción/URL — algunos casos reales (homónimos
     de zona en otro país, RUC en vez de CUIT) no se mencionan en el título
