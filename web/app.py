@@ -186,13 +186,33 @@ def api_company(company_id):
     return jsonify(get_company(company_id))
 
 
+def _ip_local() -> str | None:
+    """IP de la PC en la red WiFi/LAN, para poder abrir el dashboard desde el
+    celular sin que el motor tenga que correr ahí (no es viable: necesita
+    quedar corriendo en background con threads y accesos a disco)."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return None
+
+
 def run():
     init_db()
     # arranca el modo automático (cada 1 hora) solo al abrir la app, sin apretar
     # ningún botón — pensado para durar semanas con el presupuesto de por vida,
     # no para gastarlo todo en una sola sesión larga.
     scheduler.iniciar()
-    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
+    ip = _ip_local()
+    if ip:
+        print(f"[Motor de Jackpots] Para verlo desde el celular (misma WiFi que esta PC): http://{ip}:5000")
+    # host=0.0.0.0: acepta conexiones de otros dispositivos en la misma red
+    # local, no solo de esta PC — necesario para verlo desde el celular.
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":
