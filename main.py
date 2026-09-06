@@ -329,6 +329,23 @@ def cmd_industrial(args):
         print(f"\nExportado: {archivo}")
 
 
+def cmd_overpass(args):
+    init_db()
+    from app.overpass_discovery import buscar_por_zona
+    from app.promote import promover_candidatas
+    from app.export_txt import exportar_candidatas_txt
+    import yaml as _yaml
+    cfg = _yaml.safe_load((Path(__file__).resolve().parent / "config.yaml").read_text(encoding="utf-8"))
+    zonas = [args.zona] if args.zona else cfg["zonas"]["cercana"]
+    for zona in zonas:
+        r = buscar_por_zona(zona, radio_metros=args.radio)
+        print(json.dumps(r, ensure_ascii=False))
+        promover_candidatas(zona=zona)
+    archivo = exportar_candidatas_txt()
+    if archivo:
+        print(f"\nExportado: {archivo}")
+
+
 def cmd_find_contacts(args):
     init_db()
     from app.contact_finder import correr_lote
@@ -625,6 +642,11 @@ def main():
     ppromote.add_argument("--zona", default=None)
     ppromote.add_argument("--limite", type=int, default=100)
     ppromote.set_defaults(func=cmd_promote)
+
+    povp = sub.add_parser("overpass", help="descubre comercios/oficinas/industrias reales via OpenStreetMap (gratis, no gasta presupuesto de Serper)")
+    povp.add_argument("--zona", default=None, help="si se omite, corre sobre todas las zonas cercanas")
+    povp.add_argument("--radio", type=int, default=1500, help="radio de búsqueda en metros")
+    povp.set_defaults(func=cmd_overpass)
 
     pexport = sub.add_parser("export")
     pexport.add_argument("--zona", default=None)

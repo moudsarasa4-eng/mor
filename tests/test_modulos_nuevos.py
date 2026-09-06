@@ -459,6 +459,54 @@ def test_ronda_presencial_ordena_por_distancia(tmp_path, monkeypatch):
     assert [r["nombre"] for r in ronda] == ["Cerca SRL", "Lejos SRL"]
 
 
+def test_overpass_descubre_y_filtra(tmp_path, monkeypatch):
+    """Overpass es una fuente independiente de Serper (no gasta presupuesto,
+    no depende de texto de búsqueda) — busca por categoría/radio real."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.geocoding as geocoding
+    from app.geocoding import Coordenadas
+    monkeypatch.setattr(geocoding, "geocodificar", lambda direccion: Coordenadas(lat=-34.59, lon=-58.63, direccion_encontrada=direccion))
+
+    import app.overpass_discovery as ovp
+
+    class FakeResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"elements": [
+                {"tags": {"name": "Metalúrgica Tesei SRL", "office": "yes", "addr:street": "Calle Falsa", "addr:housenumber": "123"}},
+                {"tags": {"name": "Carrefour Argentina", "shop": "supermarket"}},  # cadena excluida
+                {"tags": {"name": "Definición de trabajo", "office": "yes"}},  # no parece empresa
+                {"tags": {}},  # sin nombre, se ignora
+            ]}
+
+    monkeypatch.setattr(ovp.requests, "post", lambda *a, **kw: FakeResp())
+
+    r = ovp.buscar_por_zona("Hurlingham")
+    assert r["nuevas"] == 1
+    assert r["descartadas"] == 2
+
+    conn = db_module.get_conn()
+    nombres = [row["nombre_crudo"] for row in conn.execute("SELECT nombre_crudo FROM discovered_companies_raw")]
+    conn.close()
+    assert nombres == ["Metalúrgica Tesei SRL"]
+
+
+def test_overpass_respeta_zona_prohibida(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.overpass_discovery as ovp
+    r = ovp.buscar_por_zona("Capital Federal")
+    assert r["nuevas"] == 0
+    assert "prohibida" in r["error"]
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -92,4 +92,11 @@ def plantillas_query(zona: str, keyword: str = "") -> list[dict]:
     q.append({"query": f"empresa {zona} expansión OR inversión OR \"nueva planta\" OR ampliación{sufijo}", "tipo": "TYPE_E", "keyword": kw})
     q.append({"query": f"empresa {zona} depósito OR planta OR sucursal OR \"centro logístico\"{sufijo}", "tipo": "TYPE_F", "keyword": kw})
     q.append({"query": f"\"parque industrial\" {zona} empresas instaladas{sufijo}", "tipo": "TYPE_F", "keyword": kw})
+    # directorios de empresas argentinos (Páginas Amarillas, CUIT Online no
+    # tienen API gratuita masiva para descubrir por rubro, pero sus páginas
+    # SÍ están indexadas — sin este site: el buscador de texto normal casi
+    # nunca las trae arriba de los resultados).
+    if kw:
+        q.append({"query": f"site:paginasamarillas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        q.append({"query": f"site:cuitonline.com {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
     return q
