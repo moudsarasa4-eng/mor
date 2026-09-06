@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Modo Estación: antes de servir, armá el producto de memoria —
 // pan correcto + condimentos correctos — como en la estación real.
@@ -7,6 +7,15 @@ function EstacionChallenge({ challenge, onResolve, onSkip }) {
 	const [pan, setPan] = useState(null);
 	const [pasos, setPasos] = useState(new Set());
 	const [resultado, setResultado] = useState(null);
+
+	// El componente nunca se desmonta entre desafíos (challenge solo cambia
+	// de un objeto a otro, o a null) — sin este reset, el segundo desafío
+	// arrancaba mostrando el resultado del anterior en vez de la pantalla limpia.
+	useEffect(() => {
+		setPan(null);
+		setPasos(new Set());
+		setResultado(null);
+	}, [challenge]);
 
 	if (!challenge) return null;
 

@@ -109,9 +109,11 @@ function App() {
 		if (shiftActiveRef.current) {
 			setServedTimes((prev) => [...prev, timeServed]);
 		}
-		if (memoriaOnRef.current || enfoqueOnRef.current) {
+		if (memoriaOnRef.current || enfoqueOnRef.current || estacionOnRef.current || panesOnRef.current) {
 			const names = servedOrder.orderArray.map((it) => it.name);
 			dispatch(actions.registerServed(names));
+		}
+		if (memoriaOnRef.current || enfoqueOnRef.current) {
 			setSelfCheck({ code: servedOrder.randomCode, items: servedOrder.orderArray, revealed: false });
 			clearTimeout(selfCheckTimeoutRef.current);
 			selfCheckTimeoutRef.current = setTimeout(() => setSelfCheck(null), 6000);
@@ -417,7 +419,7 @@ function App() {
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />
-			{(memoriaOn || enfoqueOn) && <StatsPanel onReset={resetConfusionStats} />}
+			{(memoriaOn || enfoqueOn || estacionOn || panesOn) && <StatsPanel onReset={resetConfusionStats} />}
 		</>
 	);
 }

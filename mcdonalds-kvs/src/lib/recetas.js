@@ -97,9 +97,14 @@ export function buildChallenge(itemName) {
 	const otrosPanes = Array.from(new Set(Object.values(RECETAS).map((r) => r.pan))).filter((p) => p !== receta.pan);
 	const panOpciones = shuffle([receta.pan, ...shuffle(otrosPanes).slice(0, 1)]);
 
+	// Algunas recetas comparten pasos textuales entre sí (ej. Hamburguesa y
+	// Hamburguesa c/Queso arrancan igual) — esos NO son distractores válidos,
+	// filtrarlos evita mostrar el mismo paso dos veces como si uno fuera falso.
+	const propios = new Set(receta.pasos);
 	const otrosPasos = Object.entries(RECETAS)
 		.filter(([nombre]) => nombre !== itemName)
-		.flatMap(([, r]) => r.pasos);
+		.flatMap(([, r]) => r.pasos)
+		.filter((paso) => !propios.has(paso));
 	const distractores = shuffle(Array.from(new Set(otrosPasos))).slice(0, Math.max(2, 6 - receta.pasos.length));
 	const pasoOpciones = shuffle([...receta.pasos, ...distractores]);
 
@@ -107,7 +112,7 @@ export function buildChallenge(itemName) {
 		itemName,
 		pan: receta.pan,
 		panOpciones,
-		pasosCorrectos: new Set(receta.pasos),
+		pasosCorrectos: propios,
 		pasoOpciones,
 	};
 }

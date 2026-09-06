@@ -25,6 +25,8 @@ All available configurations can be done inside './lib/generateorder.js'.
 |OrderTypes|Type of order (Only for display)|Array (String)|Drive Through, Bag, Tray, Delivery|
 |OrderStorage|Current order state (Only for display|Array (String)|Paid, Stored|
 
+`maxOrderlength` is a ceiling, not a flat range: order length ramps up progressively from `START_ORDER_LENGTH` (2 items, right at the top of `generateorder.js`) by one extra item every `LEVELS_PER_EXTRA_ITEM` levels (3), until it reaches `maxOrderlength` around level 10. This is intentional — orders start short like a real onboarding shift and get busier as you level up, instead of being able to hand you a 4-item order from level 1.
+
   
   
 

@@ -15,13 +15,13 @@ function StatsPanel({ onReset }) {
 					reiniciar
 				</button>
 			</div>
-			{top.length === 0 && <p className="text-neutral-400">Todavía sin datos — jugá con Modo Memoria u Modo Enfoque prendido.</p>}
+			{top.length === 0 && <p className="text-neutral-400">Todavía sin datos — jugá con algún modo de entrenamiento prendido.</p>}
 			<ol className="list-decimal list-inside space-y-0.5">
 				{top.map((it) => (
 					<li key={it.name}>
 						{it.name}{" "}
 						<span className="text-neutral-400">
-							({it.peeks} espiadas, {it.selfMiss} autofallos, {it.served} servidos)
+							({it.peeks} espiadas, {it.selfMiss} fallos, {it.served} servidos)
 						</span>
 					</li>
 				))}
