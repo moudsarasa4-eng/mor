@@ -55,6 +55,13 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
 
     coords = geocoding.geocodificar(f"{zona}, Buenos Aires, Argentina")
     if coords is None:
+        # se marca igual como "procesada" (aunque haya fallado): si no, esta
+        # zona queda primera en zonas_pendientes() para siempre — el ciclo
+        # automático la reintentaría cada hora sin avanzar nunca a las
+        # zonas siguientes. El comando manual (main.py overpass --zona X)
+        # no pasa por zonas_pendientes(), así que sirve para forzar un
+        # reintento puntual sin este bloqueo.
+        _marcar_procesada(zona, nuevas=0)
         return {"zona": zona, "error": "no se pudo geocodificar la zona", "nuevas": 0}
 
     query = _construir_query_overpass(coords.lat, coords.lon, radio_metros)
@@ -64,6 +71,7 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
         resp.raise_for_status()
         data = resp.json()
     except (requests.RequestException, ValueError) as e:
+        _marcar_procesada(zona, nuevas=0)
         return {"zona": zona, "error": str(e), "nuevas": 0}
 
     conn = get_conn()
@@ -96,6 +104,14 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
         )
         nuevas += 1
 
+    conn.commit()
+    conn.close()
+    _marcar_procesada(zona, nuevas)
+    return {"zona": zona, "nuevas": nuevas, "descartadas": descartadas, "total_osm": len(data.get("elements", []))}
+
+
+def _marcar_procesada(zona: str, nuevas: int):
+    conn = get_conn()
     conn.execute(
         "INSERT INTO overpass_progress (zona, empresas_nuevas, procesado_en) VALUES (?, ?, ?) "
         "ON CONFLICT(zona) DO UPDATE SET empresas_nuevas=empresas_nuevas+excluded.empresas_nuevas, procesado_en=excluded.procesado_en",
@@ -103,4 +119,3 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
     )
     conn.commit()
     conn.close()
-    return {"zona": zona, "nuevas": nuevas, "descartadas": descartadas, "total_osm": len(data.get("elements", []))}

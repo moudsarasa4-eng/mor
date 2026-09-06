@@ -749,6 +749,48 @@ def test_categorias_producto_son_300_y_todas_unicas():
     assert len(set(sd.CATEGORIAS_PRODUCTO)) == 300
 
 
+def test_overpass_marca_procesada_aunque_falle_geocodificar(tmp_path, monkeypatch):
+    """Bug real: si geocodificar la zona fallaba, buscar_por_zona no la
+    marcaba en overpass_progress — esa zona quedaba primera en
+    zonas_pendientes() para siempre, y el ciclo automático la reintentaba
+    cada hora sin avanzar NUNCA a las zonas siguientes."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.geocoding as geocoding
+    monkeypatch.setattr(geocoding, "geocodificar", lambda direccion: None)  # simula fallo de red
+
+    import app.overpass_discovery as ovp
+    r = ovp.buscar_por_zona("Hurlingham")
+    assert r["error"]
+
+    conn = db_module.get_conn()
+    marcada = conn.execute("SELECT 1 FROM overpass_progress WHERE zona=?", ("Hurlingham",)).fetchone()
+    conn.close()
+    assert marcada is not None, "debe marcarse como procesada aunque haya fallado, para no bloquear el resto de las zonas"
+
+    assert "Hurlingham" not in ovp.zonas_pendientes(["Hurlingham", "Moron"])
+
+
+def test_site_crawler_cae_a_http_si_https_no_carga(monkeypatch):
+    """Muchos sitios chicos/viejos no tienen SSL — si https ni siquiera carga
+    la home, hay que probar http antes de descartar el sitio entero."""
+    import app.site_crawler as sitecrawler
+
+    def fake_fetch(url):
+        if url.startswith("https://"):
+            return None  # simula que https no responde (sin SSL)
+        if url == "http://tallerviejo.com.ar":
+            return '<html><a href="mailto:contacto@tallerviejo.com.ar">mail</a></html>'
+        return None
+    monkeypatch.setattr(sitecrawler, "_fetch", fake_fetch)
+
+    r = sitecrawler.extraer_contacto_de_sitio("tallerviejo.com.ar")
+    assert r["email"] == "contacto@tallerviejo.com.ar"
+    assert r["fuente_url"].startswith("http://")
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

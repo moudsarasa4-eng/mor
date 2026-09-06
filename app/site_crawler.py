@@ -67,7 +67,15 @@ def extraer_contacto_de_sitio(dominio: str) -> dict | None:
     si no hay nada publicado (nunca inventa ni adivina un email por patrón)."""
     if not dominio:
         return None
-    base = dominio if dominio.startswith("http") else f"https://{dominio}"
+
+    if dominio.startswith("http"):
+        base = dominio
+    else:
+        # muchos sitios chicos/viejos no tienen SSL — si https ni siquiera
+        # carga la home, se cae a http antes de descartar el sitio entero.
+        base = f"https://{dominio}"
+        if _fetch(base) is None:
+            base = f"http://{dominio}"
 
     for ruta in RUTAS_CONTACTO:
         url = base.rstrip("/") + ruta
