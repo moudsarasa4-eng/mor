@@ -740,6 +740,15 @@ def test_no_repite_queries_ya_ejecutadas_en_la_misma_zona(tmp_path, monkeypatch)
     assert len(lote_filtrado) == len(lote_completo) - 3
 
 
+def test_categorias_producto_son_300_y_todas_unicas():
+    """A pedido del usuario: la lista del método envolvente debe tener 300
+    categorías reales, sin duplicados (un duplicado sería presupuesto
+    gastado dos veces en la misma pregunta)."""
+    import app.supplier_discovery as sd
+    assert len(sd.CATEGORIAS_PRODUCTO) == 300
+    assert len(set(sd.CATEGORIAS_PRODUCTO)) == 300
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

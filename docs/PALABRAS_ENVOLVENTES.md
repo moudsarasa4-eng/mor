@@ -43,6 +43,13 @@ depender de que la empresa haya publicado nada.
 
 ## Columna 2 — productos/materiales/servicios (por rubro relacionado)
 
+**300 categorías en total** (`app/supplier_discovery.py::CATEGORIAS_PRODUCTO`),
+agrupadas en 16 rubros. Además de las 9 familias de abajo, se sumaron:
+textil/indumentaria, papelería/oficina/informática, farmacia/salud/estética,
+energía/climatización, transporte/logística de insumos, y una categoría
+"otros servicios B2B" (lavaderos, tintorerías, imprentas, carpinterías,
+vidrierías, herrerías, gastronomía, hotelería, call centers, entre otros).
+
 ### Construcción / ferretería (mucho depósito y logística)
 ladrillos, cemento, arena, hierro para construcción, maderas, chapas,
 caños, cables, pinturas, cerámicos, revestimientos, aberturas (puertas y
