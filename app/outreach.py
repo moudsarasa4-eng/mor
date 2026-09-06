@@ -152,7 +152,7 @@ def audit_before_generate(req: OutreachRequest) -> AuditResult:
         warnings.append("Se afirma vacante CONFIRMADA sin verified_facts que la respalden.")
     if not req.reason_to_contact.strip():
         return AuditResult(False, ["Falta reason_to_contact (WHY_THIS_COMPANY)."])
-    return AuditResult(len([w for w in warnings]) == 0 or True, warnings)  # warnings no bloquean, solo avisan
+    return AuditResult(True, warnings)  # warnings no bloquean, solo avisan (llegar acá ya pasó los checks que sí bloquean)
 
 
 def generar_email(req: OutreachRequest) -> dict:

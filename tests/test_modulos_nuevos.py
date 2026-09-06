@@ -791,6 +791,19 @@ def test_site_crawler_cae_a_http_si_https_no_carga(monkeypatch):
     assert r["fuente_url"].startswith("http://")
 
 
+def test_dashboard_fmt_sueldo_marca_estimado():
+    """Bug real: la variable 'prefijo' en _fmt_sueldo nunca se usaba (era ''
+    en los dos casos), así que un sueldo estimado se mostraba igual que uno
+    verificado — sin la aclaración '(estimado)' que sí tiene detalle()."""
+    import app.dashboard as dashboard
+
+    fila_estimado = {"sueldo_min": 900000, "sueldo_max": 1200000, "sueldo_es_estimado": 1}
+    fila_verificado = {"sueldo_min": 900000, "sueldo_max": 1200000, "sueldo_es_estimado": 0}
+
+    assert "(estimado)" in dashboard._fmt_sueldo(fila_estimado)
+    assert "(estimado)" not in dashboard._fmt_sueldo(fila_verificado)
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

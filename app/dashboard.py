@@ -11,8 +11,8 @@ RUBROS_LEGIBLES = {
 def _fmt_sueldo(row) -> str:
     if row["sueldo_min"] is None or row["sueldo_max"] is None:
         return "No estimable"
-    prefijo = "" if not row["sueldo_es_estimado"] else ""
-    return f"${row['sueldo_min']:,.0f}–${row['sueldo_max']:,.0f}".replace(",", ".")
+    rango = f"${row['sueldo_min']:,.0f}–${row['sueldo_max']:,.0f}".replace(",", ".")
+    return f"{rango} (estimado)" if row["sueldo_es_estimado"] else rango
 
 
 def _fmt_chances(row) -> str:
