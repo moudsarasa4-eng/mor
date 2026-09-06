@@ -1,6 +1,16 @@
 import { recallVisibleS } from "../lib/memoria";
 
-function ModeBar({ memoriaOn, enfoqueOn, estacionOn, onToggleMemoria, onToggleEnfoque, onToggleEstacion, level }) {
+function ModeBar({
+	memoriaOn,
+	enfoqueOn,
+	estacionOn,
+	panesOn,
+	onToggleMemoria,
+	onToggleEnfoque,
+	onToggleEstacion,
+	onTogglePanes,
+	level,
+}) {
 	const handleClick = (fn) => (event) => {
 		event.currentTarget.blur();
 		fn();
@@ -27,11 +37,18 @@ function ModeBar({ memoriaOn, enfoqueOn, estacionOn, onToggleMemoria, onToggleEn
 				>
 					Modo Estación (E): {estacionOn ? "ON" : "OFF"}
 				</button>
+				<button
+					onClick={handleClick(onTogglePanes)}
+					className={`px-3 py-1 rounded font-bold ${panesOn ? "bg-amber-600 text-white" : "bg-neutral-700"}`}
+				>
+					Modo Panes (B): {panesOn ? "ON" : "OFF"}
+				</button>
 			</div>
 			<div className="flex flex-row gap-3">
 				{memoriaOn && <span>Se tapa a los {recallVisibleS(level).toFixed(1)}s · Espacio = chequear</span>}
 				{enfoqueOn && <span>Practicando tus ítems más difíciles</span>}
 				{estacionOn && <span>Armá el pan y los condimentos antes de servir</span>}
+				{panesOn && <span>Elegí el pan de cada producto antes de servir</span>}
 			</div>
 		</div>
 	);

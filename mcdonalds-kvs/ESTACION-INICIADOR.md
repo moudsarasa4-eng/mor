@@ -152,6 +152,38 @@ adelante:
   inventar un sistema de puntaje paralelo — un solo lugar para ver "qué me
   cuesta", ya sea por olvido o por armado.
 
+## Parte 3 — Modo Panes (tecla `B`): la versión liviana
+
+Modo Estación entrena a fondo 7 productos con receta 100% confirmada. Modo
+Panes es más liviano y cubre **todo el menú**: al servir, cada producto del
+pedido que lleve pan (ensaladas, McNuggets y Apple Pie se saltan solos)
+aparece uno por uno con 6 botones — el tipo de pan, nada de condimentos ni
+gramos.
+
+| Pan | Ejemplos en el menú actual |
+|---|---|
+| Regular (sin semilla) | Hamburguesa, Fiesta Jr, McFiesta, Dbl Carne Dble |
+| Sésamo grande | 1/4 De Libra, Dbl 1/4 De Libra c/Queso, McNífica, McPollo |
+| Big Mac (3 piezas, con "club") | Big Mac |
+| Grand (prensado, más grande) | Grand Tasty, McBacon, Bacon Crispy, Grand Tostado |
+| Pan de papa | McCrispy Classic/Deluxe/Ranch |
+| Kaiser (McCafé) | Tostado Lomo y Queso, sándwiches con huevo |
+
+Verificado contra la guía oficial o una fuente pública puntual: Hamburguesa
+(y su versión con queso/CF), 1/4 de Libra (simple y doble), McNífica, Big
+Mac, y McCrispy (las 3 — McDonald's Argentina lo confirma como diferencial
+de marketing de esa línea: pan de papa) y Tostado Lomo y Queso (kaiser).
+Todo lo demás está asignado por lógica de línea de producto/nombre, no por
+una fuente oficial puntual, y queda marcado como tal en la propia pantalla
+del desafío — corregible el día que aparezca el póster de lanzamiento que
+menciona la guía para las líneas más nuevas.
+
+Si Modo Estación y Modo Panes están prendidos a la vez, primero se resuelve
+el desafío de Estación (pan + condimentos) para el producto que le toque, y
+recién después Modo Panes pregunta por el resto de los productos del mismo
+pedido que tengan pan — nunca se pregunta el pan dos veces para el mismo
+producto en un mismo servido.
+
 ### Ajuste a Modo Memoria (de la revisión pedida)
 
 Al analizar Modo Memoria para esta vuelta se encontró un problema: espiar

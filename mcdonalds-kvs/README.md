@@ -60,6 +60,10 @@ Peeks at every currently-hidden order for 1.5s while Modo Memoria is on, then a 
 
 Toggles **Modo Estación**. Before serving an order whose items have a known real recipe, you must pick the correct bread and condiment steps from a mix of real-and-decoy options, sourced from the official McDonald's training guide. See `ESTACION-INICIADOR.md`.
 
+### `b`
+
+Toggles **Modo Panes**, the lightweight version covering the whole menu: before serving, pick just the bread type (no condiments) for each item that has one. Combines with Modo Estación without asking about the same item twice.
+
 See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory modes and a suggested practice routine, and `ESTACION-INICIADOR.md` for the real station procedure Modo Estación is built from.
 
   

@@ -5,10 +5,12 @@ import StatsPanel from "./components/StatsPanel";
 import SelfCheckToast from "./components/SelfCheckToast";
 import ModeBar from "./components/ModeBar";
 import EstacionChallenge from "./components/EstacionChallenge";
+import PanesChallenge from "./components/PanesChallenge";
 import { WaveBanner, SessionReminder } from "./components/Banners";
 import { actions } from "./lib/store"
 import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, PEEK_COOLDOWN_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
 import { tieneReceta, buildChallenge } from "./lib/recetas";
+import { buildPanesQueue } from "./lib/panes";
 import { useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux"
 
@@ -41,6 +43,7 @@ function App() {
 	const memoriaOn = useSelector((state) => state.memoriaOn)
 	const enfoqueOn = useSelector((state) => state.enfoqueOn)
 	const estacionOn = useSelector((state) => state.estacionOn)
+	const panesOn = useSelector((state) => state.panesOn)
 	const confusion = useSelector((state) => state.confusion)
 
 	const dispatch = useDispatch()
@@ -70,6 +73,11 @@ function App() {
 	const estacionChallengeRef = useRef(null);
 	estacionChallengeRef.current = estacionChallenge;
 
+	// --- Modo Panes state (ver ESTACION-INICIADOR.md) ---
+	const [panesQueue, setPanesQueue] = useState(null);
+	const panesQueueRef = useRef(null);
+	panesQueueRef.current = panesQueue;
+
 	// refs "vivas" para que el listener de teclado (montado una sola vez)
 	// siempre lea el estado más reciente y no quede pegado al de la primera renderización
 	const ordersRef = useRef(orders);
@@ -82,6 +90,8 @@ function App() {
 	enfoqueOnRef.current = enfoqueOn;
 	const estacionOnRef = useRef(estacionOn);
 	estacionOnRef.current = estacionOn;
+	const panesOnRef = useRef(panesOn);
+	panesOnRef.current = panesOn;
 	const levelRef = useRef(level);
 	levelRef.current = level;
 	const confusionRef = useRef(confusion);
@@ -107,12 +117,23 @@ function App() {
 			selfCheckTimeoutRef.current = setTimeout(() => setSelfCheck(null), 6000);
 		}
 	}
-	// Modo Estación: antes de servir, si el pedido de adelante tiene algún
-	// ítem con receta conocida, hay que armarlo bien primero (ver
-	// ESTACION-INICIADOR.md). Si no hay desafío pendiente y el modo está
-	// prendido, se intercepta el servido hasta resolverlo.
+	// Antes de servir de verdad, dos desafíos se pueden interponer, en orden
+	// (ver ESTACION-INICIADOR.md): primero Modo Estación (pan + condimentos,
+	// solo para los productos con receta confirmada), después Modo Panes
+	// (solo el pan, para todo lo que tenga uno y no haya sido cubierto ya
+	// por Estación en este mismo servido).
+	const proceedAfterEstacion = (servedOrder, cubiertoPorEstacion) => {
+		if (panesOnRef.current) {
+			const cola = buildPanesQueue(servedOrder.orderArray, cubiertoPorEstacion);
+			if (cola.length > 0) {
+				setPanesQueue(cola);
+				return;
+			}
+		}
+		performServe();
+	}
 	const serveOrder = () => {
-		if (estacionChallengeRef.current) return; // ya hay un desafío esperando resolución
+		if (estacionChallengeRef.current || panesQueueRef.current) return; // ya hay algo pendiente
 		const servedOrder = ordersRef.current[0]
 		if (servedOrder === undefined) return;
 		if (estacionOnRef.current) {
@@ -122,18 +143,33 @@ function App() {
 				return;
 			}
 		}
-		performServe();
+		proceedAfterEstacion(servedOrder, null);
 	}
 	const resolveEstacionChallenge = (huboError) => {
+		const cubierto = estacionChallengeRef.current.itemName;
 		if (huboError) {
-			dispatch(actions.registerSelfMiss([estacionChallengeRef.current.itemName]));
+			dispatch(actions.registerSelfMiss([cubierto]));
 		}
 		setEstacionChallenge(null);
-		performServe();
+		proceedAfterEstacion(ordersRef.current[0], cubierto);
 	}
 	const skipEstacionChallenge = () => {
+		const cubierto = estacionChallengeRef.current.itemName;
 		setEstacionChallenge(null);
-		performServe();
+		proceedAfterEstacion(ordersRef.current[0], cubierto);
+	}
+	const resolvePanAnswer = (acerto) => {
+		const item = panesQueue[0];
+		if (!acerto) {
+			dispatch(actions.registerSelfMiss([item.name]));
+		}
+		const resto = panesQueue.slice(1);
+		if (resto.length === 0) {
+			setPanesQueue(null);
+			performServe();
+		} else {
+			setPanesQueue(resto);
+		}
 	}
 	const addOrder = () => {
 		if (enfoqueOnRef.current) {
@@ -195,6 +231,7 @@ function App() {
 	const toggleMemoria = () => dispatch(actions.toggleMemoria());
 	const toggleEnfoque = () => dispatch(actions.toggleEnfoque());
 	const toggleEstacion = () => dispatch(actions.toggleEstacion());
+	const togglePanes = () => dispatch(actions.togglePanes());
 
 	// Método 6 (efecto de generación): revelar/confirmar el autochequeo post-servido
 	const revealSelfCheck = () => setSelfCheck((sc) => (sc ? { ...sc, revealed: true } : sc));
@@ -215,6 +252,7 @@ function App() {
 			if (event.key === "m") toggleMemoria();
 			if (event.key === "f") toggleEnfoque();
 			if (event.key === "e") toggleEstacion();
+			if (event.key === "b") togglePanes();
 			if (event.key === " ") { event.preventDefault(); peek(); }
 		};
 		window.addEventListener("keypress", handleKeypress);
@@ -330,9 +368,11 @@ function App() {
 					memoriaOn={memoriaOn}
 					enfoqueOn={enfoqueOn}
 					estacionOn={estacionOn}
+					panesOn={panesOn}
 					onToggleMemoria={toggleMemoria}
 					onToggleEnfoque={toggleEnfoque}
 					onToggleEstacion={toggleEstacion}
+					onTogglePanes={togglePanes}
 					level={level}
 				/>
 				<div className="min-h-[80vh] flex flex-row flex-wrap content-start">
@@ -373,6 +413,7 @@ function App() {
 			)}
 
 			<EstacionChallenge challenge={estacionChallenge} onResolve={resolveEstacionChallenge} onSkip={skipEstacionChallenge} />
+			<PanesChallenge item={panesQueue ? panesQueue[0] : null} restantes={panesQueue ? panesQueue.length - 1 : 0} onAnswer={resolvePanAnswer} />
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />

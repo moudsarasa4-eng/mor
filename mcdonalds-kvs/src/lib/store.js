@@ -38,6 +38,8 @@ const slice = createSlice({
 		enfoqueOn: false,
 		// --- Modo Estación: armado real antes de servir (ver ESTACION-INICIADOR.md) ---
 		estacionOn: false,
+		// --- Modo Panes: solo el tipo de pan, cobertura de todo el menú ---
+		panesOn: false,
 		confusion: loadConfusion(),
 	},
 	reducers: {
@@ -63,6 +65,9 @@ const slice = createSlice({
 		},
 		toggleEstacion(state) {
 			state.estacionOn = !state.estacionOn;
+		},
+		togglePanes(state) {
+			state.panesOn = !state.panesOn;
 		},
 		pushFocusOrder(state, action) {
 			state.orders.push(generateOrder(state.level, action.payload));
