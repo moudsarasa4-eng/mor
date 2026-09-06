@@ -891,6 +891,60 @@ def test_pais_extranjero_como_palabra_suelta_sin_en():
     assert not _parece_empresa("Bos Perú – Back Office Solutions", "Caseros")
 
 
+def test_bella_vista_homonimos_de_varios_paises():
+    """Bella Vista es homónimo de ciudades en EEUU (Arkansas/Missouri),
+    México (Chiapas), Guatemala — encontrado en una corrida real con más de
+    10 negocios legítimos pero ubicados en el país equivocado. El título solo
+    ('FedEx Bella Vista') no lo dice, pero el snippet/URL sí — por eso
+    _parece_empresa ahora también revisa texto_extra (snippet + URL)."""
+    from app.discovery import _parece_empresa
+    assert not _parece_empresa(
+        "2025 ofertas de Black Friday en teléfonos en Bella Vista, AR", "Bella Vista",
+        texto_extra="Ofertas de AT&T en Arkansas https://www.att.com/es-us/stores/arkansas/bella-vista/x",
+    )
+    assert not _parece_empresa(
+        "Hotel Bella Vista", "Bella Vista",
+        texto_extra="Hotel de 3 Estrellas en Catarina, Guatemala https://www.hotelsone.com/catarina-hotels-gt/x",
+    )
+
+
+def test_dominios_foraneos_por_tld():
+    """Bloqueo genérico por ccTLD — mucho más robusto que enumerar sitios
+    extranjeros uno por uno, para zonas con homónimos en varios países."""
+    from app.discovery import _es_dominio_excluido
+    assert _es_dominio_excluido("https://limpiezaparaalfombras.cl/x")
+    assert _es_dominio_excluido("https://aliservicios.pe/x")
+    assert not _es_dominio_excluido("https://www.empresareal.com.ar/")
+
+
+def test_overpass_no_trae_comercios_irrelevantes():
+    """Bug real: usar tags 'shop'/'office' SIN valor traía cualquier
+    comercio (joyería, zapatería, peluquería, remisería) sin relación con
+    los 4 rubros del CV. Ahora solo tags específicos y relevantes."""
+    from app.overpass_discovery import TAGS_RELEVANTES
+    claves_valores = set(TAGS_RELEVANTES)
+    assert ("shop", None) not in claves_valores
+    assert ("office", None) not in claves_valores
+    assert ("shop", "supermarket") in claves_valores
+
+
+def test_agencia_rrhh_con_conector_en_medio_de_la_frase():
+    """Bug real: 'Servicios de Personal y Eventual de alta calidad' no
+    matcheaba 'personal eventual' como frase fija — la 'y' en el medio
+    rompe el substring."""
+    from app.exclusions import es_agencia_rrhh
+    assert es_agencia_rrhh("Servicios de Personal y Eventual de alta calidad para la Industria y el Comercio")
+
+
+def test_provincia_chaco_y_ruc_peruano_detectados():
+    """Bug real: 'Distribuidora Moron' resultó ser una empresa real en
+    Resistencia, Chaco (no Morón, Buenos Aires) — y un RUC (identificador
+    tributario peruano, Argentina usa CUIT) se coló sin marca de país."""
+    from app.discovery import _parece_empresa
+    assert not _parece_empresa("Distribuidora Moron ubicada en Resistencia, Chaco", "Moron")
+    assert not _parece_empresa("Empresa con RUC: 20525979947", "Martin Coronado")
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

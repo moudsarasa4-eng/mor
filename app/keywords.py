@@ -91,6 +91,7 @@ DOMINIOS_RUIDO_NO_EMPRESA = [
     # registros de empresas extranjeros (Perú, Colombia, Brasil, España) —
     # se cuelan con búsquedas genéricas de rubro sin filtro geográfico real
     "cnpj.biz", "rues.org.co", "universidadperu.com", "contadormype.pe", "bosperu.com",
+    "datosperu.org",
     # educativo/gobierno genérico sin relación, mapas de POIs (no son la empresa)
     "oerproject.com", "archive.epa.gov", "mapcarta.com",
     # blogs / artículos genéricos, no una empresa
@@ -102,7 +103,14 @@ DOMINIOS_RUIDO_NO_EMPRESA = [
 # positivos (Trujillo/Lima en Perú, etc.) y avisos inmobiliarios/pasajes que no
 # son la empresa buscada — más barato filtrar en la query que gastar presupuesto
 # trayendo el resultado para descartarlo después.
-EXCLUSIONES_QUERY = "-Peru -Trujillo -Lima -México -Chile -Colombia -España -Zonaprop -Argenprop -pasajes"
+# "Bella Vista" (zona configurada) es homónimo de ciudades en EEUU
+# (Arkansas/Missouri), México (Chiapas), Chile, Guatemala — muchos de esos
+# negocios no mencionan el país en el texto, así que filtrarlos después por
+# patrón no alcanza. Es mucho más barato excluirlos en la query misma.
+EXCLUSIONES_QUERY = (
+    "-Peru -Trujillo -Lima -México -Chile -Colombia -España -Zonaprop -Argenprop -pasajes "
+    "-Arkansas -Missouri -Guatemala -Chiapas -\"Estados Unidos\""
+)
 
 
 def plantillas_query(zona: str, keyword: str = "") -> list[dict]:

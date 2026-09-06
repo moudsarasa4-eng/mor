@@ -58,6 +58,10 @@ PALABRAS_AGENCIA_RRHH = [
     "personal eventual", "personal temporario", "servicios eventuales",
     "empresa de servicios eventuales", "staffing", "reclutamiento y seleccion",
     "reclutamiento y selección",
+    # bug real: "Servicios de Personal y Eventual" no matcheaba "personal
+    # eventual" como frase fija (la "y" en el medio rompe el substring) —
+    # frase más genérica que cubre esa variante y otras similares
+    "servicios de personal", "provision de personal eventual",
 ]
 
 

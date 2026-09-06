@@ -19,16 +19,23 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "MotorDeJackpots/1.0 (uso personal, busqueda de empleo)"
 
 
+# tags específicos que de verdad se corresponden con los 4 rubros del CV.
+# Bug real encontrado con datos de producción: usar "shop" y "office" SIN
+# valor (bare tag) trae CUALQUIER comercio/oficina en el radio — joyería,
+# zapatería, peluquería, remisería, panadería, ropa — pura noise sin
+# relación con logística/administrativo/atención al cliente/limpieza.
+TAGS_RELEVANTES = [
+    ('landuse', 'industrial'), ('building', 'industrial'), ('industrial', None),
+    ('office', 'logistics'), ('office', 'company'), ('office', 'cleaning'),
+    ('shop', 'supermarket'), ('shop', 'wholesale'), ('shop', 'department_store'),
+    ('shop', 'laundry'),
+]
+
+
 def _construir_query_overpass(lat: float, lon: float, radio_metros: int) -> str:
     bloques = []
-    for tag_valor in ['"landuse"="industrial"', '"building"="industrial"', '"office"',
-                       '"shop"', '"industrial"']:
-        clave = tag_valor.split("=")[0].strip('"')
-        if "=" in tag_valor:
-            valor = tag_valor.split("=")[1].strip('"')
-            filtro = f'["{clave}"="{valor}"]'
-        else:
-            filtro = f'["{clave}"]'
+    for clave, valor in TAGS_RELEVANTES:
+        filtro = f'["{clave}"="{valor}"]' if valor else f'["{clave}"]'
         bloques.append(f'node{filtro}(around:{radio_metros},{lat},{lon});')
         bloques.append(f'way{filtro}(around:{radio_metros},{lat},{lon});')
     cuerpo = "\n  ".join(bloques)

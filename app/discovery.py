@@ -43,7 +43,12 @@ PATRONES_NO_EMPRESA = [
     # producción: "Bos Perú", "Contador Mype" (contadormype.pe), títulos que
     # mencionan el país sin la preposición "en"
     r"\b(per[uú]|peruano|peruana|mexicano|mexicana|colombiano|colombiana|brasil|brasile[ñn]o)\b",
-    r"\b(salta|jujuy|misiones|neuqu[eé]n|chubut)\b",  # otra provincia (ej. "Hotel Caseros Salta" — Caseros es homónimo de una calle en Salta)
+    r"\b(salta|jujuy|misiones|neuqu[eé]n|chubut|chaco|resistencia)\b",  # otra provincia (ej. "Hotel Caseros Salta" — Caseros es homónimo de una calle en Salta)
+    r"\bruc\s*:?\s*\d",  # RUC es el identificador tributario de Perú/otros países — Argentina usa CUIT
+    # "Bella Vista" es homónimo de ciudades en EEUU (Arkansas/Missouri), Chile,
+    # Guatemala — el bloqueo por ccTLD (.cl, .gt) no alcanza cuando el sitio usa
+    # .com genérico (fedex.com, att.com, uber.com)
+    r"\b(misuri|missouri|arkansas|guatemala|catarina)\b",
     # artículos tipo listicle / guía / definición — nunca son una empresa
     r"\b\d+\s+(mejores\s+)?(consejos|maneras|tipos|ideas|cosas|pasos|trucos)\b",
     r"^(c[oó]mo|qu[eé] es)\b.*\b(crear|hacer|abordar|mejorar|abrir)\b",
@@ -65,7 +70,11 @@ PALABRAS_GENERICAS_SOLAS = {
 _PATRONES_NO_EMPRESA_COMPILADOS = [re.compile(p, re.IGNORECASE) for p in PATRONES_NO_EMPRESA]
 
 
-def _parece_empresa(nombre: str, zona: str) -> bool:
+def _parece_empresa(nombre: str, zona: str, texto_extra: str = "") -> bool:
+    """texto_extra: snippet/descripción/URL — algunos casos reales (homónimos
+    de zona en otro país, RUC en vez de CUIT) no se mencionan en el título
+    pero sí en el snippet o en la URL (ej. 'FedEx Bella Vista' no dice
+    'Arkansas' en el título, pero la URL sí: /es-us/ar/bella-vista)."""
     nombre_l = nombre.strip().lower()
     if not nombre_l:
         return False
@@ -74,6 +83,8 @@ def _parece_empresa(nombre: str, zona: str) -> bool:
     if nombre_l in PALABRAS_GENERICAS_SOLAS:
         return False  # "Empresas", "Contacto", "Inicio"... no es un nombre real
     if any(p.search(nombre_l) for p in _PATRONES_NO_EMPRESA_COMPILADOS):
+        return False
+    if texto_extra and any(p.search(texto_extra.lower()) for p in _PATRONES_NO_EMPRESA_COMPILADOS):
         return False
     # Nota: se descartó un filtro de "nombre de persona" (2 palabras Capitalizadas)
     # porque atrapaba también nombres reales de empresa de 2 palabras (ej.
@@ -88,6 +99,17 @@ def _dominio(url: str) -> str:
     return m.group(1).lower() if m else ""
 
 
+# ccTLDs de países donde Marco no puede trabajar (todo lo que no sea
+# Argentina) — encontrado en producción: zonas como "Bella Vista" son
+# homónimo de ciudades en EEUU, México, Chile, Perú y Guatemala, y ninguna
+# lista fija de dominios alcanza para cubrir eso. Bloquear por ccTLD es
+# mucho más robusto que intentar enumerar cada sitio extranjero uno por uno.
+TLDS_EXTRANJEROS = (
+    ".mx", ".cl", ".pe", ".co", ".gt", ".py", ".uy", ".bo", ".ec", ".cr",
+    ".pa", ".do", ".es", ".us", ".br", ".ve", ".hn", ".sv", ".ni",
+)
+
+
 def _es_dominio_excluido(url: str) -> bool:
     """Coincidencia exacta/subdominio para entradas de solo-dominio (nunca
     substring suelto — 'x.com' como substring bloqueaba cualquier dominio
@@ -99,6 +121,8 @@ def _es_dominio_excluido(url: str) -> bool:
         return False
     dom = _dominio(url)
     url_l = url.lower()
+    if dom and dom.endswith(TLDS_EXTRANJEROS):
+        return True
     for excl in DOMINIOS_EXCLUIR + DOMINIOS_RUIDO_NO_EMPRESA:
         if "/" in excl:
             if excl.lower() in url_l:
@@ -142,7 +166,7 @@ def extraer_candidatas(resultado_serper: dict, zona: str) -> list[dict]:
         nombre = _limpiar_nombre(titulo)
         if len(nombre) < 3 or len(nombre) > 90:
             continue
-        if not _parece_empresa(nombre, zona):
+        if not _parece_empresa(nombre, zona, texto_extra=f"{snippet} {url}"):
             continue
         candidatas.append({"nombre_crudo": nombre, "url": url, "snippet": snippet, "zona": zona})
     return candidatas
