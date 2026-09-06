@@ -4,9 +4,11 @@ import OrderCard from "./components/OrderCard";
 import StatsPanel from "./components/StatsPanel";
 import SelfCheckToast from "./components/SelfCheckToast";
 import ModeBar from "./components/ModeBar";
+import EstacionChallenge from "./components/EstacionChallenge";
 import { WaveBanner, SessionReminder } from "./components/Banners";
 import { actions } from "./lib/store"
-import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
+import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, PEEK_COOLDOWN_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
+import { tieneReceta, buildChallenge } from "./lib/recetas";
 import { useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux"
 
@@ -38,6 +40,7 @@ function App() {
 	const level = useSelector((state) => state.level)
 	const memoriaOn = useSelector((state) => state.memoriaOn)
 	const enfoqueOn = useSelector((state) => state.enfoqueOn)
+	const estacionOn = useSelector((state) => state.estacionOn)
 	const confusion = useSelector((state) => state.confusion)
 
 	const dispatch = useDispatch()
@@ -60,6 +63,12 @@ function App() {
 	const sessionStartRef = useRef(Date.now());
 	const [sessionReminder, setSessionReminder] = useState(false);
 	const reminderShownRef = useRef(false);
+	const peekCooldownUntilRef = useRef(0);
+
+	// --- Modo Estación state (ver ESTACION-INICIADOR.md) ---
+	const [estacionChallenge, setEstacionChallenge] = useState(null);
+	const estacionChallengeRef = useRef(null);
+	estacionChallengeRef.current = estacionChallenge;
 
 	// refs "vivas" para que el listener de teclado (montado una sola vez)
 	// siempre lea el estado más reciente y no quede pegado al de la primera renderización
@@ -71,6 +80,8 @@ function App() {
 	memoriaOnRef.current = memoriaOn;
 	const enfoqueOnRef = useRef(enfoqueOn);
 	enfoqueOnRef.current = enfoqueOn;
+	const estacionOnRef = useRef(estacionOn);
+	estacionOnRef.current = estacionOn;
 	const levelRef = useRef(level);
 	levelRef.current = level;
 	const confusionRef = useRef(confusion);
@@ -79,7 +90,7 @@ function App() {
 	const toggleSide = () => {
 		dispatch(actions.toggleSide())
 	}
-	const serveOrder = () => {
+	const performServe = () => {
 		const servedOrder = ordersRef.current[0]
 		if (servedOrder === undefined) return;
 		const timeServed = (Date.now()) / 1000 - servedOrder.timeGenerated
@@ -95,6 +106,34 @@ function App() {
 			clearTimeout(selfCheckTimeoutRef.current);
 			selfCheckTimeoutRef.current = setTimeout(() => setSelfCheck(null), 6000);
 		}
+	}
+	// Modo Estación: antes de servir, si el pedido de adelante tiene algún
+	// ítem con receta conocida, hay que armarlo bien primero (ver
+	// ESTACION-INICIADOR.md). Si no hay desafío pendiente y el modo está
+	// prendido, se intercepta el servido hasta resolverlo.
+	const serveOrder = () => {
+		if (estacionChallengeRef.current) return; // ya hay un desafío esperando resolución
+		const servedOrder = ordersRef.current[0]
+		if (servedOrder === undefined) return;
+		if (estacionOnRef.current) {
+			const item = servedOrder.orderArray.find((it) => tieneReceta(it.name));
+			if (item) {
+				setEstacionChallenge(buildChallenge(item.name));
+				return;
+			}
+		}
+		performServe();
+	}
+	const resolveEstacionChallenge = (huboError) => {
+		if (huboError) {
+			dispatch(actions.registerSelfMiss([estacionChallengeRef.current.itemName]));
+		}
+		setEstacionChallenge(null);
+		performServe();
+	}
+	const skipEstacionChallenge = () => {
+		setEstacionChallenge(null);
+		performServe();
 	}
 	const addOrder = () => {
 		if (enfoqueOnRef.current) {
@@ -136,6 +175,7 @@ function App() {
 	// por un instante — cada chequeo cuenta, para saber cuánto te apoyás en mirar.
 	const peek = () => {
 		if (!memoriaOnRef.current) return;
+		if (Date.now() < peekCooldownUntilRef.current) return;
 		const now = Date.now() / 1000;
 		const visibleWindow = recallVisibleS(levelRef.current);
 		const maskedNames = new Set();
@@ -150,9 +190,11 @@ function App() {
 		setPeeking(true);
 		clearTimeout(peekTimeoutRef.current);
 		peekTimeoutRef.current = setTimeout(() => setPeeking(false), PEEK_DURATION_MS);
+		peekCooldownUntilRef.current = Date.now() + PEEK_DURATION_MS + PEEK_COOLDOWN_MS;
 	}
 	const toggleMemoria = () => dispatch(actions.toggleMemoria());
 	const toggleEnfoque = () => dispatch(actions.toggleEnfoque());
+	const toggleEstacion = () => dispatch(actions.toggleEstacion());
 
 	// Método 6 (efecto de generación): revelar/confirmar el autochequeo post-servido
 	const revealSelfCheck = () => setSelfCheck((sc) => (sc ? { ...sc, revealed: true } : sc));
@@ -172,6 +214,7 @@ function App() {
 			if (event.key === "o") addOrder();
 			if (event.key === "m") toggleMemoria();
 			if (event.key === "f") toggleEnfoque();
+			if (event.key === "e") toggleEstacion();
 			if (event.key === " ") { event.preventDefault(); peek(); }
 		};
 		window.addEventListener("keypress", handleKeypress);
@@ -286,8 +329,10 @@ function App() {
 				<ModeBar
 					memoriaOn={memoriaOn}
 					enfoqueOn={enfoqueOn}
+					estacionOn={estacionOn}
 					onToggleMemoria={toggleMemoria}
 					onToggleEnfoque={toggleEnfoque}
+					onToggleEstacion={toggleEstacion}
 					level={level}
 				/>
 				<div className="min-h-[80vh] flex flex-row flex-wrap content-start">
@@ -327,6 +372,7 @@ function App() {
 				</div>
 			)}
 
+			<EstacionChallenge challenge={estacionChallenge} onResolve={resolveEstacionChallenge} onSkip={skipEstacionChallenge} />
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />

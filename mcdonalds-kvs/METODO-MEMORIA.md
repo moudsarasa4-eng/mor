@@ -18,6 +18,16 @@ Además, con Modo Memoria o Modo Enfoque prendido, de tanto en tanto llega una
 **oleada** (2-3 pedidos juntos con cartel de aviso) simulando la hora pico real
 ("salen muchos pedidos a la vez").
 
+## Modo Estación (tecla `E`): la otra mitad del trabajo
+
+Los métodos de arriba entrenan **recordar QUÉ pedido es**. Modo Estación
+entrena la otra mitad real del puesto de Iniciador: **qué pan y qué
+condimentos lleva cada producto**, con las cantidades exactas de la guía
+oficial de McDonald's. Antes de servir, armás el producto de memoria eligiendo
+entre pasos reales y pasos de otros productos (Método 5 de nuevo, aplicado al
+armado en vez de al pedido). Ver `ESTACION-INICIADOR.md` para el detalle
+completo y las fuentes.
+
 
 ## 1. Recuperación activa (Active Recall)
 La técnica con más respaldo científico (Roediger & Karpicke, 2006). No sirve *mirar* el pedido repetido veces — sirve **intentar recordarlo sin ver** y recién ahí chequear.

@@ -1,5 +1,5 @@
 const config = {
-	maxOrderlength: 5,
+	maxOrderlength: 5, // tope de items distintos por pedido, aunque subas mucho de nivel
 	minOrderlength: 1,
 	singleItemMaxAmount: 4,
 	singleItemMinAmount: 1,
@@ -49,6 +49,12 @@ const config = {
 	OrderStorage: ["Paid", "Stored"],
 };
 
+// Progresión realista: recién empezando, los pedidos vienen cortos (como te
+// dan a vos al principio del entrenamiento real) y se alargan de a poco a
+// medida que subís de nivel, hasta llegar al tope de config.maxOrderlength.
+const START_ORDER_LENGTH = 2;
+const LEVELS_PER_EXTRA_ITEM = 3;
+
 function generateNumber() {
 	return Math.floor(Math.random() * (16 - 5) + 5);
 }
@@ -66,7 +72,11 @@ function maybeModifier(itemName) {
 
 function generateOrder(level = 1, itemPool = config.Itemlist) {
 	const duplicateChecker = [];
-	const dynamicMax = Math.min(config.maxOrderlength + Math.floor(level / 2), itemPool.length);
+	const maxForLevel = Math.min(
+		START_ORDER_LENGTH + Math.floor((level - 1) / LEVELS_PER_EXTRA_ITEM),
+		config.maxOrderlength
+	);
+	const dynamicMax = Math.min(maxForLevel + 1, itemPool.length);
 	const orderAmount = Math.floor(
 		Math.random() * (dynamicMax - config.minOrderlength) +
 			config.minOrderlength

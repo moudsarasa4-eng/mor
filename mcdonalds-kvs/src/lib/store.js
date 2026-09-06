@@ -36,6 +36,8 @@ const slice = createSlice({
 		// --- Entrenamiento de memoria (ver METODO-MEMORIA.md) ---
 		memoriaOn: false,
 		enfoqueOn: false,
+		// --- Modo Estación: armado real antes de servir (ver ESTACION-INICIADOR.md) ---
+		estacionOn: false,
 		confusion: loadConfusion(),
 	},
 	reducers: {
@@ -58,6 +60,9 @@ const slice = createSlice({
 		},
 		toggleEnfoque(state) {
 			state.enfoqueOn = !state.enfoqueOn;
+		},
+		toggleEstacion(state) {
+			state.estacionOn = !state.estacionOn;
 		},
 		pushFocusOrder(state, action) {
 			state.orders.push(generateOrder(state.level, action.payload));

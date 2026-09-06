@@ -54,9 +54,13 @@ Toggles **Modo Enfoque**. New orders are drawn only from the items you peek/miss
 
 ### `Espacio` (Space)
 
-Peeks at every currently-hidden order for 1.5s while Modo Memoria is on. Only does something while Modo Memoria is active.
+Peeks at every currently-hidden order for 1.5s while Modo Memoria is on, then a 4s cooldown before you can peek again. Only does something while Modo Memoria is active.
 
-See `METODO-MEMORIA.md` for the full science-backed rationale behind these modes and a suggested practice routine.
+### `e`
+
+Toggles **Modo Estación**. Before serving an order whose items have a known real recipe, you must pick the correct bread and condiment steps from a mix of real-and-decoy options, sourced from the official McDonald's training guide. See `ESTACION-INICIADOR.md`.
+
+See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory modes and a suggested practice routine, and `ESTACION-INICIADOR.md` for the real station procedure Modo Estación is built from.
 
   
 

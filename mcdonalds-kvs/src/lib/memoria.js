@@ -11,8 +11,11 @@ export function recallVisibleS(level) {
 	return Math.max(RECALL_VISIBLE_FLOOR_S, RECALL_VISIBLE_BASE_S - level * RECALL_VISIBLE_STEP_S);
 }
 
-// Cuánto dura el "chequeo" (espiar) al mantener la tecla de repaso.
+// Cuánto dura el "chequeo" (espiar) al mantener la tecla de repaso, y cuánto
+// hay que esperar entre chequeos para que no sea gratis mantenerlo revelado
+// todo el tiempo (eso vaciaría de sentido la recuperación activa).
 export const PEEK_DURATION_MS = 1500;
+export const PEEK_COOLDOWN_MS = 4000;
 
 // Oleadas de pedidos extra mientras hay algún modo de entrenamiento activo,
 // simulando la hora pico ("salen muchos pedidos a la vez").
