@@ -214,6 +214,19 @@ def loop_investigacion(max_ciclos: int | None = None, max_minutos: float | None 
                 _gastar(correr_contactos, zona=None, limite=3)
                 trabajo_hecho = True
 
+        # 5) OpenStreetMap Overpass — no gasta presupuesto de Serper (recurso
+        # aparte), así que no pasa por _gastar. Una zona alcanza con corrërse
+        # una vez (OSM no cambia rápido), overpass_progress evita repetirla
+        # cada hora para siempre.
+        if _puede_seguir():
+            from app.overpass_discovery import zonas_pendientes as zonas_pendientes_overpass, buscar_por_zona as buscar_overpass
+            pendientes_ovp = zonas_pendientes_overpass(orden_zonas())
+            if pendientes_ovp:
+                zona_ovp = pendientes_ovp[0]
+                buscar_overpass(zona_ovp)
+                promover_candidatas(zona=zona_ovp)
+                trabajo_hecho = True
+
         # pasa lo recién descubierto por el filtro de calidad retroactivo antes
         # de mostrarlo/exportarlo — así una tanda no muestra basura que el
         # filtro de discovery.py no atajó en el momento pero sí atrapa ahora.

@@ -171,6 +171,12 @@ CREATE TABLE IF NOT EXISTS industrial_progress (
     UNIQUE(partido, codigo_claé)
 );
 
+CREATE TABLE IF NOT EXISTS overpass_progress (
+    zona TEXT PRIMARY KEY,
+    empresas_nuevas INTEGER NOT NULL DEFAULT 0,
+    procesado_en TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS discard_reasons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER NOT NULL REFERENCES companies(id),

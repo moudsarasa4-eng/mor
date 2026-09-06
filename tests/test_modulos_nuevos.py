@@ -507,6 +507,43 @@ def test_overpass_respeta_zona_prohibida(tmp_path, monkeypatch):
     assert "prohibida" in r["error"]
 
 
+def test_loop_investigacion_corre_overpass_y_no_lo_repite(tmp_path, monkeypatch):
+    """Overpass está enganchado como 5ta fuente del ciclo automático: debe
+    correr una zona por ciclo (no gasta presupuesto de Serper) y no
+    repetirla en el siguiente ciclo, gracias a overpass_progress."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.runner as runner_module
+    import app.geocoding as geocoding
+    from app.geocoding import Coordenadas
+    import app.overpass_discovery as ovp
+
+    monkeypatch.setattr(geocoding, "geocodificar", lambda direccion: Coordenadas(lat=-34.59, lon=-58.63, direccion_encontrada=direccion))
+
+    class FakeResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"elements": [{"tags": {"name": "Depósito Overpass SRL", "industrial": "yes"}}]}
+
+    monkeypatch.setattr(ovp.requests, "post", lambda *a, **kw: FakeResp())
+
+    import app.search_client as sc
+    monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": []})  # sin resultados de Serper, para aislar overpass
+
+    runner_module.loop_investigacion(max_ciclos=20)
+
+    conn = db_module.get_conn()
+    nombres = [r["nombre"] for r in conn.execute("SELECT nombre FROM companies")]
+    zonas_corridas = [r["zona"] for r in conn.execute("SELECT zona FROM overpass_progress")]
+    conn.close()
+    assert "Depósito Overpass SRL" in nombres
+    assert len(zonas_corridas) == 1  # una sola zona por ciclo, no todas de una
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

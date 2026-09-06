@@ -11,7 +11,7 @@ timeout razonable, un radio acotado por corrida.
 import requests
 
 from app.db import get_conn, now
-from app.geocoding import geocodificar
+import app.geocoding as geocoding
 from app.discovery import _parece_empresa, _ya_existe_en_db, _ya_descubierta
 from app.exclusions import es_cadena_excluida, es_zona_prohibida
 
@@ -35,6 +35,17 @@ def _construir_query_overpass(lat: float, lon: float, radio_metros: int) -> str:
     return f"[out:json][timeout:25];\n(\n  {cuerpo}\n);\nout center tags;"
 
 
+def zonas_pendientes(zonas: list[str]) -> list[str]:
+    """OSM no cambia rápido (a diferencia de una búsqueda de texto), así que
+    no tiene sentido re-consultar la misma zona cada hora en el ciclo
+    automático — una vez es suficiente hasta que se pida explícitamente de
+    nuevo (main.py overpass corre igual, sin este filtro, si se invoca a mano)."""
+    conn = get_conn()
+    ya_hechas = {r["zona"] for r in conn.execute("SELECT zona FROM overpass_progress").fetchall()}
+    conn.close()
+    return [z for z in zonas if z not in ya_hechas]
+
+
 def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
     """Geocodifica la zona, consulta Overpass, filtra y persiste candidatas
     nuevas en discovered_companies_raw (query_id=NULL: no cuenta contra el
@@ -42,7 +53,7 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
     if es_zona_prohibida(zona):
         return {"zona": zona, "error": "zona prohibida (CABA)", "nuevas": 0}
 
-    coords = geocodificar(f"{zona}, Buenos Aires, Argentina")
+    coords = geocoding.geocodificar(f"{zona}, Buenos Aires, Argentina")
     if coords is None:
         return {"zona": zona, "error": "no se pudo geocodificar la zona", "nuevas": 0}
 
@@ -85,6 +96,11 @@ def buscar_por_zona(zona: str, radio_metros: int = 1500) -> dict:
         )
         nuevas += 1
 
+    conn.execute(
+        "INSERT INTO overpass_progress (zona, empresas_nuevas, procesado_en) VALUES (?, ?, ?) "
+        "ON CONFLICT(zona) DO UPDATE SET empresas_nuevas=empresas_nuevas+excluded.empresas_nuevas, procesado_en=excluded.procesado_en",
+        (zona, nuevas, now()),
+    )
     conn.commit()
     conn.close()
     return {"zona": zona, "nuevas": nuevas, "descartadas": descartadas, "total_osm": len(data.get("elements", []))}
