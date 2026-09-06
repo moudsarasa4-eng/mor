@@ -11,15 +11,51 @@ from app.discovery import ejecutar_query
 from app.promote import promover_candidatas
 from app.keywords import EXCLUSIONES_QUERY
 
-# Categorías de producto típicas de supermercado, mapeadas a por qué generan
-# pistas de fabricantes con necesidad de depósito/logística/administración.
+# Categorías de producto/material/servicio — "método envolvente": no se
+# busca el puesto, se busca quién provee/fabrica/distribuye/da service de
+# algo concreto en la zona. Esa empresa casi nunca publica una vacante, pero
+# tiene depósito, administración, compras y atención a clientes igual — los
+# 4 rubros del CV, sin competir con nadie que busque por portal de empleo.
+# Ver docs/PALABRAS_ENVOLVENTES.md para la investigación completa por
+# categoría y por qué cada una genera pistas de estos 4 rubros.
 CATEGORIAS_PRODUCTO = [
+    # supermercado / alimentos y bebidas (logística de reparto)
     "conservas de tomate", "conservas de vegetales", "aceites comestibles",
     "fideos secos", "harinas", "galletitas", "lácteos", "quesos",
     "embutidos", "productos de limpieza", "detergentes", "papel higiénico",
     "artículos de plástico para el hogar", "bebidas gaseosas", "aguas envasadas",
     "snacks", "golosinas", "productos de panificación congelados",
     "envases de vidrio", "envases plásticos", "productos textiles para el hogar",
+    # construcción / ferretería (mucho depósito y logística)
+    "ladrillos", "cemento", "arena", "hierro para construcción", "maderas",
+    "chapas", "caños", "cables", "pinturas", "cerámicos", "revestimientos",
+    "aberturas", "herramientas", "tornillería", "sanitarios", "membranas",
+    "áridos", "premoldeados", "andamios", "materiales eléctricos",
+    # industria / metalúrgica / autopartes
+    "autopartes", "repuestos automotor", "neumáticos", "baterías",
+    "lubricantes", "maquinaria industrial", "herramientas industriales",
+    "insumos metalúrgicos", "chapa y pintura", "matricería", "fundición",
+    # higiene / indumentaria de trabajo (rubro directo de limpieza)
+    "insumos de limpieza industrial", "indumentaria de trabajo",
+    "elementos de protección personal", "uniformes",
+    # papel, cartón, embalaje (logística intensiva)
+    "envases y embalajes", "cartón corrugado", "papel para embalaje",
+    "film stretch", "pallets", "cajas de cartón", "etiquetas", "packaging",
+    # plástico / químico
+    "productos plásticos industriales", "químicos industriales",
+    "agroquímicos", "pinturas industriales", "adhesivos industriales",
+    # muebles / equipamiento de oficina y comercio
+    "muebles de oficina", "mobiliario comercial", "estanterías industriales",
+    "equipamiento para gastronomía", "refrigeración comercial",
+    "cámaras frigoríficas", "góndolas y exhibidores",
+    # agro (zona oeste GBA tiene actividad rural residual)
+    "forrajes", "semillas", "insumos agropecuarios", "maquinaria agrícola",
+    "fertilizantes",
+    # service técnico / mantenimiento (talleres con necesidad de todo)
+    "service de aire acondicionado", "mantenimiento de ascensores",
+    "matafuegos", "portones automáticos", "sistemas de seguridad CCTV",
+    "plomería industrial", "electricidad industrial",
+    "service de electrodomésticos", "service de informática",
 ]
 
 
