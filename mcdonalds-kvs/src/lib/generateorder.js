@@ -52,8 +52,25 @@ const config = {
 // Progresión realista: recién empezando, los pedidos vienen cortos (como te
 // dan a vos al principio del entrenamiento real) y se alargan de a poco a
 // medida que subís de nivel, hasta llegar al tope de config.maxOrderlength.
+// "level" sube 1 por cada pedido SERVIDO (no por minuto), así que estos pasos
+// están pensados en pedidos servidos, no en tiempo: con 3 tardaba apenas 10
+// pedidos en llegar al tope, es decir un rato del Turno Intensivo. Con 8,
+// llegar al pedido más largo lleva una sesión entera de práctica sostenida.
 const START_ORDER_LENGTH = 2;
-const LEVELS_PER_EXTRA_ITEM = 3;
+const LEVELS_PER_EXTRA_ITEM = 8;
+
+// Misma lógica para la cantidad por ítem: arranca en 1 (un solo "Big Mac",
+// no "3 Big Mac") y va sumando de a poco hasta el tope de
+// config.singleItemMaxAmount, en vez de ser random desde el pedido número uno.
+const START_QTY_CEILING = 2;
+const LEVELS_PER_EXTRA_QTY = 6;
+
+function qtyCeilingForLevel(level) {
+	return Math.min(
+		START_QTY_CEILING + Math.floor((level - 1) / LEVELS_PER_EXTRA_QTY),
+		config.singleItemMaxAmount
+	);
+}
 
 function generateNumber() {
 	return Math.floor(Math.random() * (16 - 5) + 5);
@@ -92,7 +109,7 @@ function generateOrder(level = 1, itemPool = config.Itemlist) {
 
 		const singleItemAmount = Math.floor(
 			Math.random() *
-				(config.singleItemMaxAmount - config.singleItemMinAmount) +
+				(qtyCeilingForLevel(level) - config.singleItemMinAmount) +
 				config.singleItemMinAmount
 		);
 		orderArray.push({

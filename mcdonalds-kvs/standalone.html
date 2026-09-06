@@ -338,7 +338,12 @@ const config = {
   OrderStorage: ["Paid", "Stored"]
 };
 const START_ORDER_LENGTH = 2;
-const LEVELS_PER_EXTRA_ITEM = 3;
+const LEVELS_PER_EXTRA_ITEM = 8;
+const START_QTY_CEILING = 2;
+const LEVELS_PER_EXTRA_QTY = 6;
+function qtyCeilingForLevel(level) {
+  return Math.min(START_QTY_CEILING + Math.floor((level - 1) / LEVELS_PER_EXTRA_QTY), config.singleItemMaxAmount);
+}
 function generateNumber() {
   return Math.floor(Math.random() * (16 - 5) + 5);
 }
@@ -366,7 +371,7 @@ function generateOrder(level = 1, itemPool = config.Itemlist) {
       ItemRandomizer = Math.floor(Math.random() * itemPool.length);
     }
     duplicateChecker.push(ItemRandomizer);
-    const singleItemAmount = Math.floor(Math.random() * (config.singleItemMaxAmount - config.singleItemMinAmount) + config.singleItemMinAmount);
+    const singleItemAmount = Math.floor(Math.random() * (qtyCeilingForLevel(level) - config.singleItemMinAmount) + config.singleItemMinAmount);
     orderArray.push({
       name: itemPool[ItemRandomizer],
       amount: singleItemAmount,

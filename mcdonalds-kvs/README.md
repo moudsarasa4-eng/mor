@@ -25,7 +25,7 @@ All available configurations can be done inside './lib/generateorder.js'.
 |OrderTypes|Type of order (Only for display)|Array (String)|Drive Through, Bag, Tray, Delivery|
 |OrderStorage|Current order state (Only for display|Array (String)|Paid, Stored|
 
-`maxOrderlength` is a ceiling, not a flat range: order length ramps up progressively from `START_ORDER_LENGTH` (2 items, right at the top of `generateorder.js`) by one extra item every `LEVELS_PER_EXTRA_ITEM` levels (3), until it reaches `maxOrderlength` around level 10. This is intentional — orders start short like a real onboarding shift and get busier as you level up, instead of being able to hand you a 4-item order from level 1.
+`maxOrderlength` is a ceiling, not a flat range: order length ramps up progressively from `START_ORDER_LENGTH` (2 items, right at the top of `generateorder.js`) by one extra item every `LEVELS_PER_EXTRA_ITEM` levels (8), until it reaches `maxOrderlength` around level 25. `singleItemMaxAmount` ramps the same way — it starts fixed at 1 (a single "Big Mac", not "3 Big Mac") and only starts allowing higher quantities every `LEVELS_PER_EXTRA_QTY` levels (6). `level` goes up by 1 per order **served**, not per minute, so both of these are paced in served orders — a couple of Turno Intensivo runs' worth of practice, not one. This is intentional — orders start short and simple like a real onboarding shift and only get busier with sustained practice, instead of throwing a 4-item order with big quantities at you from level 1.
 
   
   
