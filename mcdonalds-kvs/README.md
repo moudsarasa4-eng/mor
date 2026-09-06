@@ -70,6 +70,12 @@ See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory 
 
   
 
+## `standalone.html` — versión sin instalación
+
+`standalone.html` es una copia funcionalmente equivalente de toda la app (menú, Turno Intensivo, Modo Memoria, Modo Enfoque, Modo Estación, Modo Panes) empaquetada en un único archivo HTML. No necesita `npm install`, `npm start`, Node ni conexión a internet: se abre haciendo doble clic y funciona directamente en el navegador. React, ReactDOM y el CSS de Tailwind ya usado por la app están incluidos dentro del archivo (no se cargan desde ningún CDN), así que también funciona sin wifi.
+
+Se genera desde el mismo código fuente (`src/`) compilando el JSX con Babel y generando el CSS de Tailwind real para las clases usadas — no es una reescritura aparte a mantener a mano. Si cambia algo en `src/`, `standalone.html` hay que regenerarlo (no se actualiza solo).
+
 ## Available Scripts
 
   
