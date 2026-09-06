@@ -45,6 +45,8 @@ NOISE_TERMS_INICIALES = [
 DOMINIOS_EXCLUIR = [
     "bumeran.com", "computrabajo.com", "indeed.com", "zonajobs.com",
     "linkedin.com", "jooble.org", "simplyhired.com", "empleos.clarin.com",
+    # detectado en corrida real: portal de avisos de empleo, mismo motivo que los de arriba
+    "opcionempleo.com.ar",
 ]
 
 DOMINIOS_RUIDO_NO_EMPRESA = [
@@ -52,22 +54,47 @@ DOMINIOS_RUIDO_NO_EMPRESA = [
     "mercadolibre.com", "twitter.com", "x.com",
     # inmobiliarias (avisos de depósito/galpón en alquiler/venta, no son la empresa)
     "zonaprop.com.ar", "argenprop.com", "properati.com.ar", "mercadolibre.com.ar/inmuebles",
+    "openhousebsas.org", "buscainmueble.com", "enalquiler.com",
     # pasajes / transporte de pasajeros, no logística de carga
-    "plataforma10.com", "omnilineas.com", "central-de-pasajes.com.ar",
+    "plataforma10.com", "omnilineas.com", "central-de-pasajes.com.ar", "moovitapp.com",
     # rankings / prensa genérica, no la empresa en sí
-    "rankia.com", "merco.info",
+    "rankia.com", "merco.info", "elmundo.es", "eleconomista.com.mx", "cronista.com",
+    "clarin.com", "ambito.com", "uada.org.ar", "cafydma.org", "primerplanoonline.com.ar",
+    "agrofy.com.ar",
     # diccionarios / definiciones (el nombre de una zona puede coincidir con
     # una palabra común del español, ej. "Caseros" = "casero" = "de la casa")
     "wordreference.com", "wiktionary.org", "merriam-webster.com", "dle.rae.es",
-    "significados.com", "definicion.de", "collinsdictionary.com",
+    "significados.com", "definicion.de", "collinsdictionary.com", "thefreedictionary.com",
+    "economipedia.com",
     # blogs de SaaS / marketing genéricos, no son un empleador real
-    "zendesk.com", "wix.com", "hubspot.com", "shopify.com",
+    "zendesk.com", "wix.com", "hubspot.com", "shopify.com", "oracle.com",
+    "gestionbackoffice.com", "drvsistemas.com", "themanifest.com", "exact.com.pe",
+    "prosource.com.co", "hyland.com", "emergenresearch.com", "thecfoclub.com",
+    # software de facturación (SaaS, no son un empleador real)
+    "facturasimple.com", "facturify.com", "facturalia.info", "csfacturacion.com",
+    "pimedigital.com", "sendfactura.com",
     # contenido educativo de EEUU sin relación (se cuela con keywords de salud)
     "bestcolleges.com", "nursingprocess.org", "nursingschoolhub.com",
+    "randstad.com.au", "research.com", "registerednursing.org",
     # medios/radio genéricos, no una empresa
     "los40.com", "enter.co",
     # instagram: perfiles y posts (antes solo se excluía /p/, no el perfil general)
     "instagram.com",
+    # directorios/registros de empresas — confirman que existen, pero la
+    # página en sí no es la empresa (ya se cubre lo mismo con
+    # site:cuitonline.com como fuente de búsqueda dirigida)
+    "emis.com", "dateas.com", "datok.com.ar", "dunsguide.com", "arempresas.com",
+    "buscargentina.net", "starofservice.com.ar", "cybo.com", "es.cybo.com",
+    "licuo.com.ar", "argentino.com.ar", "redargentina.com.ar", "infoisinfo-ar.com",
+    "guiaurbana.com.ar", "manufactura-latam.com", "all.biz", "empresia.es",
+    "granguiaargentina.com.ar", "negozona.com",
+    # registros de empresas extranjeros (Perú, Colombia, Brasil, España) —
+    # se cuelan con búsquedas genéricas de rubro sin filtro geográfico real
+    "cnpj.biz", "rues.org.co", "universidadperu.com", "contadormype.pe", "bosperu.com",
+    # educativo/gobierno genérico sin relación, mapas de POIs (no son la empresa)
+    "oerproject.com", "archive.epa.gov", "mapcarta.com",
+    # blogs / artículos genéricos, no una empresa
+    "substack.com", "opcionempleo.com",
 ]
 
 

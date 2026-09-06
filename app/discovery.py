@@ -39,6 +39,10 @@ PATRONES_NO_EMPRESA = [
     r"^quienes somos\b", r"^qui[eé]nes somos\b", r"^inicio\s*[-|–]",
     r"\btrabajo de en\b",  # snippet roto típico de portal de empleo que se coló
     r"\ben (trujillo|lima|per[uú]|m[eé]xico|chile|colombia|espa[ñn]a)\b",  # país equivocado
+    # país equivocado como palabra suelta (sin "en" adelante) — encontrado en
+    # producción: "Bos Perú", "Contador Mype" (contadormype.pe), títulos que
+    # mencionan el país sin la preposición "en"
+    r"\b(per[uú]|peruano|peruana|mexicano|mexicana|colombiano|colombiana|brasil|brasile[ñn]o)\b",
     r"\b(salta|jujuy|misiones|neuqu[eé]n|chubut)\b",  # otra provincia (ej. "Hotel Caseros Salta" — Caseros es homónimo de una calle en Salta)
     # artículos tipo listicle / guía / definición — nunca son una empresa
     r"\b\d+\s+(mejores\s+)?(consejos|maneras|tipos|ideas|cosas|pasos|trucos)\b",
@@ -111,10 +115,18 @@ def _limpiar_nombre(titulo: str) -> str:
     return nombre.strip(" -–|")
 
 
+def _quitar_acentos(texto: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFKD", texto) if not unicodedata.combining(c))
+
+
 def _normalizar_para_dedupe(nombre: str) -> str:
-    n = nombre.lower()
+    # bug real: "Logística" (con tilde) y "Logistica" (sin tilde) son la
+    # MISMA palabra, pero sin sacar acentos generaban claves distintas y el
+    # motor promovía la misma empresa dos veces solo por esa diferencia.
+    n = _quitar_acentos(nombre.lower())
     n = re.sub(r"\b(s\.?a\.?|s\.?r\.?l\.?)\b", "", n)
-    n = re.sub(r"[^a-z0-9áéíóúñ]+", "", n)
+    n = re.sub(r"[^a-z0-9]+", "", n)
     return n
 
 

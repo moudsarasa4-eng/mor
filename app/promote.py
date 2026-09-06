@@ -18,7 +18,7 @@ from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 from app.salarios_referencia import estimar_sueldo
 import app.site_check as site_check
-from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS
+from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS, _quitar_acentos
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -38,7 +38,11 @@ def _nucleo_nombre(nombre: str) -> str:
     genéricas) — agarra duplicados tipo 'Maquinarias Caseros S.A. Perfil de
     Compañía' vs 'Maquinarias Caseros s.a. | Buenos Aires', que el nombre
     exacto y el dominio solos no siempre pescan."""
-    palabras = re.findall(r"[a-záéíóúñ0-9]+", nombre.lower())
+    # bug real: "Logística" (con tilde) y "Logistica" (sin tilde) generaban
+    # núcleos distintos y el motor promovía la misma empresa dos veces (visto
+    # en producción: "Logística Caseros srl" e "Logistica Caseros SRL" como
+    # 2 filas separadas) — se saca el acento antes de tokenizar.
+    palabras = re.findall(r"[a-z0-9]+", _quitar_acentos(nombre.lower()))
     significativas = [p for p in palabras if p not in _STOPWORDS_NUCLEO and len(p) > 1]
     return " ".join(significativas[:2])
 

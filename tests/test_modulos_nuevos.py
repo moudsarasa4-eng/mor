@@ -804,6 +804,93 @@ def test_dashboard_fmt_sueldo_marca_estimado():
     assert "(estimado)" not in dashboard._fmt_sueldo(fila_verificado)
 
 
+def test_dedupe_ignora_diferencia_de_acentos():
+    """Bug real encontrado en producción: 'Logística Caseros srl' (con tilde)
+    e 'Logistica Caseros SRL' (sin tilde) se promovían como 2 empresas
+    separadas — la misma real, solo escrita distinto en cada fuente."""
+    from app.discovery import _normalizar_para_dedupe
+    assert _normalizar_para_dedupe("Logística Caseros srl") == _normalizar_para_dedupe("Logistica Caseros SRL")
+
+    from app.promote import _nucleo_nombre
+    assert _nucleo_nombre("Logística Caseros srl (@logisticacaseros)") == _nucleo_nombre("Logistica Caseros SRL")
+
+
+def test_promote_no_duplica_variantes_con_y_sin_acento(tmp_path, monkeypatch):
+    """Test de integración del bug real de arriba: promover ambas variantes
+    en la misma zona debe terminar en UNA sola empresa, no dos."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.search_client as sc
+    import app.site_check as scheck
+
+    def mock_buscar(query, **kwargs):
+        return {"organic": [
+            {"title": "Logística Caseros srl", "link": "https://instagram.com/logisticacaseros/", "snippet": "transporte"},
+        ]}
+    monkeypatch.setattr(sc, "buscar", mock_buscar)
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas
+
+    ejecutar_query("logistica Caseros", "Caseros", "TYPE_A", "logística")
+    promover_candidatas(zona="Caseros")
+
+    def mock_buscar_2(query, **kwargs):
+        return {"organic": [
+            {"title": "Logistica Caseros SRL", "link": "https://logistica.dir.ar/empresa/logistica-caseros-srl.html", "snippet": "transporte"},
+        ]}
+    monkeypatch.setattr(sc, "buscar", mock_buscar_2)
+    ejecutar_query("logistica Caseros distribucion", "Caseros", "TYPE_A", "distribución")
+    promover_candidatas(zona="Caseros")
+
+    conn = db_module.get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
+    conn.close()
+    assert total == 1, "las dos variantes (con y sin tilde) son la misma empresa real"
+
+
+def test_nuevos_dominios_de_directorios_y_saas_excluidos():
+    """Reproduce dominios reales encontrados en la corrida de producción del
+    2026-09-06 que se colaban: portales de empleo, registros de empresas
+    extranjeros, SaaS de facturación, inmobiliarias, blogs genéricos."""
+    from app.discovery import _es_dominio_excluido
+    casos = [
+        "https://www.opcionempleo.com.ar/trabajo-operador-logistica/Caseros",
+        "https://www.emis.com/php/company-profile/AR/x.html",
+        "https://datok.com.ar/empresa/30540806728",
+        "https://www.dunsguide.com/es/companies/x",
+        "https://www.arempresas.com/location/Caseros",
+        "https://www.starofservice.com.ar/dir/x",
+        "https://es.cybo.com/AR/caseros/industria/",
+        "https://caseros.licuo.com.ar/empresas-en_caseros.htm",
+        "https://www.argentino.com.ar/caseros-buenos-aires/x",
+        "https://openhousebsas.org/catalogo/x",
+        "https://www.buscainmueble.com/oficina-en-venta-x",
+        "https://facturasimple.com/",
+        "https://www.csfacturacion.com/",
+        "https://cnpj.biz/empresas",
+        "https://www.rues.org.co/",
+        "https://www.universidadperu.com/empresas/x.php",
+        "https://latinbiz.substack.com/p/x",
+        "https://contadormype.pe/",
+        "https://www.oerproject.com/OER-Materials/x",
+        "https://archive.epa.gov/water/archive/x",
+        "https://mapcarta.com/W321490578",
+    ]
+    for url in casos:
+        assert _es_dominio_excluido(url), f"debería excluirse: {url}"
+
+
+def test_pais_extranjero_como_palabra_suelta_sin_en():
+    """Reproduce 'Bos Perú', 'Contador Mype' (contadormype.pe): el país
+    aparece sin el prefijo 'en' que exigía el patrón anterior."""
+    from app.discovery import _parece_empresa
+    assert not _parece_empresa("Bos Perú – Back Office Solutions", "Caseros")
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))
