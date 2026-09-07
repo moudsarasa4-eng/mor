@@ -1106,6 +1106,32 @@ def test_directorio_logistica_no_rompe_si_falla_la_descarga(tmp_path, monkeypatc
     assert r["error"]
 
 
+def test_auditoria_directorios_marca_sospechoso_con_5_intentos_y_0_resultados(tmp_path, monkeypatch):
+    """Varios slugs de la red dir.ar se adivinaron sin poder verificar contra
+    el sitio real (WebFetch a dir.ar bloqueado en este entorno) — este
+    reporte detecta un slug probablemente equivocado por su rendimiento
+    real en queries_log, no por revisar el texto."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.auditoria_directorios import reporte_dominios
+
+    conn = db_module.get_conn()
+    for i in range(5):
+        conn.execute(
+            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+            "VALUES (?, 'Hurlingham', 'x', 'TYPE_H', 0, 0, 0, 0, ?)",
+            (f"site:saludybelleza.dir.ar keyword{i} Hurlingham", db_module.now()),
+        )
+    conn.commit()
+    conn.close()
+
+    filas = {f["dominio"]: f for f in reporte_dominios()}
+    assert filas["saludybelleza.dir.ar"]["sospechoso"] is True
+    assert filas["logistica.dir.ar"]["sospechoso"] is False  # sin intentos todavía, no es sospechoso
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

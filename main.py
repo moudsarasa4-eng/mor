@@ -329,6 +329,12 @@ def cmd_industrial(args):
         print(f"\nExportado: {archivo}")
 
 
+def cmd_auditar_directorios(args):
+    init_db()
+    from app.auditoria_directorios import reporte_dominios, formatear_reporte
+    print(formatear_reporte(reporte_dominios()))
+
+
 def cmd_directorio_logistica(args):
     init_db()
     from app.directorio_logistica import buscar_por_zona
@@ -660,6 +666,8 @@ def main():
     ppromote.add_argument("--zona", default=None)
     ppromote.add_argument("--limite", type=int, default=100)
     ppromote.set_defaults(func=cmd_promote)
+
+    sub.add_parser("auditar-directorios", help="reporte de rendimiento real de los subdominios dir.ar (detecta slugs mal adivinados)").set_defaults(func=cmd_auditar_directorios)
 
     pdirlog = sub.add_parser("directorio-logistica", help="crawlea logistica.dir.ar (directorio real de logística/transporte/mudanzas con dirección verificada) — comando manual, revisar el resultado antes de confiar")
     pdirlog.add_argument("--zona", default=None, help="si se omite, corre sobre zonas cercana+media")
