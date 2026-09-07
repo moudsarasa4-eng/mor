@@ -66,6 +66,10 @@ Toggles **Modo Estación**. Before serving an order whose items have a known rea
 
 Toggles **Modo Panes**, the lightweight version covering the whole menu: before serving, pick just the bread type (no condiments) for each item that has one. Combines with Modo Estación without asking about the same item twice.
 
+### `c`
+
+Opens/closes **Modo Cronómetro**, a self-contained drill separate from the order queue (it doesn't touch `sideOn`/`orders`, and while it's open the other shortcuts are inert so you don't accidentally serve or toggle something behind it). One item at a time: you see it for 2 seconds, it disappears completely, and you pick its bread from memory. Real elapsed time is measured from the moment the item appears to the moment you click an answer, against a 5-second target — that target is a personal goal to train toward, not a number from the official guide (the guide's own 5s standard is about monitor-alarm reaction time, a different thing; see the shift-summary text). Attempts/hits/best time persist across reloads (`localStorage`, key `mcdonalds-kvs:cronometro`).
+
 See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory modes and a suggested practice routine, and `ESTACION-INICIADOR.md` for the real station procedure Modo Estación is built from.
 
   

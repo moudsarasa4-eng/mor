@@ -15,7 +15,7 @@ export const PAN_CATEGORIAS = [
 	"Kaiser (McCafé)",
 ];
 
-const PANES = {
+export const PANES = {
 	"Hamburguesa": { pan: "Regular (sin semilla)", verificado: true },
 	"Hamburguesa c/Queso": { pan: "Regular (sin semilla)", verificado: true },
 	"Hamburguesa CF": { pan: "Regular (sin semilla)", verificado: true },

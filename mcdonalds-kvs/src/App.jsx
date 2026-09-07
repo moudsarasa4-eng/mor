@@ -6,6 +6,7 @@ import SelfCheckToast from "./components/SelfCheckToast";
 import ModeBar from "./components/ModeBar";
 import EstacionChallenge from "./components/EstacionChallenge";
 import PanesChallenge from "./components/PanesChallenge";
+import CronometroChallenge from "./components/CronometroChallenge";
 import { WaveBanner, SessionReminder } from "./components/Banners";
 import { actions } from "./lib/store"
 import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, PEEK_COOLDOWN_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
@@ -77,6 +78,11 @@ function App() {
 	const [panesQueue, setPanesQueue] = useState(null);
 	const panesQueueRef = useRef(null);
 	panesQueueRef.current = panesQueue;
+
+	// --- Modo Cronómetro: drill aislado, no toca la cola de pedidos ---
+	const [cronometroOpen, setCronometroOpen] = useState(false);
+	const cronometroOpenRef = useRef(cronometroOpen);
+	cronometroOpenRef.current = cronometroOpen;
 
 	// refs "vivas" para que el listener de teclado (montado una sola vez)
 	// siempre lea el estado más reciente y no quede pegado al de la primera renderización
@@ -248,6 +254,8 @@ function App() {
 
 	useEffect(() => {
 		const handleKeypress = (event) => {
+			if (event.key === "c") { setCronometroOpen((v) => !v); return; }
+			if (cronometroOpenRef.current) return; // el drill aislado tapa el resto de los atajos mientras está abierto
 			if (event.key === "p") toggleSide();
 			if (event.key === "Enter") serveOrder();
 			if (event.key === "o") addOrder();
@@ -364,6 +372,9 @@ function App() {
 					{shiftActive && (
 						<span className="text-red-400 font-bold text-2xl">TURNO ACTIVO — {fmtAge(shiftRemainingS)}</span>
 					)}
+					<button onClick={() => setCronometroOpen(true)} className="bg-cyan-500 text-black font-bold px-4 py-2 rounded">
+						CRONÓMETRO: MEMORIZAR + PAN (C)
+					</button>
 					<span className="text-white text-sm">Estándar oficial: {STANDARD_MIN_S}-{STANDARD_MAX_S}s por producto (GE Iniciador/Ensamblador)</span>
 				</div>
 				<ModeBar
@@ -416,6 +427,7 @@ function App() {
 
 			<EstacionChallenge challenge={estacionChallenge} onResolve={resolveEstacionChallenge} onSkip={skipEstacionChallenge} />
 			<PanesChallenge item={panesQueue ? panesQueue[0] : null} restantes={panesQueue ? panesQueue.length - 1 : 0} onAnswer={resolvePanAnswer} />
+			<CronometroChallenge open={cronometroOpen} onClose={() => setCronometroOpen(false)} />
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />
