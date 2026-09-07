@@ -1055,55 +1055,77 @@ def test_cadena_dia_no_confunde_con_apellido_diaz():
     assert es_cadena_excluida("Supermercados DIA Argentina") == "Dia"  # el caso real sigue andando
 
 
-def test_directorio_logistica_extrae_cards_de_html_real(tmp_path, monkeypatch):
-    """HTML sintético armado a partir del contenido REAL que el usuario pegó
-    de logistica.dir.ar/ciudad/hurlingham.html — no se pudo verificar contra
-    el HTML real (sin acceso a internet en este entorno), así que esto
-    confirma la lógica del parser, no que coincida con el markup real."""
+def test_directorio_dir_ar_extrae_cards_sin_conocer_categorias(tmp_path, monkeypatch):
+    """El parser generalizado ancla solo en la línea de rating (universal en
+    toda la red dir.ar) — no necesita conocer las categorías reales de cada
+    rubro (a diferencia del parser original de solo-logística), porque
+    varios slugs (gimnasios, tiendasderopa, etc.) tienen categorías propias
+    que no se pudieron verificar contra el sitio real."""
     import app.db as db_module
     monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
     db_module.init_db()
 
     html = """
-    <div class="card"><span class="rubro">Logística</span>
-    <h3>Marlogistic SA</h3>
-    <p>Gral. Alfredo Rodriguez 1137</p>
-    <span>★ 4.7 (59)</span></div>
-    <div class="card"><span class="rubro">Transporte de carga</span>
-    <h3>Empresa de Transporte Don Pedro</h3>
-    <p>Av. Gdor. Vergara 6060</p>
-    <span>★ 4.3 (353)</span></div>
-    <div class="card"><span class="rubro">Mudanzas</span>
-    <h3>Mudanzas Compartidas Argentina</h3>
-    <p>Los Arboles 815</p>
-    <span>★ 4.9 (52)</span></div>
+    <div class="card"><span class="rubro">Gimnasio boxeo y funcional</span>
+    <h3>Power Gym Hurlingham</h3>
+    <p>Av. Vergara 1200</p>
+    <span>★ 4.6 (80)</span></div>
+    <div class="card"><span class="rubro">Indumentaria deportiva</span>
+    <h3>Sportline Hurlingham</h3>
+    <p>Roca 500</p>
+    <span>★ 4.2 (15)</span></div>
     """
 
-    import app.directorio_logistica as dl
-    monkeypatch.setattr(dl, "_fetch", lambda url: html)
+    import app.directorio_dir_ar as dda
+    monkeypatch.setattr(dda, "_fetch", lambda url: html)
 
-    r = dl.buscar_por_zona("Hurlingham")
-    assert r["total_cards"] == 3
-    assert r["nuevas"] == 3
+    r = dda.buscar_por_zona_y_dominio("Hurlingham", "gimnasios.dir.ar")
+    assert r["total_cards"] == 2
+    assert r["nuevas"] == 2
 
     conn = db_module.get_conn()
     nombres = {row["nombre_crudo"] for row in conn.execute("SELECT nombre_crudo FROM discovered_companies_raw")}
     conn.close()
-    assert "Marlogistic SA" in nombres
-    assert "Empresa de Transporte Don Pedro" in nombres
-    assert "Mudanzas Compartidas Argentina" in nombres
+    assert "Power Gym Hurlingham" in nombres
+    assert "Sportline Hurlingham" in nombres
 
 
-def test_directorio_logistica_no_rompe_si_falla_la_descarga(tmp_path, monkeypatch):
+def test_directorio_dir_ar_no_rompe_si_falla_la_descarga(tmp_path, monkeypatch):
     import app.db as db_module
     monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
     db_module.init_db()
 
-    import app.directorio_logistica as dl
-    monkeypatch.setattr(dl, "_fetch", lambda url: None)
-    r = dl.buscar_por_zona("Hurlingham")
+    import app.directorio_dir_ar as dda
+    monkeypatch.setattr(dda, "_fetch", lambda url: None)
+    r = dda.buscar_por_zona_y_dominio("Hurlingham", "logistica.dir.ar")
     assert r["nuevas"] == 0
     assert r["error"]
+
+
+def test_directorio_dir_ar_no_repite_combinacion_ya_procesada(tmp_path, monkeypatch):
+    """Igual que overpass_progress: el contenido de un directorio no cambia
+    tan rápido como para justificar re-leer la misma página cada hora para
+    siempre."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.directorio_dir_ar as dda
+    monkeypatch.setattr(dda, "_fetch", lambda url: None)
+    dda.buscar_por_zona_y_dominio("Hurlingham", "logistica.dir.ar")
+
+    pendientes = dda.combinaciones_pendientes(["Hurlingham"])
+    assert ("Hurlingham", "logistica.dir.ar") not in pendientes
+    assert ("Hurlingham", "limpieza.dir.ar") in pendientes
+
+
+def test_inferir_rubro_de_candidatas_dir_ar_desde_snippet():
+    """directorio_dir_ar.py guarda el rubro real directo en el snippet
+    (ej. 'gimnasios.dir.ar (atencion_cliente) — ...') — no hace falta
+    traducir un tag como con Overpass, solo extraerlo."""
+    from app.promote import _inferir_rubro
+    assert _inferir_rubro(None, "gimnasios.dir.ar (atencion_cliente) — Roca 500 — 4.6★ (80 reseñas)") == "atencion_cliente"
+    assert _inferir_rubro(None, "limpieza.dir.ar (limpieza) — x") == "limpieza"
 
 
 def test_auditoria_directorios_marca_sospechoso_con_5_intentos_y_0_resultados(tmp_path, monkeypatch):
@@ -1130,6 +1152,34 @@ def test_auditoria_directorios_marca_sospechoso_con_5_intentos_y_0_resultados(tm
     filas = {f["dominio"]: f for f in reporte_dominios()}
     assert filas["saludybelleza.dir.ar"]["sospechoso"] is True
     assert filas["logistica.dir.ar"]["sospechoso"] is False  # sin intentos todavía, no es sospechoso
+
+
+def test_loop_investigacion_corre_directorio_dir_ar_gratis(tmp_path, monkeypatch):
+    """La red dir.ar está enganchada como 6ta fuente del ciclo automático,
+    no gasta presupuesto de Serper (igual que Overpass)."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.runner as runner_module
+    import app.directorio_dir_ar as dda
+
+    html = """
+    <h3>Estudio Contable Hurlingham</h3>
+    <p>Roca 100</p>
+    <span>★ 4.5 (20)</span>
+    """
+    monkeypatch.setattr(dda, "_fetch", lambda url: html)
+
+    import app.search_client as sc
+    monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": []})
+
+    runner_module.loop_investigacion(max_ciclos=20)
+
+    conn = db_module.get_conn()
+    nombres = [r["nombre"] for r in conn.execute("SELECT nombre FROM companies")]
+    conn.close()
+    assert "Estudio Contable Hurlingham" in nombres
 
 
 if __name__ == "__main__":

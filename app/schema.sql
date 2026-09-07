@@ -177,6 +177,14 @@ CREATE TABLE IF NOT EXISTS overpass_progress (
     procesado_en TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS directorio_dir_ar_progress (
+    zona TEXT NOT NULL,
+    dominio TEXT NOT NULL,
+    empresas_nuevas INTEGER NOT NULL DEFAULT 0,
+    procesado_en TEXT NOT NULL,
+    PRIMARY KEY (zona, dominio)
+);
+
 CREATE TABLE IF NOT EXISTS discard_reasons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER NOT NULL REFERENCES companies(id),

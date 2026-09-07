@@ -132,25 +132,12 @@ def plantillas_query(zona: str, keyword: str = "") -> list[dict]:
         # nunca las trae arriba de los resultados).
         q.append({"query": f"site:paginasamarillas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
         q.append({"query": f"site:cuitonline.com {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
-        # directorio real de logística/transporte/mudanzas, con dirección y a
-        # veces teléfono verificado por el propio sitio — encontrado por el
-        # usuario, ya apareció como fuente real en candidatas promovidas antes
-        q.append({"query": f"site:logistica.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
-        # misma red de directorios (dir.ar), rubro limpieza — mismo formato
-        # verificado (teléfono/WhatsApp publicado por el propio sitio)
-        q.append({"query": f"site:limpieza.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
-        q.append({"query": f"site:limpiezas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
-        # administración de consorcios (dir.ar) — rubro administrativo
-        q.append({"query": f"site:administraciondeconsorcios.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
-        # resto de la red dir.ar (confirmada por búsqueda: mismo formato con
-        # teléfono/WhatsApp verificado por el propio sitio) — cada una varía
-        # por keyword igual que las de arriba, no es texto repetido
-        for sub in (
-            "catering", "gimnasios", "tiendasderopa", "saludybelleza",
-            "seguridaddelhogar", "talleresmecanicos", "graficaseimprentas",
-            "abogados", "transporte",
-        ):
-            q.append({"query": f"site:{sub}.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        # la red dir.ar (logística, limpieza, administración de consorcios,
+        # catering, gimnasios, tiendas de ropa, salud y belleza, seguridad
+        # del hogar, talleres mecánicos, gráficas e imprentas, abogados,
+        # transporte) YA NO se busca acá vía site: (eso gasta presupuesto de
+        # Serper) — se lee directo y gratis en app/directorio_dir_ar.py,
+        # enganchado al ciclo automático en runner.py como fuente aparte.
     else:
         # estas NO dependen de la keyword (el texto de la query es siempre el
         # mismo) — antes se generaban igual dentro del bloque de arriba, así

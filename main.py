@@ -335,18 +335,23 @@ def cmd_auditar_directorios(args):
     print(formatear_reporte(reporte_dominios()))
 
 
-def cmd_directorio_logistica(args):
+def cmd_directorio_dir_ar(args):
     init_db()
-    from app.directorio_logistica import buscar_por_zona
+    from app.directorio_dir_ar import buscar_por_zona_y_dominio, DOMINIOS
     from app.promote import promover_candidatas
     from app.export_txt import exportar_candidatas_txt
     import yaml as _yaml
     cfg = _yaml.safe_load((Path(__file__).resolve().parent / "config.yaml").read_text(encoding="utf-8"))
     zonas = [args.zona] if args.zona else cfg["zonas"]["cercana"] + cfg["zonas"]["media"]
+    dominios = [args.dominio] if args.dominio else list(DOMINIOS)
     for zona in zonas:
-        r = buscar_por_zona(zona)
-        print(json.dumps(r, ensure_ascii=False))
-        if r.get("nuevas"):
+        promovio = False
+        for dominio in dominios:
+            r = buscar_por_zona_y_dominio(zona, dominio)
+            print(json.dumps(r, ensure_ascii=False))
+            if r.get("nuevas"):
+                promovio = True
+        if promovio:
             promover_candidatas(zona=zona)
     archivo = exportar_candidatas_txt()
     if archivo:
@@ -669,9 +674,10 @@ def main():
 
     sub.add_parser("auditar-directorios", help="reporte de rendimiento real de los subdominios dir.ar (detecta slugs mal adivinados)").set_defaults(func=cmd_auditar_directorios)
 
-    pdirlog = sub.add_parser("directorio-logistica", help="crawlea logistica.dir.ar (directorio real de logística/transporte/mudanzas con dirección verificada) — comando manual, revisar el resultado antes de confiar")
+    pdirlog = sub.add_parser("directorio-dir-ar", help="crawlea la red dir.ar (13 dominios: logística, limpieza, gimnasios, etc.), gratis, sin pasar por Serper — comando manual, ya corre solo en el ciclo automático")
     pdirlog.add_argument("--zona", default=None, help="si se omite, corre sobre zonas cercana+media")
-    pdirlog.set_defaults(func=cmd_directorio_logistica)
+    pdirlog.add_argument("--dominio", default=None, help="ej. limpieza.dir.ar — si se omite, corre los 13")
+    pdirlog.set_defaults(func=cmd_directorio_dir_ar)
 
     povp = sub.add_parser("overpass", help="descubre comercios/oficinas/industrias reales via OpenStreetMap (gratis, no gasta presupuesto de Serper)")
     povp.add_argument("--zona", default=None, help="si se omite, corre sobre todas las zonas cercanas")

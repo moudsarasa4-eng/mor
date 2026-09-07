@@ -59,6 +59,10 @@ _TAG_OSM_A_CATEGORIA = {
     "company": "administrativo",
 }
 _TAG_OSM_RE = re.compile(r"OpenStreetMap \(([a-z_]+)\)")
+# app/directorio_dir_ar.py ya guarda el rubro real en el snippet, ej.
+# "gimnasios.dir.ar (atencion_cliente) — ..." — no hace falta traducir nada,
+# solo extraerlo.
+_RUBRO_DIR_AR_RE = re.compile(r"dir\.ar \((\w+)\)|limpiezas\.com\.ar \((\w+)\)")
 
 
 def _inferir_rubro(keyword: str | None, snippet: str = "") -> str:
@@ -66,6 +70,11 @@ def _inferir_rubro(keyword: str | None, snippet: str = "") -> str:
         cat = _KEYWORD_A_CATEGORIA[keyword]
         if cat != "general":
             return cat
+    m = _RUBRO_DIR_AR_RE.search(snippet or "")
+    if m:
+        rubro = m.group(1) or m.group(2)
+        if rubro in ("logistica", "limpieza", "administrativo", "atencion_cliente"):
+            return rubro
     m = _TAG_OSM_RE.search(snippet or "")
     if m and m.group(1) in _TAG_OSM_A_CATEGORIA:
         return _TAG_OSM_A_CATEGORIA[m.group(1)]

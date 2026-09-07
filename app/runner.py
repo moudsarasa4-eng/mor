@@ -256,6 +256,20 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
                 promover_candidatas(zona=zona_ovp)
                 trabajo_hecho = True
 
+        # 6) red dir.ar (logística, limpieza, gimnasios, etc.) — crawl directo
+        # de la página de listado por ciudad, gratis, no pasa por Serper. Una
+        # combinación (zona, dominio) por ciclo alcanza (13 dominios x zonas,
+        # el contenido de un directorio no cambia tan rápido).
+        if _puede_seguir():
+            from app.directorio_dir_ar import combinaciones_pendientes, buscar_por_zona_y_dominio
+            pendientes_dir = combinaciones_pendientes(orden_zonas())
+            if pendientes_dir:
+                zona_dir, dominio_dir = pendientes_dir[0]
+                r = buscar_por_zona_y_dominio(zona_dir, dominio_dir)
+                if r.get("nuevas"):
+                    promover_candidatas(zona=zona_dir)
+                trabajo_hecho = True
+
         # pasa lo recién descubierto por el filtro de calidad retroactivo antes
         # de mostrarlo/exportarlo — así una tanda no muestra basura que el
         # filtro de discovery.py no atajó en el momento pero sí atrapa ahora.
