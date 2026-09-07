@@ -7,6 +7,7 @@ import ModeBar from "./components/ModeBar";
 import EstacionChallenge from "./components/EstacionChallenge";
 import PanesChallenge from "./components/PanesChallenge";
 import CronometroChallenge from "./components/CronometroChallenge";
+import EvaluacionChallenge from "./components/EvaluacionChallenge";
 import { WaveBanner, SessionReminder } from "./components/Banners";
 import { actions } from "./lib/store"
 import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, PEEK_COOLDOWN_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
@@ -83,6 +84,11 @@ function App() {
 	const [cronometroOpen, setCronometroOpen] = useState(false);
 	const cronometroOpenRef = useRef(cronometroOpen);
 	cronometroOpenRef.current = cronometroOpen;
+
+	// --- Modo Evaluación: examen acotado, tampoco toca la cola de pedidos ---
+	const [evaluacionOpen, setEvaluacionOpen] = useState(false);
+	const evaluacionOpenRef = useRef(evaluacionOpen);
+	evaluacionOpenRef.current = evaluacionOpen;
 
 	// refs "vivas" para que el listener de teclado (montado una sola vez)
 	// siempre lea el estado más reciente y no quede pegado al de la primera renderización
@@ -254,8 +260,17 @@ function App() {
 
 	useEffect(() => {
 		const handleKeypress = (event) => {
-			if (event.key === "c") { setCronometroOpen((v) => !v); return; }
-			if (cronometroOpenRef.current) return; // el drill aislado tapa el resto de los atajos mientras está abierto
+			if (event.key === "c") {
+				if (evaluacionOpenRef.current) return;
+				setCronometroOpen((v) => !v);
+				return;
+			}
+			if (event.key === "v") {
+				if (cronometroOpenRef.current) return;
+				setEvaluacionOpen((v) => !v);
+				return;
+			}
+			if (cronometroOpenRef.current || evaluacionOpenRef.current) return; // el drill/examen aislado tapa el resto de los atajos mientras está abierto
 			if (event.key === "p") toggleSide();
 			if (event.key === "Enter") serveOrder();
 			if (event.key === "o") addOrder();
@@ -372,8 +387,11 @@ function App() {
 					{shiftActive && (
 						<span className="text-red-400 font-bold text-2xl">TURNO ACTIVO — {fmtAge(shiftRemainingS)}</span>
 					)}
-					<button onClick={() => setCronometroOpen(true)} className="bg-cyan-500 text-black font-bold px-4 py-2 rounded">
+					<button onClick={() => { setEvaluacionOpen(false); setCronometroOpen(true); }} className="bg-cyan-500 text-black font-bold px-4 py-2 rounded">
 						CRONÓMETRO: MEMORIZAR + PAN (C)
+					</button>
+					<button onClick={() => { setCronometroOpen(false); setEvaluacionOpen(true); }} className="bg-emerald-500 text-black font-bold px-4 py-2 rounded">
+						TOMAR EVALUACIÓN (V)
 					</button>
 					<span className="text-white text-sm">Estándar oficial: {STANDARD_MIN_S}-{STANDARD_MAX_S}s por producto (GE Iniciador/Ensamblador)</span>
 				</div>
@@ -428,6 +446,7 @@ function App() {
 			<EstacionChallenge challenge={estacionChallenge} onResolve={resolveEstacionChallenge} onSkip={skipEstacionChallenge} />
 			<PanesChallenge item={panesQueue ? panesQueue[0] : null} restantes={panesQueue ? panesQueue.length - 1 : 0} onAnswer={resolvePanAnswer} />
 			<CronometroChallenge open={cronometroOpen} onClose={() => setCronometroOpen(false)} />
+			<EvaluacionChallenge open={evaluacionOpen} onClose={() => setEvaluacionOpen(false)} />
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />

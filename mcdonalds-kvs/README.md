@@ -70,6 +70,10 @@ Toggles **Modo Panes**, the lightweight version covering the whole menu: before 
 
 Opens/closes **Modo Cronómetro**, a self-contained drill separate from the order queue (it doesn't touch `sideOn`/`orders`, and while it's open the other shortcuts are inert so you don't accidentally serve or toggle something behind it). One item at a time: you see it for 2 seconds, it disappears completely, and you pick its bread from memory. Real elapsed time is measured from the moment the item appears to the moment you click an answer, against a 5-second target — that target is a personal goal to train toward, not a number from the official guide (the guide's own 5s standard is about monitor-alarm reaction time, a different thing; see the shift-summary text). Attempts/hits/best time persist across reloads (`localStorage`, key `mcdonalds-kvs:cronometro`).
 
+### `v`
+
+Opens/closes **Modo Evaluación**, a bounded, formal exam (as opposed to Cronómetro's open-ended practice loop) — same isolation rules as Cronómetro (mutually exclusive with it, other shortcuts inert while it's open). It's 10 fixed questions: 7 are the same "memorize + pick the bread in 5s or less" drill as Cronómetro, and 3 are multiple-choice questions on celiac (SIN TACC) order procedure — who's allowed to prepare one, what till key sequence to use, cross-contamination rules, pan celíaco thaw/expiry times — sourced from the official "GE Opciones para Celíacos" guide (Oct. 2021), see `src/lib/celiacos.js` for the verified question bank with citations. Ends with a pass/fail score (70% threshold, a practice convention, not a number from either guide) and keeps a history of past attempts (`localStorage`, key `mcdonalds-kvs:evaluaciones`).
+
 See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory modes and a suggested practice routine, and `ESTACION-INICIADOR.md` for the real station procedure Modo Estación is built from.
 
   
