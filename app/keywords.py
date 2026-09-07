@@ -132,6 +132,10 @@ def plantillas_query(zona: str, keyword: str = "") -> list[dict]:
         # nunca las trae arriba de los resultados).
         q.append({"query": f"site:paginasamarillas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
         q.append({"query": f"site:cuitonline.com {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        # directorio real de logística/transporte/mudanzas, con dirección y a
+        # veces teléfono verificado por el propio sitio — encontrado por el
+        # usuario, ya apareció como fuente real en candidatas promovidas antes
+        q.append({"query": f"site:logistica.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
     else:
         # estas NO dependen de la keyword (el texto de la query es siempre el
         # mismo) — antes se generaban igual dentro del bloque de arriba, así

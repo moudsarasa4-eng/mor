@@ -329,6 +329,24 @@ def cmd_industrial(args):
         print(f"\nExportado: {archivo}")
 
 
+def cmd_directorio_logistica(args):
+    init_db()
+    from app.directorio_logistica import buscar_por_zona
+    from app.promote import promover_candidatas
+    from app.export_txt import exportar_candidatas_txt
+    import yaml as _yaml
+    cfg = _yaml.safe_load((Path(__file__).resolve().parent / "config.yaml").read_text(encoding="utf-8"))
+    zonas = [args.zona] if args.zona else cfg["zonas"]["cercana"] + cfg["zonas"]["media"]
+    for zona in zonas:
+        r = buscar_por_zona(zona)
+        print(json.dumps(r, ensure_ascii=False))
+        if r.get("nuevas"):
+            promover_candidatas(zona=zona)
+    archivo = exportar_candidatas_txt()
+    if archivo:
+        print(f"\nExportado: {archivo}")
+
+
 def cmd_overpass(args):
     init_db()
     from app.overpass_discovery import buscar_por_zona
@@ -642,6 +660,10 @@ def main():
     ppromote.add_argument("--zona", default=None)
     ppromote.add_argument("--limite", type=int, default=100)
     ppromote.set_defaults(func=cmd_promote)
+
+    pdirlog = sub.add_parser("directorio-logistica", help="crawlea logistica.dir.ar (directorio real de logística/transporte/mudanzas con dirección verificada) — comando manual, revisar el resultado antes de confiar")
+    pdirlog.add_argument("--zona", default=None, help="si se omite, corre sobre zonas cercana+media")
+    pdirlog.set_defaults(func=cmd_directorio_logistica)
 
     povp = sub.add_parser("overpass", help="descubre comercios/oficinas/industrias reales via OpenStreetMap (gratis, no gasta presupuesto de Serper)")
     povp.add_argument("--zona", default=None, help="si se omite, corre sobre todas las zonas cercanas")

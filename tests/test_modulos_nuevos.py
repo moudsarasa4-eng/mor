@@ -1055,6 +1055,57 @@ def test_cadena_dia_no_confunde_con_apellido_diaz():
     assert es_cadena_excluida("Supermercados DIA Argentina") == "Dia"  # el caso real sigue andando
 
 
+def test_directorio_logistica_extrae_cards_de_html_real(tmp_path, monkeypatch):
+    """HTML sintético armado a partir del contenido REAL que el usuario pegó
+    de logistica.dir.ar/ciudad/hurlingham.html — no se pudo verificar contra
+    el HTML real (sin acceso a internet en este entorno), así que esto
+    confirma la lógica del parser, no que coincida con el markup real."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    html = """
+    <div class="card"><span class="rubro">Logística</span>
+    <h3>Marlogistic SA</h3>
+    <p>Gral. Alfredo Rodriguez 1137</p>
+    <span>★ 4.7 (59)</span></div>
+    <div class="card"><span class="rubro">Transporte de carga</span>
+    <h3>Empresa de Transporte Don Pedro</h3>
+    <p>Av. Gdor. Vergara 6060</p>
+    <span>★ 4.3 (353)</span></div>
+    <div class="card"><span class="rubro">Mudanzas</span>
+    <h3>Mudanzas Compartidas Argentina</h3>
+    <p>Los Arboles 815</p>
+    <span>★ 4.9 (52)</span></div>
+    """
+
+    import app.directorio_logistica as dl
+    monkeypatch.setattr(dl, "_fetch", lambda url: html)
+
+    r = dl.buscar_por_zona("Hurlingham")
+    assert r["total_cards"] == 3
+    assert r["nuevas"] == 3
+
+    conn = db_module.get_conn()
+    nombres = {row["nombre_crudo"] for row in conn.execute("SELECT nombre_crudo FROM discovered_companies_raw")}
+    conn.close()
+    assert "Marlogistic SA" in nombres
+    assert "Empresa de Transporte Don Pedro" in nombres
+    assert "Mudanzas Compartidas Argentina" in nombres
+
+
+def test_directorio_logistica_no_rompe_si_falla_la_descarga(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.directorio_logistica as dl
+    monkeypatch.setattr(dl, "_fetch", lambda url: None)
+    r = dl.buscar_por_zona("Hurlingham")
+    assert r["nuevas"] == 0
+    assert r["error"]
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))
