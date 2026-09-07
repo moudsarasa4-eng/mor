@@ -136,6 +136,12 @@ def plantillas_query(zona: str, keyword: str = "") -> list[dict]:
         # veces teléfono verificado por el propio sitio — encontrado por el
         # usuario, ya apareció como fuente real en candidatas promovidas antes
         q.append({"query": f"site:logistica.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        # misma red de directorios (dir.ar), rubro limpieza — mismo formato
+        # verificado (teléfono/WhatsApp publicado por el propio sitio)
+        q.append({"query": f"site:limpieza.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        q.append({"query": f"site:limpiezas.com.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
+        # administración de consorcios (dir.ar) — rubro administrativo
+        q.append({"query": f"site:administraciondeconsorcios.dir.ar {kw} {zona}{sufijo}", "tipo": "TYPE_H", "keyword": kw})
     else:
         # estas NO dependen de la keyword (el texto de la query es siempre el
         # mismo) — antes se generaban igual dentro del bloque de arriba, así
