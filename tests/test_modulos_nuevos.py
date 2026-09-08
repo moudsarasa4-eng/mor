@@ -541,7 +541,13 @@ def test_loop_investigacion_corre_overpass_y_no_lo_repite(tmp_path, monkeypatch)
     import app.search_client as sc
     monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": []})  # sin resultados de Serper, para aislar overpass
 
-    runner_module.loop_investigacion(max_ciclos=20)
+    import app.directorio_dir_ar as dda
+    monkeypatch.setattr(dda, "_fetch", lambda url: None)  # aislar: no queremos que compita por presupuesto de ciclos en este test
+
+    # las fuentes gratis ahora también cuentan contra el límite de ciclos de
+    # la corrida (para que el loop no recorra TODAS las zonas de una sola
+    # llamada) — con max_ciclos=1 alcanza justo para 1 acción gratis.
+    runner_module.loop_investigacion(max_ciclos=1)
 
     conn = db_module.get_conn()
     nombres = [r["nombre"] for r in conn.execute("SELECT nombre FROM companies")]
@@ -1171,6 +1177,10 @@ def test_loop_investigacion_corre_directorio_dir_ar_gratis(tmp_path, monkeypatch
     """
     monkeypatch.setattr(dda, "_fetch", lambda url: html)
 
+    # aislar Overpass (corre primero ahora) para que no intente red real
+    import app.geocoding as geocoding
+    monkeypatch.setattr(geocoding, "geocodificar", lambda direccion: None)
+
     import app.search_client as sc
     monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": []})
 
@@ -1180,6 +1190,43 @@ def test_loop_investigacion_corre_directorio_dir_ar_gratis(tmp_path, monkeypatch
     nombres = [r["nombre"] for r in conn.execute("SELECT nombre FROM companies")]
     conn.close()
     assert "Estudio Contable Hurlingham" in nombres
+
+
+def test_fuentes_pagas_no_se_saltan_si_las_gratis_fallan(tmp_path, monkeypatch):
+    """Bug real (2 veces en la misma sesión): 1) trabajo_gratis_hecho se
+    marcaba con solo INTENTAR una fuente gratis, no con encontrar algo de
+    verdad — si Overpass/dir.ar fallaban (ej. sin red), igual saltaban
+    industrial/proveedores/geo para SIEMPRE, dejando el motor sin encontrar
+    nada. 2) quedó una línea duplicada que marcaba trabajo_gratis_hecho=True
+    sin condición, fuera del if que la ponía correctamente. Este test
+    reproduce el escenario real reportado: geo saturada + fuentes gratis
+    fallando (sin red) + industrial con trabajo pendiente."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.runner as runner_module
+    import app.overpass_discovery as ovp
+    import app.directorio_dir_ar as dda
+
+    # fuentes gratis fallan (simula sin red / sitio caído) — deben devolver
+    # nuevas=0 sin romper, y NO deben bloquear las fuentes pagas
+    monkeypatch.setattr(ovp, "buscar_por_zona", lambda zona: {"zona": zona, "error": "sin red", "nuevas": 0})
+    monkeypatch.setattr(dda, "buscar_por_zona_y_dominio", lambda zona, dominio: {"zona": zona, "dominio": dominio, "error": "sin red", "nuevas": 0})
+
+    import app.search_client as sc
+    import app.site_check as scheck
+    monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": [
+        {"title": "Fábrica Real SA", "link": "https://fabricareal.com.ar/", "snippet": "industria"},
+    ]})
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+
+    runner_module.loop_investigacion(max_ciclos=10)
+
+    conn = db_module.get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
+    conn.close()
+    assert total > 0, "las fuentes pagas deben poder correr igual si las gratis no encontraron nada"
 
 
 if __name__ == "__main__":
