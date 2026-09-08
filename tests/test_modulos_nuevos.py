@@ -1229,6 +1229,59 @@ def test_fuentes_pagas_no_se_saltan_si_las_gratis_fallan(tmp_path, monkeypatch):
     assert total > 0, "las fuentes pagas deben poder correr igual si las gratis no encontraron nada"
 
 
+def test_descarta_por_distancia_real_geocodificada(tmp_path, monkeypatch):
+    """Bug real de fondo (motivo del reclamo del usuario 'pifia mucho en la
+    ubicación'): la geocodificación existía en el código pero nunca se
+    llamaba automáticamente, solo por comando manual — ningún homónimo
+    lejano se descartaba nunca por distancia real. Overpass y dir.ar sí
+    traen dirección real en el snippet, así que ahora se verifica antes de
+    promover."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    import app.promote as promote_mod
+    monkeypatch.setattr(promote_mod.geocoding, "calcular_distancia_a_empresa",
+                        lambda direccion: {"distancia_km": 950.0, "direccion_resuelta": direccion, "lat": 0, "lon": 0})
+
+    import app.search_client as sc
+    import app.site_check as scheck
+    monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": [
+        {"title": "Fábrica Rara SA", "link": "https://fabricarara.com.ar/",
+         "snippet": "OpenStreetMap (industrial) — Calle Falsa 123"},
+    ]})
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas
+    ejecutar_query("fabrica Bella Vista", "Bella Vista", "TYPE_C", "")
+    r = promover_candidatas(zona="Bella Vista")
+
+    assert r["promovidas"] == 0
+    conn = db_module.get_conn()
+    total = conn.execute("SELECT COUNT(*) c FROM companies").fetchone()["c"]
+    estado = conn.execute("SELECT estado FROM discovered_companies_raw WHERE nombre_crudo='Fábrica Rara SA'").fetchone()["estado"]
+    conn.close()
+    assert total == 0
+    assert "EXCLUIDA_UBICACION" in estado
+
+
+def test_no_bloquea_si_no_hay_direccion_real_o_falla_geocoding(tmp_path, monkeypatch):
+    """La verificación nunca bloquea si no puede confirmar nada (sin
+    dirección real en el snippet, o Nominatim sin respuesta) — es aditiva,
+    no reemplaza los demás filtros."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    from app.promote import _ubicacion_implausible
+    assert _ubicacion_implausible("Empresa X SA", "una descripción normal sin dirección", "Hurlingham") is None
+
+    import app.promote as promote_mod
+    monkeypatch.setattr(promote_mod.geocoding, "calcular_distancia_a_empresa", lambda direccion: None)
+    assert _ubicacion_implausible("Empresa X SA", "OpenStreetMap (industrial) — Calle Falsa 123", "Hurlingham") is None
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -18,7 +18,42 @@ from app.keywords import KEYWORDS_SEED
 from app.exclusions import es_cadena_excluida, es_zona_prohibida, es_agencia_rrhh
 from app.salarios_referencia import estimar_sueldo
 import app.site_check as site_check
+import app.geocoding as geocoding
 from app.discovery import extraer_keywords_de_texto, MAX_KEYWORDS_DESCUBIERTAS, _quitar_acentos, _parece_negocio_unipersonal
+
+# la geocodificación (app/geocoding.py) existía en el código pero nunca se
+# llamaba automáticamente — solo por comando manual (main.py geocode). Sin
+# eso, ningún homónimo lejano se descartaba nunca por distancia real, sin
+# importar cuántos patrones de texto se agregaran. Overpass y la red dir.ar
+# sí traen una dirección real en el snippet — se aprovecha acá para
+# verificar la ubicación de las candidatas nuevas antes de promoverlas.
+_DIRECCION_OVERPASS_RE = re.compile(r"OpenStreetMap \([a-z_]+\) — (.+)$")
+_DIRECCION_DIR_AR_RE = re.compile(r"dir\.ar \(\w+\) — (.+?) — [\d,\.]+★")
+MAX_DISTANCIA_KM_PLAUSIBLE = 80  # generoso sobre el límite de 50 min en colectivo — margen para no descartar por error
+
+
+def _extraer_direccion_real(snippet: str) -> str | None:
+    snippet = snippet or ""
+    for patron in (_DIRECCION_OVERPASS_RE, _DIRECCION_DIR_AR_RE):
+        m = patron.search(snippet)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def _ubicacion_implausible(nombre: str, snippet: str, zona: str) -> str | None:
+    """None si no se pudo verificar (sin dirección real, o sin red — nunca
+    bloquea por falta de datos) o si la distancia es razonable. Si la
+    distancia geocodificada es absurda, devuelve el motivo para descartar."""
+    direccion = _extraer_direccion_real(snippet)
+    if not direccion:
+        return None
+    resultado = geocoding.calcular_distancia_a_empresa(f"{direccion}, {zona}, Buenos Aires, Argentina")
+    if resultado is None:
+        return None  # sin red o Nominatim no respondió — no se asume nada
+    if resultado["distancia_km"] > MAX_DISTANCIA_KM_PLAUSIBLE:
+        return f"ubicación real a {resultado['distancia_km']} km (homónimo probable) — {resultado['direccion_resuelta']}"
+    return None
 
 # keyword -> categoria, para inferir el rubro más probable de la candidata
 _KEYWORD_A_CATEGORIA = {kw: cat for cat, kws in KEYWORDS_SEED.items() for kw in kws}
@@ -162,6 +197,15 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
         if existente:
             company_id = existente["id"]
         else:
+            motivo_ubicacion = _ubicacion_implausible(nombre, f["snippet"] or "", f["zona"])
+            if motivo_ubicacion:
+                conn.execute(
+                    "UPDATE discovered_companies_raw SET estado=? WHERE id=?",
+                    (f"EXCLUIDA_UBICACION:{motivo_ubicacion}"[:120], f["id"]),
+                )
+                excluidas_cadena += 1  # mismo motivo: destino inviable
+                continue
+
             sitio_ok = site_check.sitio_activo(f["url"]) if f["url"] else None
             tamano = "chica" if _parece_negocio_unipersonal(nombre, f["snippet"]) else "desconocido"
             ts = now()
