@@ -87,6 +87,8 @@ function maybeModifier(itemName) {
 	return { prefix: isSin ? "SIN" : "SOLO", ing };
 }
 
+export const ITEM_LIST = config.Itemlist;
+
 function generateOrder(level = 1, itemPool = config.Itemlist) {
 	const duplicateChecker = [];
 	const maxForLevel = Math.min(
