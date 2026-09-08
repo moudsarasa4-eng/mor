@@ -184,28 +184,26 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
         zona_actual = None
 
         # 0) fuentes GRATIS primero (Overpass + red dir.ar): no gastan nada
-        # del presupuesto de por vida de Serper. A pedido del usuario, tras
-        # ver el presupuesto gastarse más rápido de lo esperado (32.5% ya
-        # usado): si estas fuentes encontraron trabajo este ciclo, las de
-        # Serper (geo/industrial/proveedores) SE SALTAN para este ciclo —
-        # antes corrían igual sin importar el orden, así que reordenar solo
-        # no alcanzaba para bajar el gasto real.
-        # las fuentes gratis SÍ cuentan para el límite de ciclos de esta
-        # corrida (ciclos), aunque NUNCA para el presupuesto real de Serper
-        # (queries_lifetime_usadas, que solo se mueve con queries_log) — si
-        # no, nada frena al loop de recorrer TODAS las combinaciones
-        # pendientes de una sola vez (bug real: en un test corrió las 17
-        # zonas de Overpass de un saque en vez de 1, porque mientras
-        # trabajo_gratis_hecho fuera True los ciclos pagos —los únicos que
-        # antes incrementaban ciclos— se saltaban, y el contador nunca
-        # avanzaba).
-        # trabajo_gratis_hecho solo se marca True si REALMENTE encontró algo
-        # (nuevas > 0) — no alcanza con haberlo intentado. Bug real: antes se
-        # marcaba con solo entrar al "if pendientes", incluso si la fuente
-        # gratis fallaba (sin red, o el sitio no trae nada esa vez) — eso
-        # saltaba industrial/proveedores/geo TODOS los ciclos para siempre,
-        # sin que la fuente gratis aportara nada a cambio.
-        trabajo_gratis_hecho = False
+        # del presupuesto de por vida de Serper (queries_lifetime_usadas
+        # solo se mueve con queries_log, que estas fuentes no tocan). SÍ
+        # cuentan contra el límite de ciclos de esta corrida — si no, nada
+        # frena al loop de recorrer TODAS las combinaciones pendientes de
+        # una sola vez (bug real: en un test corrió las 17 zonas de Overpass
+        # de un saque en vez de 1).
+        #
+        # Importante — bug real ya revertido: en un intento anterior, las
+        # fuentes pagas (geo/industrial/proveedores) SE SALTABAN todo el
+        # ciclo si las gratis encontraban algo. Como Overpass+dir.ar tienen
+        # cientos de combinaciones pendientes, en la práctica CASI SIEMPRE
+        # encuentran algo — eso terminaba anulando casi por completo la
+        # búsqueda paga (mucha más variedad de keywords: 273 queries únicas
+        # por zona vs. 1 acción gratis por ciclo), justo lo que el usuario
+        # reportó después ("busca mal los trabajos", "no busca bien las
+        # páginas"). Ahora las fuentes gratis corren primero (aprovechan lo
+        # que puedan sin costo) pero NUNCA bloquean a las pagas — para bajar
+        # el gasto real de Serper, el control es max_ciclos por corrida
+        # (config.yaml discovery.scheduler.queries_per_run), no saltear
+        # fuentes enteras.
         if _puede_seguir():
             from app.overpass_discovery import zonas_pendientes as zonas_pendientes_overpass, buscar_por_zona as buscar_overpass
             pendientes_ovp = zonas_pendientes_overpass(orden_zonas())
@@ -214,7 +212,6 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
                 r_ovp = buscar_overpass(zona_ovp)
                 if r_ovp.get("nuevas"):
                     promover_candidatas(zona=zona_ovp)
-                    trabajo_gratis_hecho = True
                 trabajo_hecho = True
                 ciclos += 1
 
@@ -226,16 +223,14 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
                 r = buscar_por_zona_y_dominio(zona_dir, dominio_dir)
                 if r.get("nuevas"):
                     promover_candidatas(zona=zona_dir)
-                    trabajo_gratis_hecho = True
                 trabajo_hecho = True
                 ciclos += 1
 
-        # 1) búsqueda geográfica (Serper, gasta presupuesto) — se salta si ya
-        # hubo trabajo gratis este ciclo. Si HAY zona sin saturar, la corre;
-        # si no, NO corta el ciclo entero: sigue con industrial/proveedores/
-        # contacto, que pueden tener trabajo pendiente aunque la geografía
-        # esté agotada.
-        zona = None if trabajo_gratis_hecho else siguiente_zona_no_saturada()
+        # 1) búsqueda geográfica (Serper) — si HAY zona sin saturar, la
+        # corre; si no, NO corta el ciclo entero: sigue con industrial/
+        # proveedores/contacto, que pueden tener trabajo pendiente aunque la
+        # geografía esté agotada.
+        zona = siguiente_zona_no_saturada()
         if zona is not None and _puede_seguir():
             zona_actual = zona
             set_status("running", zona_actual=zona)
@@ -261,18 +256,17 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
                         break
                 promover_candidatas(zona=zona)
 
-        # 2) industrial CLAE (Serper) — se salta si ya hubo trabajo gratis.
-        if not trabajo_gratis_hecho and _puede_seguir():
+        # 2) industrial CLAE (Serper) — corre con lo que quede de presupuesto.
+        if _puede_seguir():
             from app.industrial_discovery import pendientes as pendientes_industrial, correr_lote as correr_industrial
             if pendientes_industrial():
                 _gastar(correr_industrial, max_rubros=1)
                 trabajo_hecho = True
 
-        # 3) proveedores de góndola (Serper) — se salta si ya hubo trabajo
-        # gratis. Usa la zona geográfica actual si hubo, sino la primera
-        # zona configurada (para no depender de que la búsqueda geográfica
-        # haya corrido este ciclo).
-        if not trabajo_gratis_hecho and _puede_seguir():
+        # 3) proveedores de góndola (Serper) — usa la zona geográfica actual
+        # si hubo, sino la primera zona configurada (para no depender de que
+        # la búsqueda geográfica haya corrido este ciclo).
+        if _puede_seguir():
             from app.supplier_discovery import pendientes as pendientes_supplier, correr_lote as correr_supplier
             zona_supplier = zona_actual or orden_zonas()[0]
             if pendientes_supplier(zona_supplier):
