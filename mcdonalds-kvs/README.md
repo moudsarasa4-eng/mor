@@ -83,6 +83,10 @@ Opens/closes **Modo Reconocimiento Visual**, same isolation rules as the other t
 - Item count ramps from 2 up to a hard cap of 4, and flash duration shrinks as you level up — both calibrated to the well-replicated ~3–4 item visual working-memory capacity limit (Luck & Vogel), not an arbitrary number.
 - Items you get wrong are weighted to reappear more (same interference/discrimination idea as Modo Enfoque, its own separate table). Attempts/accuracy persist across reloads (`localStorage`, keys `mcdonalds-kvs:visual-stats` and `mcdonalds-kvs:visual-confusion`).
 
+### `?`
+
+Opens/closes the **in-app tutorial** (same isolation rules as Cronómetro/Evaluación/Reconocimiento Visual — mutually exclusive with the three, other shortcuts inert while it's open). It explains every section in plain language and shows itself automatically, once, the first time the file is ever opened (tracked in `localStorage`, key `mcdonalds-kvs:tutorial-visto`) — after that it's only shown when you ask for it, via this key or the "AYUDA" button.
+
 See `METODO-MEMORIA.md` for the full science-backed rationale behind the memory modes and a suggested practice routine, and `ESTACION-INICIADOR.md` for the real station procedure Modo Estación is built from.
 
   

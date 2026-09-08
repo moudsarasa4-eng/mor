@@ -9,6 +9,7 @@ import PanesChallenge from "./components/PanesChallenge";
 import CronometroChallenge from "./components/CronometroChallenge";
 import EvaluacionChallenge from "./components/EvaluacionChallenge";
 import VisualChallenge from "./components/VisualChallenge";
+import AyudaModal from "./components/AyudaModal";
 import { WaveBanner, SessionReminder } from "./components/Banners";
 import { actions } from "./lib/store"
 import { recallVisibleS, computeFocusPool, PEEK_DURATION_MS, PEEK_COOLDOWN_MS, WAVE_MIN_MS, WAVE_MAX_MS, WAVE_BANNER_MS } from "./lib/memoria";
@@ -31,6 +32,8 @@ const SHIFT_SPAWN_MIN_MS = 5000;
 const SHIFT_SPAWN_MAX_MS = 9000;
 
 const SESSION_REMINDER_MS = 15 * 60 * 1000; // Método 2: repetición espaciada
+
+const TUTORIAL_KEY = "mcdonalds-kvs:tutorial-visto";
 
 function fmtAge(seconds) {
 	const m = Math.floor(seconds / 60);
@@ -96,6 +99,11 @@ function App() {
 	const visualOpenRef = useRef(visualOpen);
 	visualOpenRef.current = visualOpen;
 
+	// --- Ayuda/tutorial: se abre sola la primera vez, después queda a mano ---
+	const [ayudaOpen, setAyudaOpen] = useState(false);
+	const ayudaOpenRef = useRef(ayudaOpen);
+	ayudaOpenRef.current = ayudaOpen;
+
 	// refs "vivas" para que el listener de teclado (montado una sola vez)
 	// siempre lea el estado más reciente y no quede pegado al de la primera renderización
 	const ordersRef = useRef(orders);
@@ -114,6 +122,18 @@ function App() {
 	levelRef.current = level;
 	const confusionRef = useRef(confusion);
 	confusionRef.current = confusion;
+
+	// primera vez que se abre el archivo: mostrar el tutorial una sola vez
+	useEffect(() => {
+		try {
+			if (!localStorage.getItem(TUTORIAL_KEY)) {
+				setAyudaOpen(true);
+				localStorage.setItem(TUTORIAL_KEY, "true");
+			}
+		} catch {
+			// almacenamiento no disponible — no se insiste, queda el botón de AYUDA
+		}
+	}, []);
 
 	const toggleSide = () => {
 		dispatch(actions.toggleSide())
@@ -266,22 +286,30 @@ function App() {
 
 	useEffect(() => {
 		const handleKeypress = (event) => {
+			// Cronómetro, Evaluación, Reconocimiento Visual y Ayuda son pantallas
+			// aisladas: solo una a la vez, y mientras una está abierta el resto
+			// de los atajos (incluidos los otros tres) no hace nada de fondo.
 			if (event.key === "c") {
-				if (evaluacionOpenRef.current || visualOpenRef.current) return;
+				if (evaluacionOpenRef.current || visualOpenRef.current || ayudaOpenRef.current) return;
 				setCronometroOpen((v) => !v);
 				return;
 			}
 			if (event.key === "v") {
-				if (cronometroOpenRef.current || visualOpenRef.current) return;
+				if (cronometroOpenRef.current || visualOpenRef.current || ayudaOpenRef.current) return;
 				setEvaluacionOpen((v) => !v);
 				return;
 			}
 			if (event.key === "r") {
-				if (cronometroOpenRef.current || evaluacionOpenRef.current) return;
+				if (cronometroOpenRef.current || evaluacionOpenRef.current || ayudaOpenRef.current) return;
 				setVisualOpen((v) => !v);
 				return;
 			}
-			if (cronometroOpenRef.current || evaluacionOpenRef.current || visualOpenRef.current) return; // el drill/examen aislado tapa el resto de los atajos mientras está abierto
+			if (event.key === "?") {
+				if (cronometroOpenRef.current || evaluacionOpenRef.current || visualOpenRef.current) return;
+				setAyudaOpen((v) => !v);
+				return;
+			}
+			if (cronometroOpenRef.current || evaluacionOpenRef.current || visualOpenRef.current || ayudaOpenRef.current) return;
 			if (event.key === "p") toggleSide();
 			if (event.key === "Enter") serveOrder();
 			if (event.key === "o") addOrder();
@@ -398,14 +426,17 @@ function App() {
 					{shiftActive && (
 						<span className="text-red-400 font-bold text-2xl">TURNO ACTIVO — {fmtAge(shiftRemainingS)}</span>
 					)}
-					<button onClick={() => { setEvaluacionOpen(false); setVisualOpen(false); setCronometroOpen(true); }} className="bg-cyan-500 text-black font-bold px-4 py-2 rounded">
+					<button onClick={() => { setEvaluacionOpen(false); setVisualOpen(false); setAyudaOpen(false); setCronometroOpen(true); }} className="bg-cyan-500 text-black font-bold px-4 py-2 rounded">
 						CRONÓMETRO: MEMORIZAR + PAN (C)
 					</button>
-					<button onClick={() => { setCronometroOpen(false); setVisualOpen(false); setEvaluacionOpen(true); }} className="bg-emerald-500 text-black font-bold px-4 py-2 rounded">
+					<button onClick={() => { setCronometroOpen(false); setVisualOpen(false); setAyudaOpen(false); setEvaluacionOpen(true); }} className="bg-emerald-500 text-black font-bold px-4 py-2 rounded">
 						TOMAR EVALUACIÓN (V)
 					</button>
-					<button onClick={() => { setCronometroOpen(false); setEvaluacionOpen(false); setVisualOpen(true); }} className="bg-fuchsia-500 text-black font-bold px-4 py-2 rounded">
+					<button onClick={() => { setCronometroOpen(false); setEvaluacionOpen(false); setAyudaOpen(false); setVisualOpen(true); }} className="bg-fuchsia-500 text-black font-bold px-4 py-2 rounded">
 						RECONOCIMIENTO VISUAL (R)
+					</button>
+					<button onClick={() => { setCronometroOpen(false); setEvaluacionOpen(false); setVisualOpen(false); setAyudaOpen(true); }} className="bg-white text-black font-bold px-4 py-2 rounded">
+						AYUDA (?)
 					</button>
 					<span className="text-white text-sm">Estándar oficial: {STANDARD_MIN_S}-{STANDARD_MAX_S}s por producto (GE Iniciador/Ensamblador)</span>
 				</div>
@@ -462,6 +493,7 @@ function App() {
 			<CronometroChallenge open={cronometroOpen} onClose={() => setCronometroOpen(false)} />
 			<EvaluacionChallenge open={evaluacionOpen} onClose={() => setEvaluacionOpen(false)} />
 			<VisualChallenge open={visualOpen} onClose={() => setVisualOpen(false)} />
+			<AyudaModal open={ayudaOpen} onClose={() => setAyudaOpen(false)} />
 			<WaveBanner show={waveBanner} />
 			<SessionReminder show={sessionReminder} onDismiss={() => setSessionReminder(false)} />
 			<SelfCheckToast data={selfCheck} onReveal={revealSelfCheck} onConfirm={confirmSelfCheck} />
