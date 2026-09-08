@@ -101,6 +101,11 @@
   </div>
 
 <script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
 async function actualizar() {
   const r = await fetch('/api/status');
   const d = await r.json();
@@ -144,7 +149,7 @@ async function actualizarCandidatas() {
   tbody.innerHTML = '';
   d.items.forEach((row, i) => {
     const tr = document.createElement('tr');
-    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : '-';
+    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : (row.fuente_texto ? escapeHtml(row.fuente_texto) : '-');
     const confianza = row.sueldo_ref_confianza ? ` (${row.sueldo_ref_confianza})` : '';
     tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.sueldo}${confianza}</td><td>${fuente}</td>`;
     tbody.appendChild(tr);
@@ -161,7 +166,7 @@ async function actualizarUltimaTanda() {
   tbody.innerHTML = '';
   d.items.forEach(row => {
     const tr = document.createElement('tr');
-    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : '-';
+    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : (row.fuente_texto ? escapeHtml(row.fuente_texto) : '-');
     tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.estado}</td><td>${fuente}</td>`;
     tbody.appendChild(tr);
   });

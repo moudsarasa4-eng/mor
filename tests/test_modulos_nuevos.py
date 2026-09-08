@@ -1282,6 +1282,44 @@ def test_no_bloquea_si_no_hay_direccion_real_o_falla_geocoding(tmp_path, monkeyp
     assert _ubicacion_implausible("Empresa X SA", "OpenStreetMap (industrial) — Calle Falsa 123", "Hurlingham") is None
 
 
+def test_ejecutar_query_guarda_query_id_para_inferir_rubro_correcto(tmp_path, monkeypatch):
+    """Regresión real de producción: ejecutar_query() insertaba las candidatas
+    en discovered_companies_raw ANTES de crear la fila en queries_log, así que
+    query_id quedaba NULL para siempre en TODA candidata descubierta por
+    Serper (la fuente paga principal) — no solo Overpass/dir.ar, que ya de
+    por sí no tienen keyword. El LEFT JOIN de promote.py nunca encontraba el
+    keyword real de la búsqueda, y _inferir_rubro(None, snippet) caía al
+    rubro por defecto "logistica" para casi todo lo que no matcheaba un tag
+    de OSM o de dir.ar en el snippet — reportado por el usuario como "busca
+    mal los trabajos"."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_query_id.sqlite")
+    db_module.init_db()
+
+    import app.search_client as sc
+    monkeypatch.setattr(sc, "buscar", lambda query, **kwargs: {
+        "organic": [{"title": "Estudio Contable Gómez y Asociados", "link": "https://gomezyasoc.com.ar/", "snippet": "estudio contable"}]
+    })
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas, _inferir_rubro
+
+    r = ejecutar_query("estudio contable Hurlingham", "Hurlingham", "TYPE_A", "administrativo")
+    conn = db_module.get_conn()
+    fila = conn.execute("SELECT query_id, keyword FROM discovered_companies_raw d "
+                         "LEFT JOIN queries_log q ON q.id = d.query_id "
+                         "WHERE d.nombre_crudo LIKE 'Estudio Contable%'").fetchone()
+    conn.close()
+    assert fila["query_id"] == r["query_id"] is not None
+    assert fila["keyword"] == "administrativo"
+
+    promover_candidatas(zona="Hurlingham")
+    conn = db_module.get_conn()
+    rubro = conn.execute("SELECT rubro FROM companies WHERE nombre LIKE 'Estudio Contable%'").fetchone()["rubro"]
+    conn.close()
+    assert rubro == "administrativo", "no debería caer al default 'logistica' teniendo el keyword real"
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

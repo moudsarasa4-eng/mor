@@ -132,13 +132,23 @@ def api_export():
     return jsonify({"archivo": archivo})
 
 
+def _fuente_fallback(actividad: str) -> str | None:
+    """Empresas descubiertas por OpenStreetMap (Overpass) no tienen URL propia
+    -> nunca les entra fila en `sources`, y la columna Fuente quedaba siempre
+    en '-' aunque sí sabemos de dónde salieron. Mismo texto que ya se usaba
+    en export_txt.py para este caso."""
+    if actividad and actividad.startswith("OpenStreetMap"):
+        return f"{actividad} (sin URL — descubierta por ubicación/categoría, no por búsqueda web)"
+    return None
+
+
 @app.route("/api/candidatas")
 def api_candidatas():
     conn = get_conn()
     filtro = "c.estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     total = conn.execute(f"SELECT COUNT(*) c FROM companies c WHERE {filtro}").fetchone()["c"]
     rows = conn.execute(f"""
-        SELECT c.id, c.nombre, c.zona, c.rubro, c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_confianza,
+        SELECT c.id, c.nombre, c.zona, c.rubro, c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_confianza, c.actividad,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
         FROM companies c WHERE {filtro} ORDER BY c.id DESC LIMIT 50
     """).fetchall()
@@ -146,6 +156,7 @@ def api_candidatas():
     items = []
     for r in rows:
         d = dict(r)
+        d["fuente_texto"] = None if d["fuente"] else _fuente_fallback(d.pop("actividad", ""))
         if d["sueldo_ref_min"] is not None:
             d["sueldo"] = f"${d['sueldo_ref_min']:,}-${d['sueldo_ref_max']:,}".replace(",", ".")
         else:
@@ -169,13 +180,18 @@ def api_ultima_tanda():
         conn.close()
         return jsonify({"inicio": None, "items": []})
     rows = conn.execute("""
-        SELECT c.id, c.nombre, c.zona, c.rubro, c.estado, c.motivo_descarte,
+        SELECT c.id, c.nombre, c.zona, c.rubro, c.estado, c.motivo_descarte, c.actividad,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
         FROM companies c WHERE c.creado_en >= ? ORDER BY c.id DESC
     """, (inicio,)).fetchall()
     conn.close()
-    aceptadas = [dict(r) for r in rows if r["estado"] != "descartada"]
-    descartadas = [dict(r) for r in rows if r["estado"] == "descartada"]
+    items = []
+    for r in rows:
+        d = dict(r)
+        d["fuente_texto"] = None if d["fuente"] else _fuente_fallback(d.pop("actividad", ""))
+        items.append(d)
+    aceptadas = [d for d in items if d["estado"] != "descartada"]
+    descartadas = [d for d in items if d["estado"] == "descartada"]
     return jsonify({"inicio": inicio, "items": aceptadas, "descartadas": descartadas})
 
 

@@ -248,6 +248,21 @@ def ejecutar_query(query: str, zona: str, tipo: str, keyword: str = "") -> dict:
         conn.close()
         return {"query": query, "error": str(e), "resultados": 0, "empresas_nuevas": 0}
 
+    # queries_log se inserta ANTES de las candidatas (no después, como estaba):
+    # bug real encontrado con datos de producción — se guardaba el query_id
+    # recién al final, así que TODAS las candidatas de discovery.py (la fuente
+    # paga principal) quedaban con query_id=NULL para siempre. Eso rompía el
+    # LEFT JOIN en promote.py (_inferir_rubro no encontraba el keyword de la
+    # búsqueda) y toda candidata sin match en el snippet caía al rubro por
+    # defecto "logistica", sin importar el rubro real. Se actualiza con las
+    # métricas finales (resultados/empresas_nuevas/etc.) al terminar.
+    cur = conn.execute(
+        "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
+        "VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?)",
+        (query, zona, keyword, tipo, now()),
+    )
+    query_id = cur.lastrowid
+
     crudas = extraer_candidatas(resultado, zona)
     nuevas = 0
     duplicadas = 0
@@ -256,21 +271,19 @@ def ejecutar_query(query: str, zona: str, tipo: str, keyword: str = "") -> dict:
             duplicadas += 1
             continue
         conn.execute(
-            "INSERT INTO discovered_companies_raw (nombre_crudo, url, snippet, zona, estado, creado_en) "
-            "VALUES (?, ?, ?, ?, 'DISCOVERED', ?)",
-            (c["nombre_crudo"], c["url"], c["snippet"], zona, now()),
+            "INSERT INTO discovered_companies_raw (nombre_crudo, url, snippet, zona, query_id, estado, creado_en) "
+            "VALUES (?, ?, ?, ?, ?, 'DISCOVERED', ?)",
+            (c["nombre_crudo"], c["url"], c["snippet"], zona, query_id, now()),
         )
         nuevas += 1
 
     total = len(crudas)
     yield_score = round(nuevas / total, 2) if total else 0.0
 
-    cur = conn.execute(
-        "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (query, zona, keyword, tipo, total, nuevas, duplicadas, yield_score, now()),
+    conn.execute(
+        "UPDATE queries_log SET resultados=?, empresas_nuevas=?, duplicados=?, yield=? WHERE id=?",
+        (total, nuevas, duplicadas, yield_score, query_id),
     )
-    query_id = cur.lastrowid
 
     if keyword:
         conn.execute(
