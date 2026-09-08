@@ -1122,7 +1122,7 @@ def test_directorio_dir_ar_no_repite_combinacion_ya_procesada(tmp_path, monkeypa
 
     pendientes = dda.combinaciones_pendientes(["Hurlingham"])
     assert ("Hurlingham", "logistica.dir.ar") not in pendientes
-    assert ("Hurlingham", "limpieza.dir.ar") in pendientes
+    assert ("Hurlingham", "catering.dir.ar") in pendientes
 
 
 def test_inferir_rubro_de_candidatas_dir_ar_desde_snippet():
@@ -1138,7 +1138,7 @@ def test_auditoria_directorios_marca_sospechoso_con_5_intentos_y_0_resultados(tm
     """Varios slugs de la red dir.ar se adivinaron sin poder verificar contra
     el sitio real (WebFetch a dir.ar bloqueado en este entorno) — este
     reporte detecta un slug probablemente equivocado por su rendimiento
-    real en queries_log, no por revisar el texto."""
+    real en directorio_dir_ar_progress, no por revisar el texto."""
     import app.db as db_module
     monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
     db_module.init_db()
@@ -1148,15 +1148,14 @@ def test_auditoria_directorios_marca_sospechoso_con_5_intentos_y_0_resultados(tm
     conn = db_module.get_conn()
     for i in range(5):
         conn.execute(
-            "INSERT INTO queries_log (query, zona, keyword, tipo, resultados, empresas_nuevas, duplicados, yield, creado_en) "
-            "VALUES (?, 'Hurlingham', 'x', 'TYPE_H', 0, 0, 0, 0, ?)",
-            (f"site:saludybelleza.dir.ar keyword{i} Hurlingham", db_module.now()),
+            "INSERT INTO directorio_dir_ar_progress (zona, dominio, empresas_nuevas, procesado_en) VALUES (?, ?, 0, ?)",
+            (f"Zona{i}", "tiendasderopa.dir.ar", db_module.now()),
         )
     conn.commit()
     conn.close()
 
     filas = {f["dominio"]: f for f in reporte_dominios()}
-    assert filas["saludybelleza.dir.ar"]["sospechoso"] is True
+    assert filas["tiendasderopa.dir.ar"]["sospechoso"] is True
     assert filas["logistica.dir.ar"]["sospechoso"] is False  # sin intentos todavía, no es sospechoso
 
 
@@ -1318,6 +1317,19 @@ def test_ejecutar_query_guarda_query_id_para_inferir_rubro_correcto(tmp_path, mo
     rubro = conn.execute("SELECT rubro FROM companies WHERE nombre LIKE 'Estudio Contable%'").fetchone()["rubro"]
     conn.close()
     assert rubro == "administrativo", "no debería caer al default 'logistica' teniendo el keyword real"
+
+
+def test_slug_de_zona_usa_guiones_entre_palabras():
+    """Bug real: dir.ar arma el slug de ciudad CON guiones entre palabras
+    ('mar-del-plata', 'concepcion-del-uruguay'), pero _slug_de_zona borraba
+    el espacio directamente ('mardelplata') — daba 404 silencioso en TODO
+    partido de nombre compuesto (Tres de Febrero, San Martín, San Miguel...),
+    justo los más relevantes para este motor. Verificado contra URLs reales
+    de logistica.dir.ar encontradas por búsqueda."""
+    from app.directorio_dir_ar import _slug_de_zona
+    assert _slug_de_zona("Tres de Febrero") == "tres-de-febrero"
+    assert _slug_de_zona("San Martín") == "san-martin"
+    assert _slug_de_zona("Hurlingham") == "hurlingham"
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-"""Crawler directo de la red dir.ar — 13 directorios reales (logística,
-limpieza, administración de consorcios, catering, gimnasios, tiendas de ropa,
-salud y belleza, seguridad del hogar, talleres mecánicos, gráficas e
-imprentas, abogados, transporte), cada uno organizado por ciudad con
-dirección y a veces teléfono verificado por el propio sitio.
+"""Crawler directo de la red dir.ar — subdominios reales que siguen el
+patrón "listado por ciudad" (logística, talleres mecánicos, gráficas e
+imprentas, transporte, catering, gimnasios, tiendas de ropa), cada uno
+organizado por ciudad con dirección y a veces teléfono verificado por el
+propio sitio.
 
 100% GRATIS — no pasa por Serper, no gasta nada del presupuesto de por
 vida. Reemplaza el "site:dominio.dir.ar" en Serper (que sí cuesta) por una
@@ -19,10 +19,30 @@ ropa o gimnasios, así que el parser ancla únicamente en la línea de rating
 existe, se toma como la que está 2 líneas antes del rating (nombre y
 dirección son las 2 inmediatamente anteriores).
 
-Varios slugs de subdominio se adivinaron por patrón y no se pudieron
-verificar contra el HTML real (WebFetch a dir.ar bloqueado en el entorno de
-desarrollo) — si un dominio no devuelve cards nunca, revisar con
-`main.py auditar-directorios` y docs/PROMPT_AUDITORIA_DIRECTORIOS.md.
+Mapeo verificado por investigación real (docs/mapa dir.ar, sept. 2026) —
+importante, corrige una lista anterior armada por patrón sin verificar:
+- "limpieza.dir.ar", "saludybelleza.dir.ar" y "seguridaddelhogar.dir.ar" NO
+  existen como subdominios — son subcarpetas del dominio principal
+  (dir.ar/empresas-limpieza/, dir.ar/directorio-de-empresas-salud-y-belleza/,
+  dir.ar/directorio-de-seguridad-para-el-hogar/), con otra estructura de URL
+  que este crawler todavía no sabe leer. Sacados de DOMINIOS.
+- "talleresmecanicos.dir.ar" no existe — el subdominio real es
+  "tallermecanico.dir.ar" (singular). "graficaseimprentas.dir.ar" no existe
+  — el real es "graficas.dir.ar".
+- "administraciondeconsorcios.dir.ar" y "abogados.dir.ar" SÍ existen y
+  están indexados, pero con un esquema de URL por ficha/localidad
+  (/provincia-de-buenos-aires/{ciudad}/administracion-de-consorcios-N/,
+  /abogado/{nombre-ciudad}/) muy distinto al de "listado por ciudad" que
+  este módulo sabe leer — no alcanza con cambiar el slug. Sacados de acá
+  hasta tener un parser dedicado para ese formato.
+- El slug de ciudad de logistica.dir.ar usa GUIONES entre palabras
+  ("mar-del-plata", no "mardelplata") — bug real ya corregido en
+  _slug_de_zona, que antes borraba los espacios en vez de reemplazarlos.
+
+Slugs de subdominio pendientes de verificar con HTML real (WebFetch a
+dir.ar bloqueado en este entorno) — si un dominio no devuelve cards nunca,
+revisar con `main.py auditar-directorios` y
+docs/PROMPT_AUDITORIA_DIRECTORIOS.md.
 """
 import re
 
@@ -39,17 +59,12 @@ TIMEOUT = 15
 # igual que se hace con el tag de OSM en overpass_discovery.py)
 DOMINIOS = {
     "logistica.dir.ar": "logistica",
-    "limpieza.dir.ar": "limpieza",
-    "administraciondeconsorcios.dir.ar": "administrativo",
+    "transporte.dir.ar": "logistica",
+    "tallermecanico.dir.ar": "administrativo",
+    "graficas.dir.ar": "administrativo",
     "catering.dir.ar": "atencion_cliente",
     "gimnasios.dir.ar": "atencion_cliente",
     "tiendasderopa.dir.ar": "atencion_cliente",
-    "saludybelleza.dir.ar": "atencion_cliente",
-    "seguridaddelhogar.dir.ar": "atencion_cliente",
-    "talleresmecanicos.dir.ar": "administrativo",
-    "graficaseimprentas.dir.ar": "administrativo",
-    "abogados.dir.ar": "administrativo",
-    "transporte.dir.ar": "logistica",
 }
 
 TAG_RE = re.compile(r"<[^>]+>")
@@ -57,7 +72,12 @@ RATING_RE = re.compile(r"^★\s*([\d,\.]+)\s*\((\d+)\)$")
 
 
 def _slug_de_zona(zona: str) -> str:
-    return _quitar_acentos(zona.strip().lower()).replace(" ", "")
+    # dir.ar usa guiones entre palabras en el slug de ciudad (ej.
+    # "mar-del-plata", "concepcion-del-uruguay") — bug real: antes se
+    # borraba el espacio directamente ("mardelplata"), lo que da 404
+    # silencioso en TODO partido de nombre compuesto (Tres de Febrero, San
+    # Martín, San Miguel, etc.), justo los más relevantes para este motor.
+    return _quitar_acentos(zona.strip().lower()).replace(" ", "-")
 
 
 def _fetch(url: str) -> str | None:
