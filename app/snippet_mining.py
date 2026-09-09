@@ -76,7 +76,8 @@ def extraer_senales(texto: str) -> list[str]:
 def extraer_contactos(texto: str) -> dict:
     """Emails y teléfonos que aparecen literalmente en el texto (filtrando
     ruido genérico de plataformas). Nunca inventa: solo lo escrito."""
-    emails = [e for e in EMAIL_RE.findall(texto or "")
+    # .rstrip(".,;:") — la regex captura el punto/coma final de "info@x.com. Desde..."
+    emails = [e.rstrip(".,;:)") for e in EMAIL_RE.findall(texto or "")
               if not any(r in e.lower() for r in _EMAILS_RUIDO)]
     telefonos = [t.strip() for t in TEL_RE.findall(texto or "")]
     # dedup preservando orden

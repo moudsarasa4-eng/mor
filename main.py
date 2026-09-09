@@ -281,6 +281,71 @@ def cmd_top(args):
         print(f"{f['id']:>4}  {f['triage_score']:>6}  {(f['rubro'] or '')[:16]:<16}  {(f['zona'] or '')[:16]:<16}  {f['nombre']}")
 
 
+def cmd_procesar_todo(args):
+    """Súper comando: corre TODA la cadena de análisis sobre las candidatas ya
+    descubiertas, sin gastar Serper — filtra basura, corrige rubros, mina
+    contactos del texto ya descargado, rankea las 1778, crawlea sitios para
+    más contactos, y exporta el archivo final ordenado por prioridad."""
+    from app.cleanup import limpiar_candidatas_basura, recalcular_rubros_basura
+    from app.auto_triage import triage_candidatas, ranking_triage
+    from app.contacto_gratis import enriquecer_contacto_gratis
+    from app.export_txt import exportar_candidatas_txt
+
+    print("═" * 64)
+    print("PROCESAR TODO — análisis completo de candidatas (no gasta Serper)")
+    print("═" * 64)
+
+    print("\n[1/5] Filtrando basura (homónimos extranjeros, cadenas, agencias)...")
+    r1 = limpiar_candidatas_basura(zona=args.zona)
+    print(f"      Evaluadas {r1['evaluadas']} · descartadas {r1['limpiadas']}")
+
+    print("\n[2/5] Corrigiendo rubros mal clasificados...")
+    r2 = recalcular_rubros_basura(zona=args.zona)
+    print(f"      Corregidas {r2['corregidas']} de {r2['evaluadas']}")
+
+    print("\n[3/5] Triage: minando texto ya descargado y rankeando todas...")
+    r3 = triage_candidatas(zona=args.zona)
+    print(f"      Rankeadas {r3['procesadas']} candidatas (contactos de snippets incluidos)")
+
+    print(f"\n[4/5] Crawleando sitios propios para más contactos (gratis, hasta {args.enriquecer_limite})...")
+    print("      (esto entra a cada sitio web, puede tardar unos minutos)")
+    r4 = enriquecer_contacto_gratis(zona=args.zona, limite=args.enriquecer_limite)
+    print(f"      Evaluadas {r4['evaluadas']} · contacto nuevo {r4['con_contacto_nuevo']} · sin resultado {r4['sin_resultado']}")
+
+    print("\n[5/5] Exportando archivo final ordenado por prioridad...")
+    archivo = exportar_candidatas_txt(zona=args.zona, solo_nuevas=False)
+    if archivo:
+        print(f"      ✓ Archivo generado: {archivo}")
+    else:
+        print("      (no hay candidatas para exportar)")
+
+    print("\n" + "═" * 64)
+    print("TOP 20 candidatas por prioridad (ver el resto en el archivo y el dashboard):")
+    print("═" * 64)
+    filas = ranking_triage(zona=args.zona, limite=20)
+    conn_top = _conn_para_contactos()
+    for f in filas:
+        contacto = _mejor_contacto(conn_top, f["id"])
+        print(f"  [{f['triage_score']:>3}] {f['nombre'][:42]:<42} {(f['zona'] or '')[:14]:<14} {contacto}")
+    conn_top.close()
+    print("\nEl archivo .txt está en tu carpeta Descargas — pasáselo a Claude para el análisis fino y los emails.")
+
+
+def _conn_para_contactos():
+    from app.db import get_conn
+    return get_conn()
+
+
+def _mejor_contacto(conn, company_id: int) -> str:
+    row = conn.execute(
+        "SELECT tipo, valor FROM contacts WHERE company_id=? ORDER BY (tipo='email') DESC, id LIMIT 1",
+        (company_id,),
+    ).fetchone()
+    if row:
+        return f"{row['valor']}"
+    return "(sin contacto — revisar a mano)"
+
+
 def cmd_backup(args):
     from app.backup import hacer_backup
     archivo = hacer_backup()
@@ -700,6 +765,12 @@ def main():
     ptop.add_argument("--zona", default=None)
     ptop.add_argument("--limite", type=int, default=50)
     ptop.set_defaults(func=cmd_top)
+
+    pproc = sub.add_parser("procesar-todo")
+    pproc.add_argument("--zona", default=None)
+    pproc.add_argument("--enriquecer-limite", type=int, default=400,
+                       help="máximo de sitios a crawlear para contacto (cada uno es una request web)")
+    pproc.set_defaults(func=cmd_procesar_todo)
 
     sub.add_parser("backup").set_defaults(func=cmd_backup)
     sub.add_parser("restore").set_defaults(func=cmd_restore)
