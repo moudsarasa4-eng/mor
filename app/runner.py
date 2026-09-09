@@ -292,8 +292,9 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
         # pasa lo recién descubierto por el filtro de calidad retroactivo antes
         # de mostrarlo/exportarlo — así una tanda no muestra basura que el
         # filtro de discovery.py no atajó en el momento pero sí atrapa ahora.
-        from app.cleanup import limpiar_candidatas_basura
+        from app.cleanup import limpiar_candidatas_basura, recalcular_rubros_basura
         limpiar_candidatas_basura()
+        recalcular_rubros_basura()
 
         archivo_txt = exportar_candidatas_txt()
         if archivo_txt:

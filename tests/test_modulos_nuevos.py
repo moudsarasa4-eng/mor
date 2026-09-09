@@ -1332,6 +1332,77 @@ def test_slug_de_zona_usa_guiones_entre_palabras():
     assert _slug_de_zona("Hurlingham") == "hurlingham"
 
 
+def test_cleanup_descarta_homonimo_extranjero_por_url(tmp_path, monkeypatch):
+    """Bug real (archivo de producción de 1778 candidatas): quedaban colgadas
+    empresas de 'Bella Vista' de Chile/México/Arkansas cuyo nombre no delata
+    el país, pero la URL sí (.cl, .mx, 'arkansas' en la ruta). La limpieza
+    retroactiva nunca miraba la fuente, así que nunca las agarraba."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    conn = db_module.get_conn()
+    cur = conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, estado, creado_en, actualizado_en) "
+        "VALUES ('Limpieza Total', 'limpieza', 'Bella Vista', 'candidata', ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    cid = cur.lastrowid
+    conn.execute(
+        "INSERT INTO sources (company_id, url, tipo, descripcion, creado_en) VALUES (?, ?, 'directorio', '', ?)",
+        (cid, "http://limpiezaparaalfombras.cl/bella-vista/", db_module.now()),
+    )
+    conn.commit()
+    conn.close()
+
+    from app.cleanup import limpiar_candidatas_basura
+    r = limpiar_candidatas_basura()
+    assert r["limpiadas"] == 1
+
+    conn = db_module.get_conn()
+    estado = conn.execute("SELECT estado FROM companies WHERE id=?", (cid,)).fetchone()["estado"]
+    conn.close()
+    assert estado == "descartada"
+
+
+def test_recalcular_rubros_corrige_logistica_por_defecto(tmp_path, monkeypatch):
+    """Bug real: 1778/1778 candidatas quedaron con rubro='logistica' por el
+    query_id=NULL. recalcular_rubros_basura las revisa cruzando nombre+snippet
+    contra KEYWORDS_SEED y corrige las que claramente son otro rubro."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    conn = db_module.get_conn()
+    cur = conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, actividad, estado, creado_en, actualizado_en) "
+        "VALUES ('Maclean Tapizados', 'logistica', 'Bella Vista', 'servicio premium de limpieza de tapizados', 'candidata', ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    cid = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    from app.cleanup import recalcular_rubros_basura
+    r = recalcular_rubros_basura()
+    assert r["corregidas"] == 1
+
+    conn = db_module.get_conn()
+    rubro = conn.execute("SELECT rubro FROM companies WHERE id=?", (cid,)).fetchone()["rubro"]
+    conn.close()
+    assert rubro == "limpieza"
+
+
+def test_inferir_rubro_por_texto_sin_keyword():
+    """_inferir_rubro sin keyword ni tag debe deducir del nombre+snippet
+    antes de caer al default 'logistica'."""
+    from app.promote import _inferir_rubro
+    assert _inferir_rubro(None, "servicio de limpieza de oficinas", "Limpieza Total") == "limpieza"
+    assert _inferir_rubro(None, "estudio contable y facturación", "Gómez Asociados") == "administrativo"
+    # sin ninguna señal, mantiene el default conservador
+    assert _inferir_rubro(None, "xyz sin pistas", "Empresa Nn") == "logistica"
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

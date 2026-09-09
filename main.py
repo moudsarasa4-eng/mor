@@ -244,6 +244,16 @@ def cmd_clean(args):
         print(f"  ... y {len(r['detalle']) - 30} más")
 
 
+def cmd_recalcular_rubros(args):
+    from app.cleanup import recalcular_rubros_basura
+    r = recalcular_rubros_basura(zona=args.zona)
+    print(f"Evaluadas: {r['evaluadas']} · Corregidas: {r['corregidas']}")
+    for d in r["detalle"][:30]:
+        print(f"  [{d['id']}] {d['nombre']}: {d['de']} -> {d['a']}")
+    if len(r["detalle"]) > 30:
+        print(f"  ... y {len(r['detalle']) - 30} más")
+
+
 def cmd_backup(args):
     from app.backup import hacer_backup
     archivo = hacer_backup()
@@ -645,6 +655,10 @@ def main():
     pclean = sub.add_parser("clean")
     pclean.add_argument("--zona", default=None)
     pclean.set_defaults(func=cmd_clean)
+
+    prubros = sub.add_parser("recalcular-rubros")
+    prubros.add_argument("--zona", default=None)
+    prubros.set_defaults(func=cmd_recalcular_rubros)
 
     sub.add_parser("backup").set_defaults(func=cmd_backup)
     sub.add_parser("restore").set_defaults(func=cmd_restore)

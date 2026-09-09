@@ -100,7 +100,30 @@ _TAG_OSM_RE = re.compile(r"OpenStreetMap \(([a-z_]+)\)")
 _RUBRO_DIR_AR_RE = re.compile(r"dir\.ar \((\w+)\)|limpiezas\.com\.ar \((\w+)\)")
 
 
-def _inferir_rubro(keyword: str | None, snippet: str = "") -> str:
+def _inferir_rubro_por_texto(nombre: str, snippet: str) -> str | None:
+    """Fallback cuando no hay keyword de origen (o no calza con ningún
+    rubro): busca los términos de KEYWORDS_SEED directo en nombre+snippet.
+    Bug real de producción que esto corrige: ejecutar_query() guardaba
+    query_id=NULL en TODA candidata durante un tiempo (ver historial de
+    discovery.py), así que _inferir_rubro caía SIEMPRE al default
+    'logistica' — 1778/1778 candidatas de una corrida real quedaron con ese
+    rubro, incluyendo empresas de limpieza, tapizados, atención al cliente,
+    etc. Esto da una segunda oportunidad basada en el contenido real, no
+    solo en qué búsqueda las encontró."""
+    texto = _quitar_acentos(f"{nombre} {snippet}".lower())
+    conteos = {}
+    for categoria, terminos in KEYWORDS_SEED.items():
+        if categoria == "general":
+            continue
+        n = sum(1 for t in terminos if _quitar_acentos(t.lower()) in texto)
+        if n:
+            conteos[categoria] = n
+    if not conteos:
+        return None
+    return max(conteos, key=conteos.get)
+
+
+def _inferir_rubro(keyword: str | None, snippet: str = "", nombre: str = "") -> str:
     if keyword and keyword in _KEYWORD_A_CATEGORIA:
         cat = _KEYWORD_A_CATEGORIA[keyword]
         if cat != "general":
@@ -113,6 +136,9 @@ def _inferir_rubro(keyword: str | None, snippet: str = "") -> str:
     m = _TAG_OSM_RE.search(snippet or "")
     if m and m.group(1) in _TAG_OSM_A_CATEGORIA:
         return _TAG_OSM_A_CATEGORIA[m.group(1)]
+    por_texto = _inferir_rubro_por_texto(nombre, snippet or "")
+    if por_texto:
+        return por_texto
     return "logistica"  # default conservador; se corrige en la revisión real
 
 
@@ -174,7 +200,7 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
             excluidas_cadena += 1  # mismo motivo: no es el empleador real
             continue
 
-        rubro = _inferir_rubro(f["keyword"], f["snippet"])
+        rubro = _inferir_rubro(f["keyword"], f["snippet"], nombre)
         sueldo_ref = estimar_sueldo(rubro)
         dominio = site_check.extraer_dominio(f["url"]) if f["url"] else ""
 
