@@ -1403,6 +1403,143 @@ def test_inferir_rubro_por_texto_sin_keyword():
     assert _inferir_rubro(None, "xyz sin pistas", "Empresa Nn") == "logistica"
 
 
+def test_snippet_mining_extrae_senales_reales():
+    from app.snippet_mining import extraer_senales
+    s = extraer_senales("La empresa inauguró una nueva planta y busca personal para el depósito")
+    assert "nueva_planta" in s
+    assert "contratacion_reciente_similar" in s
+    # texto sin señales no inventa ninguna
+    assert extraer_senales("vendemos tornillos") == []
+
+
+def test_snippet_mining_extrae_contactos_sin_inventar():
+    from app.snippet_mining import extraer_contactos
+    r = extraer_contactos("Escribinos a ventas@fabrica.com.ar o llamá al 4665-1605")
+    assert "ventas@fabrica.com.ar" in r["emails"]
+    assert any("4665" in t for t in r["telefonos"])
+    # ruido de plataforma se filtra, y no inventa nada donde no hay
+    r2 = extraer_contactos("contacto en soporte@wixpress.com")
+    assert r2["emails"] == []
+
+
+def test_snippet_mining_proxies_resenas_dir_ar():
+    from app.snippet_mining import extraer_proxies_calidad
+    p = extraer_proxies_calidad("logistica.dir.ar (logistica) — Av Roca 500 — 4,6★ (80 reseñas)")
+    assert p["resenas"] == 80
+    assert p["rating"] == "4.6"
+
+
+def test_triage_puntua_sin_gastar_y_no_cambia_estado(tmp_path, monkeypatch):
+    """El triage rankea con datos ya en la DB, marca auto_evaluada, pero NUNCA
+    promueve a jackpot: la candidata sigue 'candidata' hasta verificación real."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+
+    conn = db_module.get_conn()
+    cur = conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, actividad, sitio_activo, estado, creado_en, actualizado_en) "
+        "VALUES ('Distribuidora Norte SRL', 'logistica', 'Hurlingham', "
+        "'operador logístico, nuevo depósito, busca personal. Escribir a info@distnorte.com.ar', 1, "
+        "'candidata', ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    cid = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    from app.auto_triage import triage_candidatas, ranking_triage
+    r = triage_candidatas()
+    assert r["procesadas"] == 1
+
+    conn = db_module.get_conn()
+    row = conn.execute("SELECT estado, triage_score, auto_evaluada FROM companies WHERE id=?", (cid,)).fetchone()
+    # detectó email en el texto -> lo persistió como contacto (sin verificar)
+    tiene_contacto = conn.execute("SELECT 1 FROM contacts WHERE company_id=?", (cid,)).fetchone()
+    # detectó señales -> las persistió con procedencia [auto/snippet]
+    tiene_senal = conn.execute("SELECT descripcion FROM signals WHERE company_id=?", (cid,)).fetchone()
+    conn.close()
+
+    assert row["estado"] == "candidata", "el triage NUNCA debe promover a jackpot"
+    assert row["triage_score"] is not None and 0 <= row["triage_score"] <= 100
+    assert row["auto_evaluada"] == 1
+    assert tiene_contacto is not None
+    assert tiene_senal is not None and "[auto/snippet]" in tiene_senal["descripcion"]
+
+    top = ranking_triage()
+    assert top and top[0]["id"] == cid
+
+
+def test_triage_solo_sin_triage_no_recalcula(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+    conn = db_module.get_conn()
+    conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, estado, triage_score, creado_en, actualizado_en) "
+        "VALUES ('Ya Triada SA', 'logistica', 'Moron', 'candidata', 77, ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    conn.commit()
+    conn.close()
+    from app.auto_triage import triage_candidatas
+    r = triage_candidatas(solo_sin_triage=True)
+    assert r["evaluadas"] == 0  # la que ya tenía triage no se re-procesa
+
+
+def test_contacto_gratis_crawlea_sitio_sin_serper(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+    conn = db_module.get_conn()
+    cur = conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, dominio, estado, creado_en, actualizado_en) "
+        "VALUES ('Fabrica X SRL', 'logistica', 'Moron', 'fabricax.com.ar', 'candidata', ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    cid = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    import app.contacto_gratis as cg
+    monkeypatch.setattr(cg, "extraer_contacto_de_sitio",
+                        lambda dom: {"email": "admin@fabricax.com.ar", "telefono": None, "fuente_url": f"https://{dom}/contacto"})
+    monkeypatch.setattr(cg, "verificar_email", lambda e: True)
+
+    r = cg.enriquecer_contacto_gratis()
+    assert r["con_contacto_nuevo"] == 1
+    conn = db_module.get_conn()
+    c = conn.execute("SELECT valor, verificado FROM contacts WHERE company_id=?", (cid,)).fetchone()
+    conn.close()
+    assert c["valor"] == "admin@fabricax.com.ar"
+
+
+def test_contacto_gratis_marca_sin_resultado_para_no_reintentar(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.sqlite")
+    db_module.init_db()
+    conn = db_module.get_conn()
+    cur = conn.execute(
+        "INSERT INTO companies (nombre, rubro, zona, dominio, estado, creado_en, actualizado_en) "
+        "VALUES ('Sin Web SRL', 'logistica', 'Moron', 'sinweb.com.ar', 'candidata', ?, ?)",
+        (db_module.now(), db_module.now()),
+    )
+    cid = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    import app.contacto_gratis as cg
+    monkeypatch.setattr(cg, "extraer_contacto_de_sitio", lambda dom: None)
+    cg.enriquecer_contacto_gratis()
+    # segunda corrida: ya no la vuelve a intentar
+    r2 = cg.enriquecer_contacto_gratis()
+    assert r2["evaluadas"] == 0
+    conn = db_module.get_conn()
+    flag = conn.execute("SELECT contacto_intentado_sin_resultado FROM companies WHERE id=?", (cid,)).fetchone()[0]
+    conn.close()
+    assert flag == 1
+
+
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))

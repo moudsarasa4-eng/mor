@@ -27,7 +27,9 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
     query = (
         "SELECT c.id, c.nombre, c.zona, c.rubro, c.actividad, c.distancia_km, c.contacto_intentado_sin_resultado, "
         "c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_fuente, c.sueldo_ref_confianza, c.origen_contacto, "
-        "c.tamano_estimado FROM companies c "
+        "c.tamano_estimado, c.triage_score, "
+        "(SELECT valor FROM contacts WHERE company_id=c.id LIMIT 1) as contacto_encontrado "
+        "FROM companies c "
         "WHERE c.estado='candidata' "
         "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
     )
@@ -38,9 +40,11 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         query += " AND c.zona = ?"
         params.append(zona)
     # los referidos/presenciales van primero (convierten mejor que un
-    # hallazgo web frío); los negocios unipersonales/muy chicos van al final
-    # (misma zona, pero no se los quiere mezclado con candidatas serias).
-    query += " ORDER BY (c.origen_contacto = 'presencial') DESC, (c.tamano_estimado = 'chica') ASC, c.zona, c.id"
+    # hallazgo web frío); dentro de cada zona, las de mayor triage_score
+    # primero (para que la revisión humana empiece por las mejores); los
+    # negocios unipersonales/muy chicos van al final.
+    query += (" ORDER BY (c.origen_contacto = 'presencial') DESC, (c.tamano_estimado = 'chica') ASC, "
+              "c.zona, c.triage_score DESC NULLS LAST, c.id")
 
     filas = conn.execute(query, params).fetchall()
     if not filas:
@@ -77,6 +81,8 @@ def exportar_candidatas_txt(zona: str | None = None, solo_nuevas: bool = True) -
         ).fetchall()
         lineas.append(f"[{f['id']}] {f['nombre']}")
         lineas.append(f"    Rubro estimado: {f['rubro']}")
+        if f["triage_score"] is not None:
+            lineas.append(f"    Triage automático: {f['triage_score']}/100 (pre-score para ordenar, NO verificado — revisar a mano)")
         if fuente and fuente["url"]:
             lineas.append(f"    Fuente: {fuente['url']}")
         elif f["actividad"] and "OpenStreetMap" in f["actividad"]:

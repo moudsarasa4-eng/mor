@@ -92,10 +92,10 @@
   </div>
 
   <div class="card">
-    <h1>📋 Candidatas descubiertas (pendientes de revisión)</h1>
-    <div class="sub">Encontradas por el motor solo, todavía sin puntuar. <span id="candidatas_total">0</span> en total, mostrando las últimas 50.</div>
+    <h1>📋 Candidatas descubiertas (ordenadas por triage automático)</h1>
+    <div class="sub">Encontradas por el motor solo. La columna <b>Triage</b> es un pre-score automático (0-100) para ordenar la revisión — NO es un jackpot verificado. <span id="candidatas_total">0</span> en total, mostrando las mejores 50.</div>
     <table id="tabla_candidatas">
-      <thead><tr><th>#</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Sueldo estimado (por rubro)</th><th>Fuente</th></tr></thead>
+      <thead><tr><th>#</th><th>Triage</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Contacto</th><th>Sueldo estimado (por rubro)</th><th>Fuente</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -151,7 +151,9 @@ async function actualizarCandidatas() {
     const tr = document.createElement('tr');
     const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : (row.fuente_texto ? escapeHtml(row.fuente_texto) : '-');
     const confianza = row.sueldo_ref_confianza ? ` (${row.sueldo_ref_confianza})` : '';
-    tr.innerHTML = `<td>${row.id}</td><td>${row.nombre}</td><td>${row.zona}</td><td>${row.rubro}</td><td>${row.sueldo}${confianza}</td><td>${fuente}</td>`;
+    const triage = (row.triage_score !== null && row.triage_score !== undefined) ? row.triage_score : '-';
+    const contacto = row.contacto ? escapeHtml(row.contacto) : '-';
+    tr.innerHTML = `<td>${row.id}</td><td><b>${triage}</b></td><td>${escapeHtml(row.nombre)}</td><td>${escapeHtml(row.zona)}</td><td>${escapeHtml(row.rubro)}</td><td>${contacto}</td><td>${row.sueldo}${confianza}</td><td>${fuente}</td>`;
     tbody.appendChild(tr);
   });
 }

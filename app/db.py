@@ -45,6 +45,14 @@ def _migrar_columnas_nuevas(conn):
         ("contacto_intentado_sin_resultado", "INTEGER NOT NULL DEFAULT 0"),
         ("exportada_txt", "INTEGER NOT NULL DEFAULT 0"),
         ("origen_contacto", "TEXT NOT NULL DEFAULT 'web'"),
+        # triage automático: pre-score 0-100 SOLO para ordenar la revisión
+        # humana, calculado con datos ya en la base (sin gastar Serper). NO es
+        # el jackpot_score verificado (ese vive en scores + estado); esto no
+        # cambia el estado de la candidata, solo la rankea.
+        ("triage_score", "INTEGER"),
+        ("triage_detalle", "TEXT"),
+        ("triage_en", "TEXT"),
+        ("snippet_minado_en", "TEXT"),  # última vez que se minó el texto ya descargado
     ]:
         try:
             conn.execute(f"ALTER TABLE companies ADD COLUMN {columna} {tipo}")

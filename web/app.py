@@ -149,8 +149,10 @@ def api_candidatas():
     total = conn.execute(f"SELECT COUNT(*) c FROM companies c WHERE {filtro}").fetchone()["c"]
     rows = conn.execute(f"""
         SELECT c.id, c.nombre, c.zona, c.rubro, c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_confianza, c.actividad,
+               c.triage_score,
+               (SELECT valor FROM contacts WHERE company_id=c.id LIMIT 1) as contacto,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
-        FROM companies c WHERE {filtro} ORDER BY c.id DESC LIMIT 50
+        FROM companies c WHERE {filtro} ORDER BY c.triage_score DESC NULLS LAST, c.id DESC LIMIT 50
     """).fetchall()
     conn.close()
     items = []

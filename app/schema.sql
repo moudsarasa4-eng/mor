@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS companies (
     contacto_intentado_sin_resultado INTEGER NOT NULL DEFAULT 0,  -- evita reintentar find-contacts en la misma empresa sin suerte cada corrida
     estado TEXT NOT NULL DEFAULT 'candidata',  -- candidata | jackpot | en_revision | descartada
     auto_evaluada INTEGER NOT NULL DEFAULT 0,  -- 1 = puntuada por heurística automática, sin revisión humana
+    triage_score INTEGER,          -- pre-score 0-100 SOLO para ordenar la revisión humana (no cambia estado; no es el jackpot_score verificado)
+    triage_detalle TEXT,           -- desglose JSON del triage
+    triage_en TEXT,                -- cuándo se calculó el triage
+    snippet_minado_en TEXT,        -- última vez que se minó el texto ya descargado
     motivo_descarte TEXT,
     reintentar_despues TEXT,       -- fecha ISO: no reinvestigar antes de esto
     creado_en TEXT NOT NULL,

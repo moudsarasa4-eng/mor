@@ -254,6 +254,33 @@ def cmd_recalcular_rubros(args):
         print(f"  ... y {len(r['detalle']) - 30} más")
 
 
+def cmd_triage(args):
+    from app.auto_triage import triage_candidatas
+    r = triage_candidatas(zona=args.zona)
+    print(f"Triage automático (GRATIS, no gasta Serper) — evaluadas: {r['evaluadas']} · procesadas: {r['procesadas']}")
+    print("Nota: es un PRE-SCORE para ordenar la revisión, NO un jackpot verificado.")
+    print("Ver el ranking con: python main.py top")
+
+
+def cmd_enriquecer_contacto(args):
+    from app.contacto_gratis import enriquecer_contacto_gratis
+    r = enriquecer_contacto_gratis(zona=args.zona, limite=args.limite)
+    print(f"Contacto gratis (crawl de sitio propio, no gasta Serper) — evaluadas: {r['evaluadas']} · "
+          f"con contacto nuevo: {r['con_contacto_nuevo']} · sin resultado: {r['sin_resultado']}")
+
+
+def cmd_top(args):
+    from app.auto_triage import ranking_triage
+    filas = ranking_triage(zona=args.zona, limite=args.limite)
+    if not filas:
+        print("Todavía no hay candidatas con triage. Corré primero: python main.py triage")
+        return
+    print(f"TOP {len(filas)} candidatas por triage automático (pre-score, revisar a mano):")
+    print(f"{'#':>4}  {'triage':>6}  {'rubro':<16}  {'zona':<16}  empresa")
+    for f in filas:
+        print(f"{f['id']:>4}  {f['triage_score']:>6}  {(f['rubro'] or '')[:16]:<16}  {(f['zona'] or '')[:16]:<16}  {f['nombre']}")
+
+
 def cmd_backup(args):
     from app.backup import hacer_backup
     archivo = hacer_backup()
@@ -659,6 +686,20 @@ def main():
     prubros = sub.add_parser("recalcular-rubros")
     prubros.add_argument("--zona", default=None)
     prubros.set_defaults(func=cmd_recalcular_rubros)
+
+    ptriage = sub.add_parser("triage")
+    ptriage.add_argument("--zona", default=None)
+    ptriage.set_defaults(func=cmd_triage)
+
+    penr = sub.add_parser("enriquecer-contacto")
+    penr.add_argument("--zona", default=None)
+    penr.add_argument("--limite", type=int, default=25)
+    penr.set_defaults(func=cmd_enriquecer_contacto)
+
+    ptop = sub.add_parser("top")
+    ptop.add_argument("--zona", default=None)
+    ptop.add_argument("--limite", type=int, default=50)
+    ptop.set_defaults(func=cmd_top)
 
     sub.add_parser("backup").set_defaults(func=cmd_backup)
     sub.add_parser("restore").set_defaults(func=cmd_restore)

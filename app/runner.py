@@ -296,6 +296,19 @@ def _loop_investigacion_interna(max_ciclos: int | None, max_minutos: float | Non
         limpiar_candidatas_basura()
         recalcular_rubros_basura()
 
+        # enriquecimiento + triage automático de lo recién descubierto — todo
+        # GRATIS (no gasta Serper): (1) crawlea el sitio propio de unas pocas
+        # candidatas nuevas para conseguir contacto, (2) mina el texto ya
+        # descargado (señales/contactos/proxies) y calcula un pre-score para
+        # ordenar la revisión humana. Acotado por tanda para no colgar el loop.
+        from app.contacto_gratis import enriquecer_contacto_gratis
+        from app.auto_triage import triage_candidatas
+        try:
+            enriquecer_contacto_gratis(limite=10)
+        except Exception as e:
+            print(f"[Motor de Jackpots] enriquecimiento gratis falló (sigo): {e}")
+        triage_candidatas(solo_sin_triage=True)
+
         archivo_txt = exportar_candidatas_txt()
         if archivo_txt:
             print(f"[Motor de Jackpots] Candidatas exportadas a: {archivo_txt}")
