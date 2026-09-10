@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Motor de Jackpots</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔎</text></svg>">
 <style>
   body { font-family: -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 24px; }
   .card { background: #171a21; border: 1px solid #2a2e37; border-radius: 10px; padding: 20px; margin-bottom: 16px; max-width: 1000px; }
@@ -28,6 +29,18 @@
   th { color: #8a8f98; font-weight: 600; }
   .jackpot { color: #d9a441; }
   .zona-actual { color: #74c69d; font-weight: 600; }
+  .card.ancho { max-width: 1400px; }
+  .filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .filtros input[type=search], .filtros select {
+    background: #0f1115; color: #e6e6e6; border: 1px solid #2a2e37; border-radius: 6px; padding: 7px 10px; font-size: 13px;
+  }
+  .filtros input[type=search] { min-width: 240px; }
+  .check { font-size: 13px; color: #8a8f98; display: flex; align-items: center; gap: 6px; }
+  td a { color: #8ab4f8; }
+  .triage-alto { color: #74c69d; font-weight: 700; }
+  .triage-medio { color: #e0b84a; font-weight: 600; }
+  .vacio { color: #5c626d; }
+  .sin-mx { color: #e07a7a; }
 </style>
 </head>
 <body>
@@ -91,11 +104,30 @@
     </table>
   </div>
 
-  <div class="card">
-    <h1>📋 Candidatas descubiertas (ordenadas por triage automático)</h1>
-    <div class="sub">Encontradas por el motor solo. La columna <b>Triage</b> es un pre-score automático (0-100) para ordenar la revisión — NO es un jackpot verificado. <span id="candidatas_total">0</span> en total, mostrando las mejores 50.</div>
+  <div class="card ancho">
+    <h1>📋 A quién contactar</h1>
+    <div class="sub">Candidatas del motor ordenadas por <b>Triage</b>, un pre-score automático (0-100) para saber por dónde empezar — NO es un jackpot verificado. Filtrá, y usá los botones para llevarte la lista.</div>
+    <div class="filtros">
+      <input type="search" id="f_q" placeholder="Buscar empresa o localidad...">
+      <select id="f_zona"><option value="">Todas las zonas</option></select>
+      <select id="f_rubro"><option value="">Todos los rubros</option></select>
+      <select id="f_min_triage">
+        <option value="">Cualquier triage</option>
+        <option value="70">Triage 70+</option>
+        <option value="60">Triage 60+</option>
+        <option value="50">Triage 50+</option>
+      </select>
+      <select id="f_limite"><option value="50">50 filas</option><option value="100">100</option><option value="200">200</option><option value="500">500</option></select>
+      <label class="check"><input type="checkbox" id="f_contactables" checked> Solo contactables</label>
+    </div>
+    <div style="margin:10px 0 4px;">
+      <button id="btn_copiar_md" class="secondary">📋 COPIAR LISTA EN MARKDOWN</button>
+      <button id="btn_export_md" class="secondary">⬇ DESCARGAR .MD</button>
+      <span class="auto-info" id="md_result"></span>
+    </div>
+    <div class="sub" id="candidatas_resumen">-</div>
     <table id="tabla_candidatas">
-      <thead><tr><th>#</th><th>Triage</th><th>Empresa</th><th>Zona</th><th>Rubro (estimado)</th><th>Contacto</th><th>Sueldo estimado (por rubro)</th><th>Fuente</th></tr></thead>
+      <thead><tr><th>Triage</th><th>Empresa</th><th>Zona</th><th>Rubro</th><th>Página web</th><th>Email</th><th>Teléfono</th><th>Sueldo (por rubro)</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -141,21 +173,64 @@ async function actualizar() {
     `Duración estimada al ritmo actual: ~${d.presupuesto.dias_estimados_pc_8h} días (PC prendida 8h/día) · ~${d.presupuesto.dias_estimados_pc_24h} días (PC prendida 24h/día)`;
 }
 
+function queryFiltros() {
+  const p = new URLSearchParams();
+  const q = document.getElementById('f_q').value.trim();
+  if (q) p.set('q', q);
+  const zona = document.getElementById('f_zona').value;
+  if (zona) p.set('zona', zona);
+  const rubro = document.getElementById('f_rubro').value;
+  if (rubro) p.set('rubro', rubro);
+  const minTriage = document.getElementById('f_min_triage').value;
+  if (minTriage) p.set('min_triage', minTriage);
+  p.set('limite', document.getElementById('f_limite').value);
+  if (document.getElementById('f_contactables').checked) p.set('solo_contactables', '1');
+  return p.toString();
+}
+
+function celdaTriage(score) {
+  if (score === null || score === undefined) return '<span class="vacio">—</span>';
+  const clase = score >= 70 ? 'triage-alto' : (score >= 50 ? 'triage-medio' : '');
+  return `<span class="${clase}">${score}</span>`;
+}
+
+function celdaLista(valores, sinMx) {
+  if (!valores || !valores.length) return '<span class="vacio">—</span>';
+  return valores.map(v => {
+    const clase = (sinMx || []).includes(v) ? ' class="sin-mx" title="el dominio no tiene registro MX: probablemente no recibe mail"' : '';
+    return `<span${clase}>${escapeHtml(v)}</span>`;
+  }).join('<br>');
+}
+
 async function actualizarCandidatas() {
-  const r = await fetch('/api/candidatas');
+  const r = await fetch('/api/candidatas?' + queryFiltros());
   const d = await r.json();
-  document.getElementById('candidatas_total').textContent = d.total;
+  document.getElementById('candidatas_resumen').textContent =
+    `${d.items.length} mostradas de ${d.total} que cumplen el filtro.`;
   const tbody = document.querySelector('#tabla_candidatas tbody');
   tbody.innerHTML = '';
-  d.items.forEach((row, i) => {
+  d.items.forEach(row => {
     const tr = document.createElement('tr');
-    const fuente = row.fuente ? `<a href="${row.fuente}" target="_blank" style="color:#8ab4f8">ver fuente</a>` : (row.fuente_texto ? escapeHtml(row.fuente_texto) : '-');
     const confianza = row.sueldo_ref_confianza ? ` (${row.sueldo_ref_confianza})` : '';
-    const triage = (row.triage_score !== null && row.triage_score !== undefined) ? row.triage_score : '-';
-    const contacto = row.contacto ? escapeHtml(row.contacto) : '-';
-    tr.innerHTML = `<td>${row.id}</td><td><b>${triage}</b></td><td>${escapeHtml(row.nombre)}</td><td>${escapeHtml(row.zona)}</td><td>${escapeHtml(row.rubro)}</td><td>${contacto}</td><td>${row.sueldo}${confianza}</td><td>${fuente}</td>`;
+    const sitio = row.sitio
+      ? `<a href="${encodeURI(row.sitio)}" target="_blank" rel="noopener">${escapeHtml(row.dominio)}</a>`
+      : (row.fuente ? `<a href="${encodeURI(row.fuente)}" target="_blank" rel="noopener">ver fuente</a>` : '<span class="vacio">—</span>');
+    let nombre = escapeHtml(row.nombre);
+    if (row.origen_contacto === 'presencial') nombre += ' <b class="jackpot">[referido]</b>';
+    tr.innerHTML = `<td>${celdaTriage(row.triage_score)}</td><td>${nombre}</td>` +
+      `<td>${escapeHtml(row.zona || '')}</td><td>${escapeHtml(row.rubro_legible || '')}</td>` +
+      `<td>${sitio}</td><td>${celdaLista(row.emails, row.emails_sin_mx)}</td>` +
+      `<td>${celdaLista(row.telefonos)}</td><td>${row.sueldo}${confianza}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function cargarOpcionesFiltro() {
+  const d = await (await fetch('/api/filtros')).json();
+  const zonaSel = document.getElementById('f_zona');
+  const rubroSel = document.getElementById('f_rubro');
+  d.zonas.forEach(z => zonaSel.add(new Option(z, z)));
+  d.rubros.forEach(r => rubroSel.add(new Option(r, r)));
 }
 
 async function actualizarUltimaTanda() {
@@ -198,7 +273,36 @@ document.getElementById('btn_export').onclick = async () => {
   actualizarCandidatas();
 };
 
+document.getElementById('btn_copiar_md').onclick = async () => {
+  const md = await (await fetch('/api/entrega.md?' + queryFiltros())).text();
+  const salida = document.getElementById('md_result');
+  try {
+    await navigator.clipboard.writeText(md);
+    salida.textContent = 'Copiado al portapapeles — pegalo donde lo necesites.';
+  } catch (e) {
+    // clipboard falla si la página no es "contexto seguro" (http://IP desde
+    // el celular, por ejemplo): abrir el markdown en una pestaña sirve igual.
+    window.open('/api/entrega.md?' + queryFiltros(), '_blank');
+    salida.textContent = 'No se pudo copiar solo: lo abrí en otra pestaña para copiarlo a mano.';
+  }
+};
+document.getElementById('btn_export_md').onclick = async () => {
+  const d = await (await fetch('/api/export-md', {method: 'POST'})).json();
+  document.getElementById('md_result').textContent =
+    d.archivo ? `Guardado: ${d.archivo}` : 'No hay candidatas contactables para exportar.';
+};
+
+['f_zona', 'f_rubro', 'f_min_triage', 'f_limite', 'f_contactables'].forEach(id => {
+  document.getElementById(id).onchange = actualizarCandidatas;
+});
+let tecleando;
+document.getElementById('f_q').oninput = () => {
+  clearTimeout(tecleando);
+  tecleando = setTimeout(actualizarCandidatas, 300);
+};
+
 actualizar();
+cargarOpcionesFiltro();
 actualizarCandidatas();
 actualizarUltimaTanda();
 actualizarRonda();

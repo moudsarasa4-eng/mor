@@ -103,3 +103,62 @@ def recalcular_rubros_basura(zona: str | None = None) -> dict:
     conn.commit()
     conn.close()
     return {"evaluadas": len(filas), "corregidas": len(corregidas), "detalle": corregidas}
+
+
+def limpiar_dominios_directorio(zona: str | None = None) -> dict:
+    """Borra `companies.dominio` cuando apunta a un directorio (dir.ar,
+    páginas amarillas, etc.) en vez de al sitio propio de la empresa, y elimina
+    los contactos que salieron de crawlear ese directorio.
+
+    Bug real: promote.py guardaba como dominio el host de la fuente que
+    descubrió la candidata. Si la fuente era un directorio, el crawl gratis
+    entraba a la home del directorio y guardaba SU email/teléfono como si fuera
+    el de la empresa — o sea, un dato inventado de hecho, justo lo que el motor
+    tiene prohibido. Además el dashboard mostraba el directorio como "página
+    web" de la empresa.
+
+    Solo toca candidatas sin outreach: nunca pisa algo ya contactado.
+    """
+    from app.site_check import es_directorio
+
+    conn = get_conn()
+    query = (
+        "SELECT id, nombre, dominio FROM companies "
+        "WHERE estado='candidata' AND dominio IS NOT NULL AND dominio != '' "
+        "AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = companies.id)"
+    )
+    params = []
+    if zona:
+        query += " AND zona = ?"
+        params.append(zona)
+    filas = conn.execute(query, params).fetchall()
+
+    limpiados = []
+    contactos_borrados = 0
+    for f in filas:
+        if not es_directorio(f["dominio"]):
+            continue
+        # contactos cuya fuente fue el crawl de ese "sitio propio" que en
+        # realidad era el directorio: son del directorio, no de la empresa.
+        cur = conn.execute(
+            "DELETE FROM contacts WHERE company_id=? AND fuente_id IN "
+            "(SELECT id FROM sources WHERE company_id=? AND tipo='sitio_propio')",
+            (f["id"], f["id"]),
+        )
+        contactos_borrados += cur.rowcount or 0
+        # el intento de contacto contra el directorio no cuenta como intento
+        # real contra la empresa: se rehabilita para el crawl futuro.
+        conn.execute(
+            "UPDATE companies SET dominio='', contacto_intentado_sin_resultado=0, actualizado_en=? WHERE id=?",
+            (now(), f["id"]),
+        )
+        limpiados.append({"id": f["id"], "nombre": f["nombre"], "dominio": f["dominio"]})
+
+    conn.commit()
+    conn.close()
+    return {
+        "evaluadas": len(filas),
+        "limpiados": len(limpiados),
+        "contactos_borrados": contactos_borrados,
+        "detalle": limpiados,
+    }

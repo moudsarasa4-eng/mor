@@ -142,29 +142,59 @@ def _fuente_fallback(actividad: str) -> str | None:
     return None
 
 
+def _filtros_de_request():
+    """Filtros de la lista de entrega, tal como los manda el dashboard."""
+    limite = min(int(request.args.get("limite", 50)), 500)
+    return {
+        "zona": request.args.get("zona") or None,
+        "rubro": request.args.get("rubro") or None,
+        "busqueda": request.args.get("q") or None,
+        "solo_contactables": request.args.get("solo_contactables") == "1",
+        "minimo_triage": int(request.args["min_triage"]) if request.args.get("min_triage") else None,
+        "limite": limite,
+    }
+
+
 @app.route("/api/candidatas")
 def api_candidatas():
+    from app.entrega import filas_entrega
+    datos = filas_entrega(**_filtros_de_request())
+    for d in datos["items"]:
+        actividad = d.pop("actividad", "") or ""
+        d["fuente_texto"] = None if d["fuente"] else _fuente_fallback(actividad)
+    return jsonify(datos)
+
+
+@app.route("/api/filtros")
+def api_filtros():
+    """Zonas y rubros que existen de verdad en la base, para poblar los
+    desplegables del dashboard sin hardcodear nada."""
     conn = get_conn()
-    filtro = "c.estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = c.id)"
-    total = conn.execute(f"SELECT COUNT(*) c FROM companies c WHERE {filtro}").fetchone()["c"]
-    rows = conn.execute(f"""
-        SELECT c.id, c.nombre, c.zona, c.rubro, c.sueldo_ref_min, c.sueldo_ref_max, c.sueldo_ref_confianza, c.actividad,
-               c.triage_score,
-               (SELECT valor FROM contacts WHERE company_id=c.id LIMIT 1) as contacto,
-               (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente
-        FROM companies c WHERE {filtro} ORDER BY c.triage_score DESC NULLS LAST, c.id DESC LIMIT 50
-    """).fetchall()
+    filtro = "estado='candidata' AND NOT EXISTS (SELECT 1 FROM outreach o WHERE o.company_id = companies.id)"
+    zonas = [r["zona"] for r in conn.execute(
+        f"SELECT DISTINCT zona FROM companies WHERE {filtro} AND zona IS NOT NULL ORDER BY zona")]
+    rubros = [r["rubro"] for r in conn.execute(
+        f"SELECT DISTINCT rubro FROM companies WHERE {filtro} AND rubro IS NOT NULL ORDER BY rubro")]
     conn.close()
-    items = []
-    for r in rows:
-        d = dict(r)
-        d["fuente_texto"] = None if d["fuente"] else _fuente_fallback(d.pop("actividad", ""))
-        if d["sueldo_ref_min"] is not None:
-            d["sueldo"] = f"${d['sueldo_ref_min']:,}-${d['sueldo_ref_max']:,}".replace(",", ".")
-        else:
-            d["sueldo"] = "No estimable"
-        items.append(d)
-    return jsonify({"total": total, "items": items})
+    return jsonify({"zonas": zonas, "rubros": rubros})
+
+
+@app.route("/api/entrega.md")
+def api_entrega_md():
+    """La misma lista que muestra el dashboard, en Markdown, para copiar y
+    pegar (en una conversación con Claude, en un mail, donde sea)."""
+    from app.entrega import filas_entrega, render_md
+    filtros = _filtros_de_request()
+    datos = filas_entrega(**filtros)
+    md = render_md(datos["items"], datos["total"])
+    return app.response_class(md, mimetype="text/markdown; charset=utf-8")
+
+
+@app.route("/api/export-md", methods=["POST"])
+def api_export_md():
+    from app.entrega import exportar_candidatas_md
+    archivo = exportar_candidatas_md(limite=500, solo_contactables=True)
+    return jsonify({"archivo": archivo})
 
 
 @app.route("/api/ronda-presencial")
@@ -180,7 +210,10 @@ def api_ultima_tanda():
     inicio = st["ultima_tanda_inicio"] if st else None
     if not inicio:
         conn.close()
-        return jsonify({"inicio": None, "items": []})
+        # 'descartadas' siempre presente: sin esto, en una base todavía sin
+        # ninguna tanda el dashboard rompía con "Cannot read properties of
+        # undefined" y la tabla de última tanda no se renderizaba nunca.
+        return jsonify({"inicio": None, "items": [], "descartadas": []})
     rows = conn.execute("""
         SELECT c.id, c.nombre, c.zona, c.rubro, c.estado, c.motivo_descarte, c.actividad,
                (SELECT url FROM sources WHERE company_id=c.id ORDER BY id LIMIT 1) as fuente

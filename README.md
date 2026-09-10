@@ -21,10 +21,14 @@ En la página, apretá **▶ INICIAR BÚSQUEDA**. El motor empieza a buscar empr
 ### 4. Cómo pausar
 Apretá **⏸ PAUSAR** en cualquier momento. El progreso queda guardado.
 
+### 4 bis. Analizar todo lo ya descubierto (no gasta búsquedas)
+Doble click en `procesar.bat` (Windows) o `python main.py procesar-todo` (Linux/Mac). Filtra basura, corrige rubros, rankea todas las candidatas, busca contacto gratis en los sitios propios y deja dos archivos en Descargas: la lista corta `.md` para contactar y el detalle completo `.txt`.
+
 ### 5. Cómo continuar
 Apretá **↻ CONTINUAR**, o simplemente volvé a abrir la app otro día — retoma exactamente donde quedó, sin repetir trabajo.
 
 ### 6. Dónde están los resultados
+- En la página: la tabla **📋 A quién contactar** muestra las candidatas ordenadas por triage, con su página web, email y teléfono. Se puede filtrar por zona, rubro, triage mínimo o nombre, y llevarse la lista con **COPIAR LISTA EN MARKDOWN** o **DESCARGAR .MD**.
 - En la página: tabla de mejores oportunidades, actualizada en vivo.
 - En archivos: `outreach/` tiene los emails listos para copiar y enviar a mano (nunca se envían solos).
 - `reports/learning_report.md`: qué aprendió el motor sobre qué búsquedas/fuentes funcionan mejor.

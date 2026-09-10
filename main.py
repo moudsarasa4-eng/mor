@@ -22,6 +22,39 @@ import json
 import sys
 from pathlib import Path
 
+
+def _chequear_dependencias():
+    """Sin esto, correr un comando fuera del entorno virtual (ej. abrir una
+    consola suelta y tipear 'python main.py procesar-todo') muere con un
+    ModuleNotFoundError crudo que no dice qué hacer. Caso real: falló así por
+    PyYAML y el análisis de las candidatas quedó frenado."""
+    faltantes = []
+    for modulo, paquete in (("yaml", "PyYAML"), ("requests", "requests"), ("flask", "flask")):
+        try:
+            __import__(modulo)
+        except ModuleNotFoundError:
+            faltantes.append(paquete)
+    if not faltantes:
+        return
+    print("Faltan dependencias para correr el motor: " + ", ".join(faltantes))
+    print()
+    print("Arreglo (una sola vez), parado en la carpeta del motor:")
+    if sys.platform.startswith("win"):
+        print(r"    .venv\Scripts\activate")
+        print("    pip install -r requirements.txt")
+        print()
+        print("Si no existe la carpeta .venv, hacé doble click en start.bat una vez")
+        print("y dejalo terminar: crea el entorno e instala todo solo.")
+    else:
+        print("    source .venv/bin/activate")
+        print("    pip install -r requirements.txt")
+        print()
+        print("Si no existe la carpeta .venv, corré ./start.sh una vez.")
+    sys.exit(1)
+
+
+_chequear_dependencias()
+
 from app.db import init_db, get_conn, now
 from app.company import (
     upsert_company, add_source, add_signal, add_negative_signal,
@@ -36,7 +69,6 @@ from app.audit import AuditChecklist, auditar
 from app.outreach import OutreachRequest, CompanyInput, OpportunityInput, generar_email, guardar_outreach
 from app.geography import accessibility_score, LINEA_SAN_MARTIN
 import yaml
-from pathlib import Path
 
 CONFIG = yaml.safe_load((Path(__file__).resolve().parent / "config.yaml").read_text(encoding="utf-8"))
 
@@ -286,38 +318,43 @@ def cmd_procesar_todo(args):
     descubiertas, sin gastar Serper — filtra basura, corrige rubros, mina
     contactos del texto ya descargado, rankea las 1778, crawlea sitios para
     más contactos, y exporta el archivo final ordenado por prioridad."""
-    from app.cleanup import limpiar_candidatas_basura, recalcular_rubros_basura
+    from app.cleanup import limpiar_candidatas_basura, recalcular_rubros_basura, limpiar_dominios_directorio
     from app.auto_triage import triage_candidatas, ranking_triage
     from app.contacto_gratis import enriquecer_contacto_gratis
     from app.export_txt import exportar_candidatas_txt
+    from app.entrega import exportar_candidatas_md
 
     print("═" * 64)
     print("PROCESAR TODO — análisis completo de candidatas (no gasta Serper)")
     print("═" * 64)
 
-    print("\n[1/5] Filtrando basura (homónimos extranjeros, cadenas, agencias)...")
+    print("\n[1/6] Filtrando basura (homónimos extranjeros, cadenas, agencias)...")
     r1 = limpiar_candidatas_basura(zona=args.zona)
     print(f"      Evaluadas {r1['evaluadas']} · descartadas {r1['limpiadas']}")
 
-    print("\n[2/5] Corrigiendo rubros mal clasificados...")
+    print("\n[2/6] Corrigiendo rubros mal clasificados...")
     r2 = recalcular_rubros_basura(zona=args.zona)
     print(f"      Corregidas {r2['corregidas']} de {r2['evaluadas']}")
 
-    print("\n[3/5] Triage: minando texto ya descargado y rankeando todas...")
+    print("\n[3/6] Descartando 'sitios web' que en realidad eran directorios...")
+    r3b = limpiar_dominios_directorio(zona=args.zona)
+    print(f"      Dominios corregidos {r3b['limpiados']} · contactos del directorio borrados {r3b['contactos_borrados']}")
+
+    print("\n[4/6] Triage: minando texto ya descargado y rankeando todas...")
     r3 = triage_candidatas(zona=args.zona)
     print(f"      Rankeadas {r3['procesadas']} candidatas (contactos de snippets incluidos)")
 
-    print(f"\n[4/5] Crawleando sitios propios para más contactos (gratis, hasta {args.enriquecer_limite})...")
+    print(f"\n[5/6] Crawleando sitios propios para más contactos (gratis, hasta {args.enriquecer_limite})...")
     print("      (esto entra a cada sitio web, puede tardar unos minutos)")
     r4 = enriquecer_contacto_gratis(zona=args.zona, limite=args.enriquecer_limite)
     print(f"      Evaluadas {r4['evaluadas']} · contacto nuevo {r4['con_contacto_nuevo']} · sin resultado {r4['sin_resultado']}")
 
-    print("\n[5/5] Exportando archivo final ordenado por prioridad...")
+    print("\n[6/6] Exportando los archivos finales ordenados por prioridad...")
     archivo = exportar_candidatas_txt(zona=args.zona, solo_nuevas=False)
-    if archivo:
-        print(f"      ✓ Archivo generado: {archivo}")
-    else:
-        print("      (no hay candidatas para exportar)")
+    print(f"      ✓ Detalle completo (.txt): {archivo}" if archivo else "      (no hay candidatas para exportar)")
+    archivo_md = exportar_candidatas_md(zona=args.zona, limite=500)
+    print(f"      ✓ Lista para contactar (.md, con página web): {archivo_md}" if archivo_md
+          else "      (ninguna candidata tiene todavía una vía de contacto)")
 
     print("\n" + "═" * 64)
     print("TOP 20 candidatas por prioridad (ver el resto en el archivo y el dashboard):")
@@ -328,7 +365,9 @@ def cmd_procesar_todo(args):
         contacto = _mejor_contacto(conn_top, f["id"])
         print(f"  [{f['triage_score']:>3}] {f['nombre'][:42]:<42} {(f['zona'] or '')[:14]:<14} {contacto}")
     conn_top.close()
-    print("\nEl archivo .txt está en tu carpeta Descargas — pasáselo a Claude para el análisis fino y los emails.")
+    print("\nLos dos archivos quedaron en tu carpeta Descargas: el .md es la lista corta")
+    print("para contactar (con página web), el .txt el detalle completo para pasarle a Claude.")
+    print("Lo mismo, filtrable y en vivo, está en el dashboard: python main.py webapp")
 
 
 def _conn_para_contactos():
@@ -412,6 +451,13 @@ def cmd_export(args):
     from app.export_txt import exportar_candidatas_txt
     archivo = exportar_candidatas_txt(zona=args.zona)
     print(archivo or "No hay candidatas nuevas para exportar.")
+
+
+def cmd_export_md(args):
+    from app.entrega import exportar_candidatas_md
+    archivo = exportar_candidatas_md(zona=args.zona, limite=args.limite,
+                                     solo_contactables=not args.todas)
+    print(archivo or "No hay candidatas para exportar.")
 
 
 def cmd_industrial(args):
@@ -813,6 +859,13 @@ def main():
     pexport = sub.add_parser("export")
     pexport.add_argument("--zona", default=None)
     pexport.set_defaults(func=cmd_export)
+
+    pmd = sub.add_parser("export-md", help="lista de empresas a contactar en Markdown (con página web, email y teléfono)")
+    pmd.add_argument("--zona", default=None)
+    pmd.add_argument("--limite", type=int, default=300)
+    pmd.add_argument("--todas", action="store_true",
+                     help="incluir también las que no tienen ninguna vía de contacto")
+    pmd.set_defaults(func=cmd_export_md)
 
     pind = sub.add_parser("industrial")
     pind.add_argument("--partidos", default=None, help="Ej: 'Moron,Hurlingham,Merlo,Ituzaingo'")

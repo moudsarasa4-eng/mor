@@ -202,7 +202,12 @@ def promover_candidatas(zona: str | None = None, limite: int = 100) -> dict:
 
         rubro = _inferir_rubro(f["keyword"], f["snippet"], nombre)
         sueldo_ref = estimar_sueldo(rubro)
-        dominio = site_check.extraer_dominio(f["url"]) if f["url"] else ""
+        # el dominio de un directorio (dir.ar, páginas amarillas...) no es el
+        # sitio de la empresa: guardarlo hacía que el crawl gratis levantara el
+        # contacto del directorio y lo guardara como si fuera el de la empresa.
+        dominio = ""
+        if f["url"] and not site_check.es_directorio(f["url"]):
+            dominio = site_check.extraer_dominio(f["url"])
 
         # dedupe: por nombre normalizado O por dominio (agarra casos donde el
         # nombre varía pero es el mismo sitio, ej. "Empresa SA" vs "Empresa S.A. - Inicio")

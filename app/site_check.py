@@ -33,3 +33,31 @@ def sitio_activo(url: str) -> bool | None:
 def extraer_dominio(url: str) -> str:
     m = re.search(r"https?://(?:www\.)?([^/]+)", url or "")
     return m.group(1).lower() if m else ""
+
+
+# Directorios/agregadores: sirven para DESCUBRIR la empresa (de ahí sale la
+# candidata), pero su dominio NO es el sitio propio de la empresa. Guardarlo
+# como `companies.dominio` tenía dos consecuencias reales: el crawl gratis
+# entraba a la home del directorio y terminaba guardando el email del
+# directorio como si fuera el de la empresa, y el dashboard mostraba el
+# directorio como "página web" de la empresa.
+DOMINIOS_DIRECTORIO = (
+    "dir.ar", "paginasamarillas.com.ar", "paginasblancas.com.ar",
+    "cylex.com.ar", "cylex-argentina.com", "guiaurbana.com.ar",
+    "cuitonline.com", "dateas.com", "universodeempresas.com",
+    "informacion-empresas.co", "acambiode.com", "yelp.com",
+    "foursquare.com", "openstreetmap.org", "google.com", "waze.com",
+    "elguia.com", "quiendondecuando.com.ar",
+)
+
+
+def es_directorio(url_o_dominio: str) -> bool:
+    """True si la URL/dominio es un directorio de empresas y no el sitio
+    propio de una empresa."""
+    if not url_o_dominio:
+        return False
+    dom = extraer_dominio(url_o_dominio)
+    if not dom:  # vino un dominio pelado, sin esquema (companies.dominio)
+        dom = url_o_dominio.lower().split("/")[0]
+        dom = dom[4:] if dom.startswith("www.") else dom
+    return any(dom == d or dom.endswith("." + d) for d in DOMINIOS_DIRECTORIO)

@@ -1543,3 +1543,118 @@ def test_contacto_gratis_marca_sin_resultado_para_no_reintentar(tmp_path, monkey
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_es_directorio_distingue_directorio_de_sitio_propio():
+    """Un directorio (dir.ar, páginas amarillas) NO es el sitio de la empresa:
+    guardarlo como tal hacía que el crawl gratis levantara el contacto del
+    directorio y lo guardara como si fuera el de la empresa."""
+    from app.site_check import es_directorio
+    assert es_directorio("https://limpieza.dir.ar/ciudad/hurlingham.html") is True
+    assert es_directorio("dir.ar") is True
+    assert es_directorio("www.paginasamarillas.com.ar") is True
+    assert es_directorio("https://transportesdelsur.com.ar/contacto") is False
+    assert es_directorio("midirectorio.com.ar") is False  # no es sufijo de dir.ar
+    assert es_directorio("") is False
+
+
+def test_promote_no_guarda_el_directorio_como_sitio_de_la_empresa(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_dominio_dir.sqlite")
+    db_module.init_db()
+
+    import app.search_client as sc
+    import app.site_check as scheck
+    monkeypatch.setattr(scheck, "sitio_activo", lambda url: True)
+    monkeypatch.setattr(sc, "buscar", lambda query, **kw: {"organic": [
+        {"title": "Transportes El Roble SRL", "link": "https://logistica.dir.ar/ficha/el-roble.html",
+         "snippet": "Empresa de transporte y distribución en Hurlingham"},
+    ]})
+
+    from app.discovery import ejecutar_query
+    from app.promote import promover_candidatas
+    ejecutar_query("empresas deposito Hurlingham", "Hurlingham", "TYPE_A", "depósito")
+    promover_candidatas(zona="Hurlingham")
+
+    conn = db_module.get_conn()
+    fila = conn.execute("SELECT nombre, dominio FROM companies").fetchone()
+    conn.close()
+    assert fila is not None
+    assert not fila["dominio"], "el dominio del directorio no es el sitio propio de la empresa"
+
+
+def test_limpiar_dominios_directorio_borra_contacto_del_directorio(tmp_path, monkeypatch):
+    """Retroactivo: candidatas cargadas antes del fix tienen el directorio
+    como dominio, y contactos crawleados de ahí que son del directorio."""
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_limpieza_dir.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    from app.db import get_conn, now
+    cid_malo = upsert_company("Logística del Oeste SRL", "logistica", "Hurlingham")
+    cid_bueno = upsert_company("Transportes Propios SA", "logistica", "Hurlingham")
+    conn = get_conn()
+    conn.execute("UPDATE companies SET dominio='limpieza.dir.ar', contacto_intentado_sin_resultado=1 WHERE id=?", (cid_malo,))
+    conn.execute("UPDATE companies SET dominio='transportespropios.com.ar' WHERE id=?", (cid_bueno,))
+    for cid, url in ((cid_malo, "https://limpieza.dir.ar"), (cid_bueno, "https://transportespropios.com.ar")):
+        cur = conn.execute(
+            "INSERT INTO sources (company_id, url, tipo, descripcion, creado_en) VALUES (?, ?, 'sitio_propio', '', ?)",
+            (cid, url, now()))
+        conn.execute(
+            "INSERT INTO contacts (company_id, tipo, valor, verificado, fuente_id, es_persona, creado_en) "
+            "VALUES (?, 'email', ?, 1, ?, 0, ?)",
+            (cid, f"info@{url.split('//')[1]}", cur.lastrowid, now()))
+    conn.commit()
+    conn.close()
+
+    from app.cleanup import limpiar_dominios_directorio
+    r = limpiar_dominios_directorio()
+    assert r["limpiados"] == 1
+    assert r["contactos_borrados"] == 1
+
+    conn = get_conn()
+    malo = conn.execute("SELECT dominio, contacto_intentado_sin_resultado FROM companies WHERE id=?", (cid_malo,)).fetchone()
+    bueno = conn.execute("SELECT dominio FROM companies WHERE id=?", (cid_bueno,)).fetchone()
+    quedan = [r["valor"] for r in conn.execute("SELECT valor FROM contacts")]
+    conn.close()
+    assert malo["dominio"] == ""
+    assert malo["contacto_intentado_sin_resultado"] == 0, "nunca se intentó contra la empresa real"
+    assert bueno["dominio"] == "transportespropios.com.ar", "el sitio propio no se toca"
+    assert quedan == ["info@transportespropios.com.ar"]
+
+
+def test_entrega_filtra_y_arma_markdown_con_pagina_web(tmp_path, monkeypatch):
+    import app.db as db_module
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_entrega.sqlite")
+    db_module.init_db()
+
+    from app.company import upsert_company
+    from app.db import get_conn, now
+    con_web = upsert_company("Depósitos Ituzaingó SA", "logistica", "Ituzaingó")
+    sin_nada = upsert_company("Empresa Fantasma", "limpieza", "Morón")
+    conn = get_conn()
+    conn.execute("UPDATE companies SET dominio='depositosituzaingo.com.ar', triage_score=78 WHERE id=?", (con_web,))
+    conn.execute("UPDATE companies SET triage_score=40 WHERE id=?", (sin_nada,))
+    conn.execute(
+        "INSERT INTO contacts (company_id, tipo, valor, verificado, es_persona, creado_en) "
+        "VALUES (?, 'email', 'rrhh@depositosituzaingo.com.ar', 1, 0, ?)", (con_web, now()))
+    conn.commit()
+    conn.close()
+
+    from app.entrega import filas_entrega, render_md
+    todas = filas_entrega()
+    assert todas["total"] == 2
+
+    contactables = filas_entrega(solo_contactables=True)
+    assert [i["nombre"] for i in contactables["items"]] == ["Depósitos Ituzaingó SA"]
+
+    assert filas_entrega(minimo_triage=70)["total"] == 1
+    assert filas_entrega(busqueda="fantasma")["total"] == 1
+    assert filas_entrega(rubro="limpieza")["total"] == 1
+
+    md = render_md(contactables["items"], contactables["total"])
+    assert "https://depositosituzaingo.com.ar" in md
+    assert "rrhh@depositosituzaingo.com.ar" in md
+    assert "Ituzaingó" in md
+    assert "Empresa Fantasma" not in md
