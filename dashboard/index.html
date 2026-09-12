@@ -391,6 +391,7 @@ async function cargarDatos(){
       datosDemo();
     }
   }finally{
+    mergeProspectosLocales(); // suma los prospectos creados desde WhatsApp (localStorage)
     cargando = false;
     actualizarHeaderEstado();
   }
@@ -920,10 +921,10 @@ function renderDashboard(){
   const r = reporteMensual();
 
   if(usandoDatosDemo){
-    return `<div class="card"><div class="sub">Sin conexión a la API — conectate en la pestaña "Conexión" para ver el panel real.</div></div>`;
+    return renderPanelPendientes() + `<div class="card"><div class="sub">Sin conexión a la API — mostrando datos de ejemplo (y los prospectos que cargues desde WhatsApp). Conectate en "Conexión" para el panel real.</div></div>`;
   }
 
-  return `
+  return renderPanelPendientes() + `
   <div class="grid g5" style="margin-bottom:8px;">
     <div class="metric"><div class="lbl">🔴 Urgencias</div><div class="val" style="color:var(--bad);">${urgentes.length}</div></div>
     <div class="metric"><div class="lbl">🟠 Info faltante</div><div class="val" style="color:var(--warn);">${infoFaltante.length}</div></div>
@@ -1209,6 +1210,9 @@ const tabs = [
   {id:"trabajos", label:"Trabajos"},
   {id:"presupuesto", label:"Presupuesto"},
   {id:"calculadora", label:"🧮 Calculadora"},
+  {id:"whatsapp", label:"💬 WhatsApp"},
+  {id:"catalogo", label:"📋 Catálogo"},
+  {id:"conviene", label:"⚖️ ¿Conviene?"},
   {id:"prompts", label:"🤖 Prompts IA"},
   {id:"finanzas", label:"Finanzas"},
   {id:"proveedores", label:"Bodega y proveedores"},
@@ -1401,6 +1405,9 @@ const RENDERERS = {
   trabajos: renderTrabajos,
   presupuesto: renderPresupuesto,
   calculadora: renderCalculadora,
+  whatsapp: renderWhatsapp,
+  catalogo: renderCatalogo,
+  conviene: renderConviene,
   prompts: renderPrompts,
   finanzas: renderFinanzas,
   proveedores: renderProveedores,
@@ -2481,6 +2488,654 @@ function renderCalculadora(){
   `;
 }
 
+// ==================================================================
+// DATOS DE INVESTIGACIÓN EMBEBIDOS
+// - CATALOGO_30: cuadro de 30 trabajos (precio ref, solución, materiales,
+//   tiempo, notas). Fuente: Home Solution / iProfesional / Servidos (2026)
+//   + base normativa AEA 90364. Los "s/d" NO tienen precio: no se inventan.
+// - SPEECHS: 11 trabajos top con speech + preguntas + upsells (verificados).
+// Todo es de referencia; Marco carga SUS precios (override en localStorage).
+// ==================================================================
+const CATALOGO_30 = [
+  {r:1,n:"Búsqueda y reparación de cortocircuito",mn:57974,mx:91865,tmin:60,tmax:180,sol:"Megado de circuitos para aislar el tramo con falla; inspección de cajas y empalmes; reparación o reemplazo del tramo dañado.",mat:"Cinta aisladora, borneras/conectores, tramo de cable de repuesto, termocontraíble",nota:"El precio es solo mano de obra; no incluye abrir pared."},
+  {r:2,n:"Cambio/instalación de térmica (termomagnética)",mn:22367,mx:41465,tmin:20,tmax:40,sol:"Identificar amperaje correcto (In ≤ Iz, AEA 90364-7-770); reemplazar en riel DIN.",mat:"Térmica del amperaje correcto, terminales, puente de riel DIN",nota:"Nunca subir el amperaje sobre el mismo cable para que no salte: indica sobrecarga a resolver."},
+  {r:3,n:"Cambio/instalación de disyuntor diferencial",mn:26274,mx:47775,tmin:30,tmax:45,sol:"Verificar sensibilidad (30mA estándar AEA; 10mA opcional en riesgo agravado); instalar y probar con test.",mat:"Disyuntor diferencial (30mA o 10mA), terminales",nota:"Corta por fuga a tierra, no por sobrecarga."},
+  {r:4,n:"Instalación de boca eléctrica completa",mn:29436,mx:58746,tmin:60,tmax:120,sol:"Definir si entra en circuito existente o requiere uno nuevo; tender cañería, cablear, montar caja y artefacto.",mat:"Caño corrugado, cable, caja de embutir, tapa, toma o punto de luz",nota:"Cambia mucho el precio si la pared es de material vs durlock."},
+  {r:5,n:"Colocación/cambio de tomacorriente",mn:13916,mx:24435,tmin:15,tmax:30,sol:"Instalar caja nueva o reemplazar; conectar fase/neutro/tierra con colores normativos.",mat:"Tomacorriente (simple/doble/USB), caja si es nueva, tornillos",nota:"Rápido; buena puerta de entrada para upsells (USB, más bocas)."},
+  {r:6,n:"Visita de diagnóstico / presupuestación",mn:25577,mx:71101,tmin:30,tmax:60,sol:"Relevamiento del problema/alcance sin intervención; entrega de presupuesto.",mat:"Instrumental (tester, pinza); sin materiales de obra",nota:"Conviene cobrarla y descontarla si se concreta, para filtrar consultas."},
+  {r:7,n:"Instalación eléctrica para aire acondicionado",mn:46161,mx:97327,tmin:90,tmax:180,sol:"Circuito exclusivo dimensionado según BTU/corriente de arranque; térmica y cableado propios.",mat:"Cable 2.5-4mm², térmica dedicada, caño, caja de conexión",nota:"No compartir circuito: la norma exige circuito exclusivo para cargas especiales."},
+  {r:8,n:"Colocación de artefactos de iluminación",mn:16051,mx:183753,tmin:30,tmax:90,sol:"Desmontar viejo o instalar punto nuevo; conectar y fijar asegurando el peso.",mat:"Artefacto (lo aporta el cliente), borneras, tarugos/tornillos",nota:"Rango amplio: desde aplique simple hasta empotrado complejo."},
+  {r:9,n:"Instalación de termotanque eléctrico",mn:52392,mx:135591,tmin:90,tmax:180,sol:"Circuito exclusivo dimensionado a la potencia; térmica y diferencial propios.",mat:"Cable 4-6mm², térmica 25-32A, caño, caja",nota:"Coordinar con gasista si reemplaza uno a gas."},
+  {r:10,n:"Instalación de cocina eléctrica",mn:34034,mx:83435,tmin:90,tmax:180,sol:"Circuito dedicado de alta potencia; verificar módulos libres o ampliar tablero.",mat:"Cable 4-6mm², térmica 25-32A, caja, ficha industrial si corresponde",nota:"Suele requerir actualizar el tablero."},
+  {r:11,n:"Instalación de anafe eléctrico",mn:30992,mx:59434,tmin:60,tmax:120,sol:"Similar a cocina pero menor potencia; circuito propio.",mat:"Cable 2.5-4mm², térmica acorde, caja",nota:"Verificar potencia real de la plaqueta antes de dimensionar."},
+  {r:12,n:"Instalación de horno eléctrico",mn:51968,mx:96347,tmin:90,tmax:150,sol:"Circuito exclusivo; frecuentemente combinado con anafe.",mat:"Cable 4-6mm², térmica dedicada, caja",nota:"Si va con anafe/cocina, cotizar junto por ahorro de mano de obra."},
+  {r:13,n:"Instalación de estufa eléctrica",mn:45426,mx:59873,tmin:60,tmax:120,sol:"Circuito propio; en baños respetar zonas IP (AEA 90364-7-701).",mat:"Cable según potencia, térmica, caja IP si es zona húmeda",nota:"En baño, cuidar zonas 0/1/2/3 de la norma."},
+  {r:14,n:"Ventilador de techo con luces",mn:47068,mx:75783,tmin:90,tmax:150,sol:"Verificar que el punto soporte el peso (refuerzo si hace falta); llave combinada luz+velocidad.",mat:"Soporte reforzado, llave con control de velocidad, borneras",nota:"Techo de losa vs liviano cambia mucho el tiempo."},
+  {r:15,n:"Ventilador de techo (sin luces)",mn:43045,mx:71862,tmin:60,tmax:120,sol:"Igual que con luces pero sin circuito de iluminación combinado.",mat:"Soporte, control de pared o remoto, borneras",nota:"—"},
+  {r:16,n:"Cambio de tecla/interruptor de pared",mn:18707,mx:null,tmin:20,tmax:40,sol:"Reemplazo de la llave de pared que enciende un circuito de iluminación.",mat:"Tecla/interruptor (simple/combinación/cruzamiento), caja si es nueva",nota:"Máximo original descartado por outlier; se deja solo el mínimo de referencia."},
+  {r:17,n:"Puesta a tierra / jabalina",mn:57441,mx:121359,tmin:90,tmax:180,sol:"Clavar jabalina en tierra accesible, conectar al PE del tablero, verificar continuidad.",mat:"Jabalina, cable verde-amarillo, borne, pozo con sal/carbón si hace falta",nota:"Sin esto el diferencial no corta a tiempo; buen upsell con tablero."},
+  {r:18,n:"Medición de resistencia a tierra (telurómetro)",mn:null,mx:null,tmin:30,tmax:45,sol:"Medición con telurómetro; entrega de informe.",mat:"Instrumental (telurómetro); sin materiales de obra",nota:"Sin precio de referencia público: cotizar dentro del servicio de PAT/certificación."},
+  {r:19,n:"Armado/cambio de tablero (4-6 circuitos)",mn:155000,mx:310000,tmin:180,tmax:360,sol:"Definir circuitos (AEA 90364-7-770/771); montar gabinete, general, diferenciales y térmicas por circuito.",mat:"Gabinete DIN, general, diferencial(es) 30mA, térmicas, riel, cableado interno",nota:"Ticket alto: ofrecer PAT y certificación en la misma visita."},
+  {r:20,n:"Certificado DCI",mn:149036,mx:266951,tmin:120,tmax:240,sol:"Revisión completa contra normativa; emisión de la declaración por matriculado.",mat:"Instrumental de verificación; sin materiales salvo correcciones",nota:"Requiere matriculado; solo para trámites (venta, escritura, habilitación)."},
+  {r:21,n:"Trámites de conexión (distribuidora)",mn:114704,mx:159596,tmin:30,tmax:60,sol:"Gestión ante Edenor/Edesur/EDEA para alta o modificación de suministro.",mat:"Documentación técnica, formularios; sin materiales",nota:"El monto es por la gestión, no por el trámite ante el organismo."},
+  {r:22,n:"Instalación de portero eléctrico",mn:38329,mx:165932,tmin:120,tmax:300,sol:"Tender cableado de baja tensión frente↔unidades; instalar central y frentes.",mat:"Cable de portero, frente, tubos/auriculares o pantalla, fuente",nota:"Rango amplio: de 1 unidad a sistemas con video para consorcios."},
+  {r:23,n:"Instalación de detector de humo",mn:33657,mx:73912,tmin:30,tmax:45,sol:"Definir ubicación según normativa; fijar y conectar (línea o pilas).",mat:"Detector, cable si es a línea, tarugos/tornillos",nota:"Buen upsell cruzado con certificaciones o seguros."},
+  {r:24,n:"Campana de extracción (conexión eléctrica)",mn:46092,mx:97734,tmin:90,tmax:180,sol:"Conectar a circuito propio o existente según potencia; fijación coordinada con mueble.",mat:"Cable según potencia, ficha o conexión directa, caja",nota:"Puede requerir coordinar con carpintero."},
+  {r:25,n:"Colocación de pararrayos",mn:null,mx:null,tmin:240,tmax:480,sol:"Evaluación de riesgo (IRAM 2184); punta captora, bajada y PAT dedicada.",mat:"Punta captora, cable de bajada, jabalina dedicada, abrazaderas",nota:"Precio de fuente inconsistente: cotizar caso por caso. Trabajo especializado poco frecuente."},
+  {r:26,n:"Instalación de alarma",mn:null,mx:null,tmin:180,tmax:360,sol:"Tendido de sensores, central y sirena; programación básica.",mat:"Central, sensores (apertura/movimiento), sirena, cable BT, batería",nota:"Sin precio público relevado."},
+  {r:27,n:"Instalación de cámaras de seguridad",mn:null,mx:null,tmin:180,tmax:360,sol:"Definir cobertura; tender cableado (o wifi), instalar cámaras y NVR.",mat:"Cámaras, UTP o coaxial, NVR/DVR, disco, fuente",nota:"Demanda creciente, sin precio público confiable."},
+  {r:28,n:"Instalación de cerco eléctrico",mn:null,mx:null,tmin:240,tmax:480,sol:"Tender cerco perimetral, energizador y cartelería obligatoria.",mat:"Energizador, cable de cerco, aisladores, cartelería, jabalina",nota:"Verificar ordenanza municipal local."},
+  {r:29,n:"Llaves inteligentes / domótica básica",mn:null,mx:null,tmin:45,tmax:90,sol:"Reemplazar llave por una con control wifi/app; vincular a la red.",mat:"Llave inteligente (requiere neutro), app del fabricante",nota:"Verificar si la caja tiene neutro; muchas viejas no lo tienen."},
+  {r:30,n:"Cargador de auto eléctrico (wallbox)",mn:null,mx:null,tmin:120,tmax:240,sol:"Circuito exclusivo sin simultaneidad; diferencial Tipo B (o A con detección DC) 30mA obligatorio (AEA 90364-7-722).",mat:"Cable 2.5-6mm², diferencial Tipo B, térmica dedicada, wallbox",nota:"Categoría en crecimiento (combo solar+domótica+EV); sin precio de mercado relevado."},
+];
+
+const SPEECHS = [
+  {rank:1,nombre:"Cortocircuito / diagnóstico",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Para localizar un cortocircuito sin romper paredes al voleo, hago un diagnóstico con instrumental — tiene un costo de visita de [$monto] que se descuenta del arreglo si lo hacés conmigo. Contame: ¿hay olor a quemado, chispas, o solo se corta la luz?",
+   preguntas:["¿Hay olor a quemado o marcas visibles (chispas, negro)? → urgencia, ir ya.","¿Es reciente o intermitente hace tiempo?","¿En qué zona de la casa se nota más?"],
+   upsells:["Reemplazo del tramo de cableado afectado (si está deteriorado, cambiar entero, no empalmar).","Revisión preventiva del resto de la instalación.","Informe técnico de la falla (útil para seguro o alquiler)."]},
+  {rank:2,nombre:"Salta la térmica / el disyuntor",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Contame primero: ¿es la térmica (la llave chica del tablero) o el disyuntor (el más grande, con botón de test) el que salta? Son cosas distintas: la térmica salta casi siempre por sobrecarga, y el disyuntor por una fuga a tierra. ¿Coincide con usar algún aparato (microondas, aire, secador)?",
+   preguntas:["¿Térmica o disyuntor?","¿Coincide con un aparato puntual o es al azar?","¿El tablero es viejo o ya renovado?"],
+   upsells:["Circuito exclusivo para el aparato que sobrecarga (no subir el amperaje sobre el mismo cable).","Revisión general del tablero.","Diferencial de 10mA como MEJORA OPCIONAL en baño con bañera/hidromasaje (la norma exige 30mA en toda la casa; el 10mA NO es obligatorio para toda pileta/exterior)."]},
+  {rank:4,nombre:"Boca eléctrica / ampliar tomas",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Buenísimo, contame cuántas bocas nuevas necesitás y para qué ambiente, así te armo el presupuesto con materiales y mano de obra. Si me pasás una foto del tablero y del lugar, calculo más rápido.",
+   preguntas:["¿Cuántas bocas y de qué tipo (toma común, línea para AC, punto de luz)?","¿El circuito existente tiene lugar o hay que armar uno nuevo?","¿Pared de material o durlock?"],
+   upsells:["Tomas con USB integrado (diferencia chica, queda prolijo).","Circuito independiente para la zona nueva.","Llaves con control por wifi (domótica básica)."]},
+  {rank:7,nombre:"Instalación para aire acondicionado",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Para el aire lo ideal es un circuito propio (no compartido) para que no salte la térmica en pleno verano. Contame las frigorías/BTU y si el tablero tiene lugar para un circuito más.",
+   preguntas:["¿Cuántas frigorías/BTU?","¿Ya está instalado el equipo o va todo junto?","¿El tablero tiene lugar?"],
+   upsells:["Llave térmica dedicada + diferencial si falta.","Estabilizador de tensión (protege el compresor en zonas con fluctuaciones).","Preinstalación para un segundo equipo (dejar cañería lista)."]},
+  {rank:6,nombre:"Visita de diagnóstico / presupuesto",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Te cuento cómo trabajo: la visita de diagnóstico tiene un costo de [$monto] y se descuenta del trabajo si lo hacés conmigo. Contame qué está pasando así veo si puedo darte un adelanto de precio antes de ir.",
+   preguntas:["¿Qué problema específico tenés?","¿Es la primera vez que llamás por esto?","¿Podés mandar una foto del tablero/zona afectada?"],
+   upsells:["Paquete de revisión preventiva anual.","Certificación si el motivo real es un trámite (venta/alquiler/seguro).","Presupuesto de obra completa si el diagnóstico revela algo mayor."]},
+  {rank:8,nombre:"Artefactos de iluminación",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Decime cuántos artefactos son y si ya los tenés comprados. Contame también si es reemplazo de algo existente o un punto nuevo.",
+   preguntas:["¿Cuántos artefactos y en qué ambientes?","¿Reemplazo o punto nuevo?","¿Tenés los artefactos o necesitás asesoramiento?"],
+   upsells:["Cambio a LED (ahorra consumo).","Dimmer para regular intensidad.","Sensor de movimiento/crepuscular para pasillos, entrada o jardín."]},
+  {rank:9,nombre:"Termotanque eléctrico",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ El termotanque eléctrico necesita circuito propio con su protección dedicada. Contame la potencia y si ya está el punto eléctrico o hay que hacerlo de cero.",
+   preguntas:["¿Qué potencia tiene el termotanque?","¿Hay punto eléctrico ya hecho o es nuevo?","¿Reemplazo o primera instalación?"],
+   upsells:["Térmica y cable dimensionados a la potencia real (no reusar circuito compartido).","Diferencial específico para el circuito.","Revisión de la puesta a tierra (crítica con agua)."]},
+  {rank:10,nombre:"Cocina eléctrica",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ La cocina eléctrica es de las cargas más pesadas y necesita su propio circuito con cable de mayor sección. Contame la potencia y si el tablero tiene lugar para sumar el circuito.",
+   preguntas:["¿Qué potencia tiene la cocina/horno?","¿El tablero tiene módulos libres?","¿Cambio de gas a eléctrica o ya había una eléctrica?"],
+   upsells:["Actualización del tablero si no tiene lugar.","Revisión de la acometida/medidor si se suma mucha potencia.","Circuito adicional para horno empotrado a futuro."]},
+  {rank:14,nombre:"Ventilador de techo con luz",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ Perfecto, para el ventilador de techo con luz depende si hay que reforzar el punto para el peso. Contame en qué ambiente va y si ya lo tenés comprado.",
+   preguntas:["¿Reemplaza una lámpara o es punto nuevo?","¿Techo de losa o liviano (necesita refuerzo)?","¿Control por cadena, pared o remoto?"],
+   upsells:["Llave con dimmer + control de velocidad.","Refuerzo estructural del punto de fijación.","Cotizar otro ventilador en la misma visita."]},
+  {rank:19,nombre:"Tablero nuevo / renovación",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ El cambio de tablero es de las mejoras más importantes en una instalación vieja. Contame: ¿el tablero actual tiene térmicas tipo 'tapita' o ya es riel DIN? ¿Tiene diferencial?",
+   preguntas:["¿Cuántos circuitos tiene la casa hoy?","¿Es para uso general o necesitás certificación?","¿Hay puesta a tierra instalada?"],
+   upsells:["Puesta a tierra si no existe (sin tierra el diferencial no protege bien).","Certificación técnica con informe.","Protección contra sobretensiones (tormentas)."]},
+  {rank:17,nombre:"Puesta a tierra / jabalina",
+   speech:"¡Hola! Soy [Nombre] de [Negocio] ⚡ La puesta a tierra hace que el disyuntor funcione de verdad — sin ella no tiene referencia para cortar a tiempo. ¿Sabés si tu casa tiene jabalina, o es una duda que te surgió ahora?",
+   preguntas:["¿La casa es antigua (+15-20 años) sin reformas?","¿Es por un trámite o por seguridad general?","¿Tenés patio/jardín con tierra accesible?"],
+   upsells:["Medición de resistencia con informe.","Revisión del diferencial existente (test).","Actualización de tablero si es muy viejo (misma visita)."]},
+];
+
+// Clasificador por lenguaje real (sinónimos). El primero que matchea gana.
+const EMERGENCIA_CLAVES = ["quemado","olor a quemado","huele a quemado","chispa","chispas","humo","fuego","arde","se calienta","calienta","caliente al tacto","descarga","calambre"];
+const CLASIFICADOR = [
+  // 1) Síntomas de falla PRIMERO — evita confundir el nombre de un ambiente
+  //    ("la luz de la cocina") con el pedido de instalar un artefacto ("cocina eléctrica").
+  {claves:["corto","cortocircuito","corto circuito"], rank:1, speech:0, urg:"ALTA"},
+  {claves:["salta la termica","salta la llave","salta el disyuntor","salta el diferencial","se baja la llave","salta la luz","se corta la proteccion","salta","disyuntor","diferencial","termica"], rank:2, speech:1, urg:"MEDIA"},
+  {claves:["no vuelve la luz","se corta la luz","me corta la luz","se me corta la luz","sin luz","quede sin luz","corte de luz","se corta"], rank:1, speech:0, urg:"ALTA"},
+  {claves:["parpadea","titila","parpadeo","tira y da luz"], rank:1, speech:0, urg:"MEDIA"},
+  {claves:["enchufe","tomacorriente","toma muerto","no anda el toma","no tengo corriente","no anda un enchufe","muerto"], rank:4, speech:2, urg:"BAJA"},
+  // 2) Instalaciones / aparatos — requieren señal más específica que un ambiente.
+  {claves:["termotanque"], rank:9, speech:6, urg:"MEDIA"},
+  {claves:["aire acondicionado","split","frigorias","aire nuevo","poner un aire","poner aire","instalar aire","btu"], rank:7, speech:3, urg:"MEDIA"},
+  {claves:["cocina electrica","cocina electrica","anafe","horno electrico","horno electrico","instalar cocina","instalar horno"], rank:10, speech:7, urg:"MEDIA"},
+  {claves:["ventilador"], rank:14, speech:8, urg:"BAJA"},
+  {claves:["tablero","tapita","riel din","cambiar el tablero"], rank:19, speech:9, urg:"MEDIA"},
+  {claves:["puesta a tierra","jabalina","descarga a tierra","toma de tierra"], rank:17, speech:10, urg:"MEDIA"},
+  {claves:["boca","punto de luz","pasar un cable","agregar toma","agregar boca","mas tomas","ampliar"], rank:4, speech:2, urg:"BAJA"},
+  {claves:["lampara","artefacto","aplique","spot","iluminacion","led","foco","luminaria","dicroica"], rank:8, speech:5, urg:"BAJA"},
+  {claves:["certificado","dci","alquilar","alquiler","escritura","habilitacion"], rank:20, speech:4, urg:"BAJA"},
+  {claves:["presupuesto","cuanto sale","cuanto cuesta","cotizar","diagnostico","presupuestar"], rank:6, speech:4, urg:"BAJA"},
+];
+
+// ==================================================================
+// CONFIG DE NEGOCIO (editable, localStorage) — pesos, cortes, meta, zonas
+// ==================================================================
+const CONFIG_NEGOCIO_DEFAULT = {
+  negocio:"Electricista OS", titular:"Marco", visita_monto:40000,
+  meta_mensual:1500000, dias_habiles:22, horas_dia:8, ocupacion:40, factor_estacional:1.0,
+  pesos:{rent:30,tras:25,urg:15,conf:15,ajuste:15}, cortes:{conviene:70,negociable:40},
+  zonas:["Hurlingham","Morón","Castelar","Haedo","Ituzaingó","Padua","Otra"],
+  matriz:{"Hurlingham|Morón":12,"Hurlingham|Castelar":20,"Hurlingham|Haedo":15,"Hurlingham|Ituzaingó":18,"Morón|Castelar":12,"Morón|Haedo":10,"Castelar|Ituzaingó":10,"Haedo|Morón":10,"Padua|Castelar":12,"Padua|Ituzaingó":10},
+};
+function getConfigNegocio(){
+  try{ const g = JSON.parse(localStorage.getItem("eos_config_negocio")||"{}");
+    return {...CONFIG_NEGOCIO_DEFAULT, ...g, pesos:{...CONFIG_NEGOCIO_DEFAULT.pesos,...(g.pesos||{})}, cortes:{...CONFIG_NEGOCIO_DEFAULT.cortes,...(g.cortes||{})}};
+  }catch(e){ return JSON.parse(JSON.stringify(CONFIG_NEGOCIO_DEFAULT)); }
+}
+function setConfigNegocio(c){ localStorage.setItem("eos_config_negocio", JSON.stringify(c)); }
+
+// Mis precios por trabajo (override del catálogo).
+function getMisPreciosTrabajos(){ try{ return JSON.parse(localStorage.getItem("eos_precios_trabajos")||"{}"); }catch(e){ return {}; } }
+function setMisPreciosTrabajos(o){ localStorage.setItem("eos_precios_trabajos", JSON.stringify(o)); }
+function trabajoPorRank(r){ return CATALOGO_30.find(t=> String(t.r)===String(r)); }
+function midPrecio(t){ if(t.mn!=null && t.mx!=null) return (t.mn+t.mx)/2; return t.mn!=null ? t.mn : null; }
+function midTiempo(t){ return (t.tmin+t.tmax)/2; }
+function precioTrabajo(r){
+  const mis = getMisPreciosTrabajos();
+  if(mis[r]!=null && mis[r]!=="") return Number(mis[r]);
+  const t = trabajoPorRank(r); return t ? midPrecio(t) : null;
+}
+// $/hora de referencia = mediana del catálogo (con mis precios donde existan).
+let _refHoraCache = null;
+function refHora(){
+  if(_refHoraCache!=null) return _refHoraCache;
+  const vals = CATALOGO_30.map(t=>{ const p=precioTrabajo(t.r); const h=midTiempo(t)/60; return (p&&h) ? p/h : null; }).filter(x=>x&&isFinite(x)).sort((a,b)=>a-b);
+  _refHoraCache = vals.length ? vals[Math.floor(vals.length/2)] : 30000;
+  return _refHoraCache;
+}
+
+// ==================================================================
+// PROSPECTOS LOCALES — creados desde WhatsApp intake sin backend.
+// Se guardan en localStorage y se fusionan con los que trae la API/demo.
+// ==================================================================
+function getProspectosLocales(){ try{ return JSON.parse(localStorage.getItem("eos_prospectos_local")||"[]"); }catch(e){ return []; } }
+function addProspectoLocal(p){ const a=getProspectosLocales(); a.push(p); localStorage.setItem("eos_prospectos_local", JSON.stringify(a)); }
+function mergeProspectosLocales(){
+  const loc = getProspectosLocales();
+  if(!loc.length) return;
+  const ids = new Set((prospectos||[]).map(p=>String(p.id)));
+  loc.forEach(p=>{ if(!ids.has(String(p.id))) prospectos.push(p); });
+}
+
+// ==================================================================
+// 💬 WHATSAPP — intake + triage + biblioteca de speechs
+// ==================================================================
+function fillSpeech(txt){
+  const c = getConfigNegocio();
+  return String(txt)
+    .replace(/\[Nombre\]/g, c.titular || "Marco")
+    .replace(/\[Negocio\]/g, c.negocio || "Electricista OS")
+    .replace(/\[\$monto\]/g, fmt(c.visita_monto || 40000));
+}
+
+function clasificarMensaje(texto){
+  const t = normalizar(texto);
+  const emergencia = EMERGENCIA_CLAVES.some(k=> t.includes(normalizar(k)));
+  let match = null;
+  for(const c of CLASIFICADOR){ if(c.claves.some(k=> t.includes(normalizar(k)))){ match = c; break; } }
+  // En emergencia nunca es un pedido de instalación: si lo detectado no es una
+  // falla (cortocircuito/térmica/disyuntor), tratarlo como falla + diagnóstico.
+  const FALLAS = [1,2,3];
+  if(emergencia && (!match || !FALLAS.includes(match.rank))){ match = {claves:[], rank:1, speech:0, urg:"EMERGENCIA"}; }
+  let urg = emergencia ? "EMERGENCIA" : (match ? match.urg : "BAJA");
+  return {emergencia, match, urg};
+}
+
+let lastWA = null;
+
+function waAnalizar(){
+  const texto = (document.getElementById("wa-mensaje")||{}).value || "";
+  const cont = document.getElementById("wa-resultado");
+  if(!texto.trim()){ cont.innerHTML = `<div class="footnote">Pegá primero el mensaje del cliente.</div>`; return; }
+  const {emergencia, match, urg} = clasificarMensaje(texto);
+  const t = match ? trabajoPorRank(match.rank) : null;
+  const speech = match ? SPEECHS.find(s=> s.rank===match.rank) : null;
+  const precioTxt = t ? (t.mn!=null ? (t.mx!=null ? `${fmt(t.mn)} – ${fmt(t.mx)}` : `desde ${fmt(t.mn)}`) : "sin precio de referencia (cargá el tuyo)") : "—";
+  lastWA = {texto, emergencia, rank: match?match.rank:null, urg, trabajo: t?t.n:"Sin clasificar"};
+
+  const banderaEmerg = emergencia ? `
+    <div class="card banner-bad" role="alert">
+      <h3 style="margin:0;color:var(--bad);">🚨 Posible EMERGENCIA</h3>
+      <div class="sub" style="margin:6px 0 0;">Guion de seguridad para pasarle YA al cliente:</div>
+      <div style="font-size:13px; margin-top:6px;">🔌 Si podés, bajá la térmica de esa zona (o la general si no sabés cuál es).<br>🚫 No toques el tablero ni el enchufe hasta que llegue.<br>📞 Te puedo pasar hoy con prioridad. ¿Me confirmás la dirección?</div>
+      <div class="footnote">Nunca dar diagnóstico ni solución por WhatsApp en emergencias — solo seguridad y agendar como prioritario.</div>
+    </div>` : "";
+
+  cont.innerHTML = `
+    ${banderaEmerg}
+    <div class="card">
+      <div class="row" style="flex-wrap:wrap; gap:8px;">
+        <h3 style="margin:0;">${t ? "#"+t.r+" "+esc(t.n) : "Sin clasificar"}</h3>
+        <span class="pill ${pillClass(urg)}">${iconoUrgencia(urg==="EMERGENCIA"?"CRITICA":urg)} ${esc(urg)}</span>
+      </div>
+      <div class="sub" style="margin-top:6px;">Precio de referencia: ${esc(precioTxt)}${t&&precioTrabajo(t.r)!=null?` · Mi precio: ${fmt(precioTrabajo(t.r))}`:""}</div>
+      ${t? `<div class="footnote">Solución típica: ${esc(t.sol)}</div><div class="footnote">Materiales: ${esc(t.mat)}</div>`:""}
+    </div>
+    ${speech? `
+    <div class="card">
+      <div class="footnote" style="text-transform:uppercase; font-weight:700;">Speech sugerido</div>
+      <pre class="prompt-box" id="wa-speech-txt">${esc(fillSpeech(speech.speech))}</pre>
+      <button class="btn sm" data-action="copiar-texto" data-target="wa-speech-txt">Copiar speech</button>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Preguntas de calificación</div>
+      <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">
+        ${speech.preguntas.map(q=>`<li>${esc(q)}</li>`).join("")}
+      </ul>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsell sugerido (uno, según respuesta)</div>
+      <div class="aviso">${esc(emergencia ? "En emergencia NO vender: solo seguridad. El upsell real es el chequeo de seguimiento después." : speech.upsells[0])}</div>
+      <details style="margin-top:6px;"><summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Ver los otros upsells</summary>
+        <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${speech.upsells.slice(1).map(u=>`<li>${esc(u)}</li>`).join("")}</ul>
+      </details>
+    </div>`:'<div class="card"><div class="footnote">No pude clasificar el trabajo por el texto. Podés crear el prospecto igual y clasificarlo a mano.</div></div>'}
+    <div class="card">
+      <h3>Crear prospecto con esta consulta</h3>
+      <div class="grid g2">
+        <div><label class="field-label" for="wa-nombre">Nombre del cliente</label><input id="wa-nombre" placeholder="Nombre y apellido"></div>
+        <div><label class="field-label" for="wa-telefono">Teléfono</label><input id="wa-telefono" placeholder="11-...."></div>
+      </div>
+      <button class="btn primary" style="margin-top:10px;" data-action="wa-crear-prospecto">Crear prospecto</button>
+      <div class="footnote">Se guarda en tu navegador y aparece en Prospectos y en Hoy. Cuando conectes el backend, se sincroniza.</div>
+    </div>`;
+}
+
+function waCrearProspecto(){
+  if(!lastWA){ toast("Primero analizá un mensaje.", "warn"); return; }
+  const nombre = ((document.getElementById("wa-nombre")||{}).value||"").trim() || "Cliente WhatsApp";
+  const telefono = ((document.getElementById("wa-telefono")||{}).value||"").trim();
+  const t = lastWA.rank ? trabajoPorRank(lastWA.rank) : null;
+  const p = {
+    id: "w" + Date.now(),
+    nombre, telefono,
+    estado: "LEAD",
+    urgencia: lastWA.urg === "EMERGENCIA" ? "CRITICA" : lastWA.urg,
+    riesgo_tablero_detectado: [2,3,19,17].includes(lastWA.rank),
+    presupuesto_estimado_rango: (t && t.mn!=null) ? `${t.mn}-${t.mx!=null?t.mx:t.mn}` : "",
+    proximo_recordatorio: "",
+    diagnostico: t ? {problema_nombre: t.n, confianza_clasificacion: 70, causas_posibles: []} : null,
+    _mensaje: lastWA.texto,
+  };
+  addProspectoLocal(p);
+  if(!prospectos.some(x=>String(x.id)===String(p.id))) prospectos.push(p);
+  toast("Prospecto creado. Lo ves en Prospectos y en Hoy.", "ok");
+  render("prospectos");
+}
+
+function waMostrarSpeech(idx){
+  const s = SPEECHS[Number(idx)];
+  const box = document.getElementById("wa-biblioteca-detalle");
+  if(!s || !box) return;
+  box.innerHTML = `
+    <div class="card">
+      <h3>${esc(s.nombre)}</h3>
+      <pre class="prompt-box" id="wa-bib-txt">${esc(fillSpeech(s.speech))}</pre>
+      <button class="btn sm" data-action="copiar-texto" data-target="wa-bib-txt">Copiar speech</button>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Preguntas</div>
+      <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${s.preguntas.map(q=>`<li>${esc(q)}</li>`).join("")}</ul>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsells</div>
+      <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${s.upsells.map(u=>`<li>${esc(u)}</li>`).join("")}</ul>
+    </div>`;
+}
+
+function renderWhatsapp(){
+  return `
+  <div class="card banner-info">
+    <strong>💬 Entrada de WhatsApp (modo manual mejorado)</strong>
+    <div class="sub" style="margin:4px 0 0;">Pegá o reenviá el mensaje del cliente. El sistema clasifica el trabajo, detecta emergencias, te arma el speech + las preguntas + el upsell, y crea el prospecto. Cuando quieras, se conecta a WhatsApp automático sin rehacer nada.</div>
+  </div>
+  <div class="card">
+    <label class="field-label" for="wa-mensaje">Mensaje del cliente</label>
+    <textarea id="wa-mensaje" rows="4" style="width:100%; font-family:inherit;" placeholder="Ej: hola, se me corta la luz de la cocina y siento olor a quemado cuando prendo el microondas"></textarea>
+    <button class="btn primary" style="margin-top:10px;" data-action="wa-analizar">Analizar mensaje</button>
+  </div>
+  <div id="wa-resultado"></div>
+
+  <h3 class="seccion">Biblioteca de speechs (${SPEECHS.length})</h3>
+  <div class="card">
+    <div class="row" style="flex-wrap:wrap; gap:6px; justify-content:flex-start;">
+      ${SPEECHS.map((s,i)=>`<button class="btn sm" data-action="wa-mostrar-speech" data-id="${i}">${esc(s.nombre)}</button>`).join("")}
+    </div>
+    <div id="wa-biblioteca-detalle" style="margin-top:12px;"></div>
+  </div>`;
+}
+
+// ==================================================================
+// 📋 CATÁLOGO — 30 trabajos con mi precio editable + detalle
+// ==================================================================
+function catFmtPrecioRef(t){
+  if(t.mn==null) return "s/d";
+  return t.mx!=null ? `${fmt(t.mn)} – ${fmt(t.mx)}` : `desde ${fmt(t.mn)}`;
+}
+function catFmtTiempo(t){
+  const h = m => m%60===0 ? (m/60)+" h" : (m<60? m+" min" : (m/60).toFixed(1)+" h");
+  return `${h(t.tmin)} – ${h(t.tmax)}`;
+}
+function catRender(filtro){
+  const mis = getMisPreciosTrabajos();
+  const f = normalizar(filtro||"");
+  const lista = CATALOGO_30.filter(t=> !f || normalizar(t.n).includes(f));
+  if(!lista.length) return '<div class="empty">Sin resultados.</div>';
+  return lista.map(t=>{
+    const speech = SPEECHS.find(s=> s.rank===t.r);
+    return `
+    <div class="card">
+      <div class="row" style="flex-wrap:wrap; gap:8px;">
+        <h3 style="margin:0;">#${t.r} ${esc(t.n)}</h3>
+        <span class="pill ${t.mn==null?'pendiente':'baja'}">${esc(catFmtPrecioRef(t))}</span>
+      </div>
+      <div class="row" style="margin-top:8px; gap:10px; flex-wrap:wrap; justify-content:flex-start; align-items:flex-end;">
+        <div><label class="field-label" for="cat-precio-${t.r}">Mi precio (ARS)</label>
+          <input id="cat-precio-${t.r}" class="cat-precio calc-num" data-key="${t.r}" type="number" value="${esc(mis[t.r] ?? "")}" placeholder="${t.mn!=null?Math.round(midPrecio(t)):''}" style="width:140px;"></div>
+        <div class="footnote">⏱ ${esc(catFmtTiempo(t))}</div>
+      </div>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Solución, materiales y upsells</summary>
+        <div class="footnote" style="margin-top:6px;"><strong>Solución:</strong> ${esc(t.sol)}</div>
+        <div class="footnote"><strong>Materiales:</strong> ${esc(t.mat)}</div>
+        <div class="footnote"><strong>Nota:</strong> ${esc(t.nota)}</div>
+        ${speech? `<div class="footnote" style="margin-top:6px;"><strong>Upsells:</strong></div><ul style="margin:4px 0 0; padding-left:18px; font-size:12.5px; color:var(--ink-soft);">${speech.upsells.map(u=>`<li>${esc(u)}</li>`).join("")}</ul>`:""}
+      </details>
+    </div>`;
+  }).join("");
+}
+function catFiltrar(){
+  const cont = document.getElementById("cat-lista");
+  if(cont) cont.innerHTML = catRender((document.getElementById("cat-buscar")||{}).value||"");
+}
+function catGuardarPrecios(){
+  const mis = getMisPreciosTrabajos();
+  document.querySelectorAll(".cat-precio").forEach(inp=>{
+    const v = inp.value.trim();
+    if(v==="") delete mis[inp.dataset.key]; else mis[inp.dataset.key] = Number(v)||0;
+  });
+  setMisPreciosTrabajos(mis);
+  _refHoraCache = null;
+  toast("Tus precios se guardaron. Alimentan la agenda y la proyección.", "ok");
+}
+function renderCatalogo(){
+  return `
+  <div class="card banner-info">
+    <strong>📋 Catálogo de 30 trabajos más demandados</strong>
+    <div class="sub" style="margin:4px 0 0;">Precios de referencia de mercado (2026) — cargá <em>tu</em> precio en cada uno. Son la base de la calculadora, la agenda y la proyección.</div>
+  </div>
+  <div class="toolbar">
+    <input id="cat-buscar" placeholder="Buscar trabajo..." style="min-width:220px;" data-input="cat-buscar" aria-label="Buscar trabajo">
+    <button class="btn primary" data-action="cat-guardar-precios">Guardar mis precios</button>
+  </div>
+  <div id="cat-lista">${catRender("")}</div>`;
+}
+
+// ==================================================================
+// ⚖️ ¿CONVIENE? — Motor de agenda dinámica (balanza) + Proyectista
+// ==================================================================
+function tiempoZona(a,b){
+  if(!a||!b||a===b) return 0;
+  const c = getConfigNegocio();
+  return c.matriz[a+"|"+b] ?? c.matriz[b+"|"+a] ?? 25;
+}
+function agendaHoyZonas(){
+  const hoy = new Date().toISOString().slice(0,10);
+  return visitas.filter(v=> String(v.fecha_hora||"").slice(0,10)===hoy && !["CANCELADA","REALIZADA"].includes(v.estado))
+    .map(v=> v.zona).filter(Boolean);
+}
+const clamp100 = x => Math.max(0, Math.min(100, x));
+
+function convPrefillTipo(){
+  const r = (document.getElementById("conv-tipo")||{}).value;
+  const t = trabajoPorRank(r);
+  if(!t) return;
+  const pe = document.getElementById("conv-precio");
+  const du = document.getElementById("conv-dur");
+  if(pe){ const p = precioTrabajo(r); pe.value = p!=null ? Math.round(p) : ""; }
+  if(du) du.value = Math.round(midTiempo(t));
+}
+
+function convEvaluar(){
+  const c = getConfigNegocio();
+  const zona = (document.getElementById("conv-zona")||{}).value;
+  const r = (document.getElementById("conv-tipo")||{}).value;
+  const precio = numId("conv-precio");
+  const dur = numId("conv-dur") || 60;
+  const urg = (document.getElementById("conv-urg")||{}).value || "media";
+  const recurrente = (document.getElementById("conv-recurrente")||{}).checked;
+  const deuda = numId("conv-deuda");
+  const cancel = numId("conv-cancel");
+  const cont = document.getElementById("conv-resultado");
+  const t = trabajoPorRank(r);
+  if(!precio && t && t.mn==null){ cont.innerHTML = `<div class="card"><div class="footnote">Este trabajo está marcado "s/d" (sin precio de referencia). Cargá un precio estimado antes de evaluar.</div></div>`; return; }
+
+  const phora = precio / (dur/60);
+  const ref = refHora();
+  const sRent = clamp100((phora/ref)*50);
+
+  // Traslado: comparar zona nueva con las zonas de hoy.
+  const zonasHoy = agendaHoyZonas();
+  let sTras;
+  if(!zonasHoy.length) sTras = 60;
+  else if(zonasHoy.includes(zona)) sTras = 100;
+  else { const tmin = Math.min(...zonasHoy.map(z=> tiempoZona(z, zona))); sTras = clamp100(100 - (tmin/45)*100); }
+
+  const sUrg = {emergencia:100, alta:75, media:50, baja:30}[urg] ?? 50;
+
+  let sConf = 60;
+  if(recurrente) sConf += 15;
+  sConf -= cancel*15;
+  if(deuda>0) sConf -= 30;
+  sConf = clamp100(sConf);
+
+  const sAjuste = dur<=90 ? 85 : (dur<=180 ? 65 : (dur<=300 ? 50 : 35));
+
+  const pesos = c.pesos;
+  const sumaPesos = (pesos.rent+pesos.tras+pesos.urg+pesos.conf+pesos.ajuste) || 100;
+  const puntaje = Math.round((pesos.rent*sRent + pesos.tras*sTras + pesos.urg*sUrg + pesos.conf*sConf + pesos.ajuste*sAjuste)/sumaPesos);
+
+  let veredicto, clasePill, detalle;
+  if(puntaje >= c.cortes.conviene){ veredicto="Conviene tomarlo"; clasePill="convertido"; }
+  else if(puntaje >= c.cortes.negociable){ veredicto="Es negociable"; clasePill="alta"; }
+  else { veredicto="No conviene (salvo estratégico)"; clasePill="descartado"; }
+
+  // Sugerencia de horario: agrupar por zona.
+  let horario;
+  if(zonasHoy.includes(zona)) horario = "Metelo pegado a los otros turnos de " + zona + " (misma zona, no rompés la ruta).";
+  else if(!zonasHoy.length) horario = "Tenés el día libre: cualquier franja sirve. Arrancá por la mañana.";
+  else horario = "No hay nadie en " + esc(zona) + " hoy. Si podés, juntá otro cliente de esa zona el mismo día, o dejalo para un día que ya vayas para allá.";
+
+  // Explicación en lenguaje simple.
+  const bits = [];
+  bits.push(phora >= ref*1.2 ? `Es de <strong>buen $/hora</strong> (${fmt(phora)}/h vs ${fmt(ref)}/h promedio).` : (phora <= ref*0.8 ? `Es de <strong>bajo $/hora</strong> (${fmt(phora)}/h vs ${fmt(ref)}/h promedio).` : `Rentabilidad promedio (${fmt(phora)}/h).`));
+  if(zonasHoy.length && !zonasHoy.includes(zona)) bits.push(`Te <strong>saca de la ruta</strong> del día (nadie más en ${esc(zona)}).`);
+  if(zonasHoy.includes(zona)) bits.push(`<strong>Cae en tu zona</strong> de hoy (${esc(zona)}), casi sin traslado extra.`);
+  if(urg==="emergencia") bits.push(`Es <strong>emergencia</strong>: podés cobrar adicional y justifica reordenar.`);
+  if(deuda>0) bits.push(`⚠️ Cliente con <strong>deuda pendiente</strong> (${fmt(deuda)}): ojo antes de agendar.`);
+  if(cancel>0) bits.push(`Tiene ${cancel} cancelación(es) previa(s).`);
+
+  const barra = (lbl, val, peso) => `
+    <div style="margin:6px 0;">
+      <div class="row" style="font-size:12px;"><span>${lbl} <span class="footnote">(${peso}%)</span></span><span>${Math.round(val)}</span></div>
+      <div style="height:8px; background:var(--bg); border-radius:6px; overflow:hidden;"><div style="height:100%; width:${clamp100(val)}%; background:var(--accent);"></div></div>
+    </div>`;
+
+  cont.innerHTML = `
+    <div class="card">
+      <div class="row" style="flex-wrap:wrap; gap:8px;">
+        <h3 style="margin:0;">Puntaje: ${puntaje}/100</h3>
+        <span class="pill ${clasePill}">${esc(veredicto)}</span>
+      </div>
+      <div style="margin-top:10px;">
+        ${barra("Rentabilidad", sRent, pesos.rent)}
+        ${barra("Traslado / ruta", sTras, pesos.tras)}
+        ${barra("Urgencia", sUrg, pesos.urg)}
+        ${barra("Confiabilidad", sConf, pesos.conf)}
+        ${barra("Ajuste al hueco", sAjuste, pesos.ajuste)}
+      </div>
+      <div class="card" style="background:var(--bg); margin-top:12px;">
+        <div class="footnote" style="text-transform:uppercase; font-weight:700;">⚖️ La balanza (por qué)</div>
+        <div style="font-size:13px; margin-top:6px;">${bits.join(" ")}</div>
+        <div style="font-size:13px; margin-top:8px;"><strong>🕐 Horario:</strong> ${horario}</div>
+        ${puntaje>=c.cortes.negociable && puntaje<c.cortes.conviene ? `<div class="footnote" style="margin-top:6px;">💡 Para que convenga claro, apuntá a un ticket que te deje ~${fmt(ref*1.2*(dur/60))} (a este $/hora).</div>`:""}
+      </div>
+      <div class="footnote" style="margin-top:8px;">La decisión final es tuya — esto es una ayuda, no una orden. Ajustá pesos y cortes abajo.</div>
+    </div>`;
+}
+
+function convProyectar(){
+  const c = getConfigNegocio();
+  const cont = document.getElementById("conv-proy-resultado");
+  const rep = reporteMensual();
+  const ref = refHora();
+  // Piso: lo ya cobrado + lo pendiente/parcial por cobrar.
+  const pendiente = trabajos.filter(t=>["PENDIENTE","PARCIAL"].includes(t.estado_pago))
+    .reduce((s,t)=> s + (t.monto_total - (t.monto_cobrado||0)), 0);
+  const piso = rep.ingresos + pendiente;
+  // Capacidad libre del mes.
+  const horasTot = c.dias_habiles * c.horas_dia;
+  const horasLibres = horasTot * (1 - c.ocupacion/100);
+  const adicTecho = horasLibres * ref;
+  const techo = piso + adicTecho;
+  const esperado = piso + adicTecho * 0.55 * c.factor_estacional;
+  const metaPct = c.meta_mensual>0 ? Math.round(piso/c.meta_mensual*100) : 0;
+  const umbral = piso < c.meta_mensual ? Math.max(30, c.cortes.conviene-10) : Math.min(90, c.cortes.conviene+10);
+
+  // Desglose por tipo (de los trabajos cargados).
+  const porTipo = {};
+  trabajos.forEach(t=>{ const k=t.tipo||"Otro"; porTipo[k]=porTipo[k]||{n:0,tot:0}; porTipo[k].n++; porTipo[k].tot+=t.monto_total; });
+  const desglose = Object.keys(porTipo).map(k=>`<tr><td>${esc(k)}</td><td>${porTipo[k].n}</td><td>${fmt(porTipo[k].tot)}</td></tr>`).join("");
+
+  cont.innerHTML = `
+    <div class="card">
+      <h3>Proyección del mes</h3>
+      <div class="res-metric">
+        <div class="rm"><div class="l">Piso (ya comprometido)</div><div class="v">${fmt(piso)}</div></div>
+        <div class="rm"><div class="l">Esperado</div><div class="v" style="color:var(--accent-dark);">${fmt(esperado)}</div></div>
+        <div class="rm"><div class="l">Techo (capacidad llena)</div><div class="v">${fmt(techo)}</div></div>
+        <div class="rm"><div class="l">Meta</div><div class="v">${fmt(c.meta_mensual)}</div></div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="row" style="font-size:12px;"><span>Avance del piso vs meta</span><span>${metaPct}%</span></div>
+        <div style="height:12px; background:var(--bg); border-radius:6px; overflow:hidden; margin-top:4px;"><div style="height:100%; width:${clamp100(metaPct)}%; background:${metaPct>=100?'var(--ok)':'var(--accent)'};"></div></div>
+      </div>
+      <div class="aviso" style="margin-top:10px;">Umbral dinámico sugerido para "¿conviene?": <strong>${umbral}</strong> ${piso<c.meta_mensual?"(vas atrasado → aceptá más para no perder facturación)":"(vas bien → ponete selectivo)"}.</div>
+      ${desglose? `<div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Trabajos cargados por tipo</div>
+        <div class="tabla-scroll"><table><thead><tr><th>Tipo</th><th>Cant.</th><th>Total</th></tr></thead><tbody>${desglose}</tbody></table></div>`:""}
+      <div class="footnote" style="margin-top:6px;">Estimación con $/hora de referencia ${fmt(ref)}. Cargá tus precios en Catálogo para afinarla.</div>
+    </div>`;
+}
+
+function guardarConfigNegocio(){
+  const c = getConfigNegocio();
+  const setNum = (id, path) => { const el=document.getElementById(id); if(el){ const v=Number(el.value); if(!isNaN(v)) path(v); } };
+  setNum("cfg-meta", v=> c.meta_mensual=v);
+  setNum("cfg-dias", v=> c.dias_habiles=v);
+  setNum("cfg-horas", v=> c.horas_dia=v);
+  setNum("cfg-ocup", v=> c.ocupacion=v);
+  setNum("cfg-estacional", v=> c.factor_estacional=v);
+  setNum("cfg-corte-conv", v=> c.cortes.conviene=v);
+  setNum("cfg-corte-neg", v=> c.cortes.negociable=v);
+  setNum("cfg-p-rent", v=> c.pesos.rent=v);
+  setNum("cfg-p-tras", v=> c.pesos.tras=v);
+  setNum("cfg-p-urg", v=> c.pesos.urg=v);
+  setNum("cfg-p-conf", v=> c.pesos.conf=v);
+  setNum("cfg-p-ajuste", v=> c.pesos.ajuste=v);
+  const neg=document.getElementById("cfg-negocio"); if(neg) c.negocio=neg.value.trim()||c.negocio;
+  const tit=document.getElementById("cfg-titular"); if(tit) c.titular=tit.value.trim()||c.titular;
+  setNum("cfg-visita", v=> c.visita_monto=v);
+  setConfigNegocio(c);
+  toast("Configuración guardada.", "ok");
+}
+
+function renderConviene(){
+  const c = getConfigNegocio();
+  const zonasOpt = c.zonas.map(z=>`<option value="${esc(z)}">${esc(z)}</option>`).join("");
+  const tipoOpt = CATALOGO_30.map(t=>`<option value="${t.r}">#${t.r} ${esc(t.n)}</option>`).join("");
+  return `
+  <div class="card banner-info">
+    <strong>⚖️ ¿Me conviene tomar este trabajo?</strong>
+    <div class="sub" style="margin:4px 0 0;">Compará un cliente nuevo contra tu día. Te dice si conviene, a qué hora meterlo y por qué — en criollo, no como caja negra. La decisión final es tuya.</div>
+  </div>
+
+  <div class="card">
+    <h3>Cliente nuevo</h3>
+    <div class="grid g3">
+      <div><label class="field-label" for="conv-zona">Zona</label><select id="conv-zona">${zonasOpt}</select></div>
+      <div><label class="field-label" for="conv-tipo">Tipo de trabajo</label><select id="conv-tipo" data-change="conv-tipo">${tipoOpt}</select></div>
+      <div><label class="field-label" for="conv-urg">Urgencia</label><select id="conv-urg"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option><option value="emergencia">Emergencia</option></select></div>
+      <div><label class="field-label" for="conv-precio">Precio estimado (ARS)</label><input id="conv-precio" type="number" placeholder="autocompleta según trabajo"></div>
+      <div><label class="field-label" for="conv-dur">Duración estimada (min)</label><input id="conv-dur" type="number" value="60"></div>
+      <div><label class="field-label" for="conv-cancel">Cancelaciones previas</label><input id="conv-cancel" type="number" value="0"></div>
+      <div><label class="field-label" for="conv-deuda">Deuda pendiente (ARS)</label><input id="conv-deuda" type="number" value="0"></div>
+      <div style="display:flex; align-items:flex-end;"><label class="chk-item"><input type="checkbox" id="conv-recurrente"> Cliente recurrente</label></div>
+    </div>
+    <button class="btn primary" style="margin-top:12px;" data-action="conv-evaluar">Evaluar en la balanza</button>
+  </div>
+  <div id="conv-resultado"></div>
+
+  <h3 class="seccion">📈 Proyección de ingresos del mes</h3>
+  <div class="card">
+    <button class="btn primary" data-action="conv-proyectar">Calcular proyección</button>
+    <div class="footnote" style="margin-top:6px;">Usa tus trabajos cargados + la capacidad libre del mes (configurable abajo).</div>
+  </div>
+  <div id="conv-proy-resultado"></div>
+
+  <details class="card">
+    <summary style="cursor:pointer; font-weight:600;">Configuración (pesos, cortes, meta, negocio)</summary>
+    <div style="margin-top:10px;">
+      <div class="footnote" style="text-transform:uppercase; font-weight:700;">Negocio</div>
+      <div class="grid g3">
+        <div><label class="field-label" for="cfg-negocio">Nombre del negocio</label><input id="cfg-negocio" value="${esc(c.negocio)}"></div>
+        <div><label class="field-label" for="cfg-titular">Tu nombre</label><input id="cfg-titular" value="${esc(c.titular)}"></div>
+        <div><label class="field-label" for="cfg-visita">Costo de visita (ARS)</label><input id="cfg-visita" type="number" value="${esc(c.visita_monto)}"></div>
+      </div>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:10px;">Proyección</div>
+      <div class="grid g3">
+        <div><label class="field-label" for="cfg-meta">Meta mensual (ARS)</label><input id="cfg-meta" type="number" value="${esc(c.meta_mensual)}"></div>
+        <div><label class="field-label" for="cfg-dias">Días hábiles/mes</label><input id="cfg-dias" type="number" value="${esc(c.dias_habiles)}"></div>
+        <div><label class="field-label" for="cfg-horas">Horas/día</label><input id="cfg-horas" type="number" value="${esc(c.horas_dia)}"></div>
+        <div><label class="field-label" for="cfg-ocup">% ocupación actual</label><input id="cfg-ocup" type="number" value="${esc(c.ocupacion)}"></div>
+        <div><label class="field-label" for="cfg-estacional">Factor estacional</label><input id="cfg-estacional" type="number" step="0.1" value="${esc(c.factor_estacional)}"></div>
+      </div>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:10px;">Balanza — cortes y pesos (%)</div>
+      <div class="grid g4">
+        <div><label class="field-label" for="cfg-corte-conv">Corte "conviene"</label><input id="cfg-corte-conv" type="number" value="${esc(c.cortes.conviene)}"></div>
+        <div><label class="field-label" for="cfg-corte-neg">Corte "negociable"</label><input id="cfg-corte-neg" type="number" value="${esc(c.cortes.negociable)}"></div>
+        <div><label class="field-label" for="cfg-p-rent">Peso rentabilidad</label><input id="cfg-p-rent" type="number" value="${esc(c.pesos.rent)}"></div>
+        <div><label class="field-label" for="cfg-p-tras">Peso traslado</label><input id="cfg-p-tras" type="number" value="${esc(c.pesos.tras)}"></div>
+        <div><label class="field-label" for="cfg-p-urg">Peso urgencia</label><input id="cfg-p-urg" type="number" value="${esc(c.pesos.urg)}"></div>
+        <div><label class="field-label" for="cfg-p-conf">Peso confiabilidad</label><input id="cfg-p-conf" type="number" value="${esc(c.pesos.conf)}"></div>
+        <div><label class="field-label" for="cfg-p-ajuste">Peso ajuste</label><input id="cfg-p-ajuste" type="number" value="${esc(c.pesos.ajuste)}"></div>
+      </div>
+      <button class="btn primary" style="margin-top:12px;" data-action="guardar-config-negocio">Guardar configuración</button>
+    </div>
+  </details>`;
+}
+
+// ==================================================================
+// PANEL "NO SE TE ESCAPA NADA" — meta del mes + recordatorios (para Hoy)
+// ==================================================================
+function recordatoriosLista(){
+  const items = [];
+  const activos = prospectos.filter(p=>!["CONVERTIDO","DESCARTADO"].includes(p.estado));
+  const urgentes = activos.filter(p=>["CRITICA","ALTA"].includes(urgenciaDe(p)));
+  if(urgentes.length) items.push({ic:"🔴", txt:`${urgentes.length} prospecto(s) urgente(s) sin resolver`, tab:"dashboard"});
+  const sinDiag = activos.filter(p=> !p.diagnostico || !p.diagnostico.problema_nombre);
+  if(sinDiag.length) items.push({ic:"🟠", txt:`${sinDiag.length} prospecto(s) sin diagnóstico cargado`, tab:"prospectos"});
+  const cobros = trabajos.filter(t=>["PENDIENTE","PARCIAL"].includes(t.estado_pago));
+  if(cobros.length){ const monto = cobros.reduce((s,t)=>s+(t.monto_total-(t.monto_cobrado||0)),0); items.push({ic:"💰", txt:`${cobros.length} cobro(s) pendiente(s) por ${fmt(monto)}`, tab:"trabajos"}); }
+  const stock = insumos.filter(i=> i.stock <= i.stock_min);
+  if(stock.length) items.push({ic:"📦", txt:`Reponer ${stock.length} insumo(s) bajo el mínimo`, tab:"proveedores"});
+  const cerrar = activos.filter(p=> p.escenarios_presupuesto && p.escenarios_presupuesto.length);
+  if(cerrar.length) items.push({ic:"📝", txt:`${cerrar.length} presupuesto(s) para cerrar (seguimiento)`, tab:"presupuesto"});
+  const cobrados = trabajos.filter(t=> t.estado_pago==="COBRADO");
+  if(cobrados.length) items.push({ic:"⭐", txt:`Pedir reseña a ${cobrados.length} cliente(s) que ya pagaron`, tab:"trabajos"});
+  if(!items.length) items.push({ic:"✅", txt:"Todo al día — nada pendiente por ahora.", tab:"dashboard"});
+  return items;
+}
+
+function renderPanelPendientes(){
+  const c = getConfigNegocio();
+  const rep = reporteMensual();
+  const pct = c.meta_mensual>0 ? Math.round(rep.ingresos/c.meta_mensual*100) : 0;
+  const items = recordatoriosLista();
+  return `
+  <div class="card">
+    <div class="row" style="flex-wrap:wrap; gap:8px;">
+      <h3 style="margin:0;">📌 No se te escapa nada</h3>
+      <span class="footnote">Meta del mes: ${fmt(rep.ingresos)} / ${fmt(c.meta_mensual)} (${pct}%)</span>
+    </div>
+    <div style="height:10px; background:var(--bg); border-radius:6px; overflow:hidden; margin:8px 0 12px;"><div style="height:100%; width:${clamp100(pct)}%; background:${pct>=100?'var(--ok)':'var(--accent)'};"></div></div>
+    ${items.map(i=>`<div class="row" style="justify-content:flex-start; gap:8px; padding:5px 0; cursor:pointer;" data-action="ir-a-tab" data-tab="${i.tab}" role="button" tabindex="0"><span>${i.ic}</span><span style="font-size:13px;">${esc(i.txt)}</span></div>`).join("")}
+  </div>`;
+}
+
 // ------------------------------------------------------------------
 // DELEGACIÓN DE EVENTOS — un solo listener por tipo, en lugar de ~37
 // onclick inline con datos interpolados a mano. Más seguro (no hay
@@ -2534,6 +3189,13 @@ function handleAction(action, el, ev){
     case "calc-a-checklist": calcAChecklist(); break;
     case "calc-copiar": calcCopiar(); break;
     case "calc-pdf": calcPromptPDF(); break;
+    case "wa-analizar": waAnalizar(); break;
+    case "wa-crear-prospecto": waCrearProspecto(); break;
+    case "wa-mostrar-speech": waMostrarSpeech(d.id); break;
+    case "cat-guardar-precios": catGuardarPrecios(); break;
+    case "conv-evaluar": convEvaluar(); break;
+    case "conv-proyectar": convProyectar(); break;
+    case "guardar-config-negocio": guardarConfigNegocio(); break;
   }
 }
 
@@ -2550,6 +3212,7 @@ function handleChange(change, el){
     case "filtrar-prospectos": filtrarProspectos(); break;
     case "agenda-fecha-input": agendaFechaSeleccionada = el.value || null; render("agenda"); break;
     case "nv-cliente-sel": nvClienteSelChange(); break;
+    case "conv-tipo": convPrefillTipo(); break;
   }
 }
 
@@ -2575,6 +3238,7 @@ document.body.addEventListener("input", (ev)=>{
   const el = ev.target.closest("[data-input]");
   if(!el) return;
   if(el.dataset.input === "filtrar-prospectos") filtrarProspectos();
+  else if(el.dataset.input === "cat-buscar") catFiltrar();
 });
 
 document.addEventListener("keydown", (ev)=>{
