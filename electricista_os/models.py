@@ -65,6 +65,7 @@ class Prospecto(Base):
             "proximo_recordatorio": self.proximo_recordatorio,
             "diagnostico": self.diagnostico,
             "escenarios_presupuesto": self.escenarios_presupuesto or [],
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 
@@ -108,6 +109,7 @@ class Trabajo(Base):
             "monto_cobrado": self.monto_cobrado,
             "cae": self.cae,
             "pdf_url": self.pdf_url,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             # El dashboard mapea insumos_usados -> {insumo:{nombre}, cantidad, costo_unitario_historico}
             "insumos_usados": [iu.as_dict() for iu in self.insumos_usados],
         }

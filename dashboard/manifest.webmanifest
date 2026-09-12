@@ -1,0 +1,14 @@
+{
+  "name": "Electricista OS",
+  "short_name": "Electricista",
+  "description": "Gestión para electricista domiciliario — turnos, presupuestos, cobros y avisos.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1B33",
+  "theme_color": "#0B1B33",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
