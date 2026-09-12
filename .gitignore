@@ -8,3 +8,10 @@ reports/*.txt
 outreach/*.md
 !outreach/.gitkeep
 .env
+
+# Electricista OS backend (local)
+.venv-eos/
+electricista_os/*.db
+electricista_os/.env
+__pycache__/
+eos.db

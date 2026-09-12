@@ -273,7 +273,10 @@
 // conviene pasar a una cookie httpOnly emitida por el backend.
 // ------------------------------------------------------------------
 
-let API_BASE = localStorage.getItem("eos_api_base") || "http://localhost:8000";
+// Si el dashboard lo sirve el backend (http://127.0.0.1:8000), apuntamos al mismo
+// origen automáticamente. Si se abre como archivo (file://), usamos localhost:8000.
+let API_BASE = localStorage.getItem("eos_api_base")
+  || (location.protocol.startsWith("http") ? location.origin : "http://localhost:8000");
 let API_TOKEN = localStorage.getItem("eos_api_token") || "";
 
 let configuracion = { margen_insumos_default: 40, precio_visita_base: 35000, garantia_dias: 365 };
@@ -1502,8 +1505,7 @@ async function procesarComoProspecto(){
         </div>
       </div>
     `;
-    await cargarDatos();
-    render(currentTab === "escenarios" ? "escenarios" : currentTab);
+    await cargarDatos(); // refresca prospectos/trabajos en memoria (sin re-render: mantiene el resultado a la vista)
   }catch(e){
     resultadoDiv.innerHTML = `<div class="footnote">Error: ${esc(e.message)}</div>`;
   }
