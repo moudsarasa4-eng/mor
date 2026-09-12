@@ -2312,13 +2312,20 @@ function comboMultiplier(){
    SCORING
 ============================================================ */
 // PROGRESO POR CREW (localStorage, solo en este dispositivo/navegador —
-// no hay backend). Se guarda con clave "mcdcrew_"+nombre, así cada
-// persona que usa el mismo equipo tiene su propio progreso separado.
-function crewKey(){ return "mcdcrew_"+(state.crewName||"").trim().toLowerCase(); }
+// no hay backend). Mismo esquema de KVS que "McPractica KVS": un
+// namespace único "mcdonalds-kvs:" y una clave por dato guardado, así
+// las claves de los dos juegos conviven en el mismo localStorage sin
+// pisarse. El progreso por crew usa "mcdonalds-kvs:crew:"+nombre, así
+// cada persona que usa el mismo equipo tiene su propio progreso
+// separado.
+const LASTCREW_KEY = "mcdonalds-kvs:lastcrew";
+const THEME_KEY = "mcdonalds-kvs:theme";
+const TUTORIAL_KEY = "mcdonalds-kvs:tutorial-visto";
+function crewKey(){ return "mcdonalds-kvs:crew:"+(state.crewName||"").trim().toLowerCase(); }
 function saveCrewName(){
   const inp=$("crewNameInput");
   state.crewName = inp && inp.value.trim() ? inp.value.trim() : "Crew";
-  try{ localStorage.setItem("mcd_lastcrew", state.crewName); }catch(e){}
+  try{ localStorage.setItem(LASTCREW_KEY, state.crewName); }catch(e){}
 }
 function loadCrewProgress(){
   try{
@@ -2336,7 +2343,7 @@ function saveCrewProgress(){
 }
 (function prefillCrewName(){
   try{
-    const last = localStorage.getItem("mcd_lastcrew");
+    const last = localStorage.getItem(LASTCREW_KEY);
     const inp = document.getElementById("crewNameInput");
     if(last && inp) inp.value = last;
   }catch(e){}
@@ -2622,12 +2629,12 @@ renderAll();
     if(themeBtn) themeBtn.textContent = dark ? '🌙 Tema: Oscuro' : '☀️ Tema: Claro';
   }
   var saved = null;
-  try{ saved = localStorage.getItem('mcd_theme'); }catch(e){}
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
   applyTheme(saved === 'dark');
   if(themeBtn) themeBtn.addEventListener('click', function(){
     var isDark = html.getAttribute('data-theme') === 'dark';
     applyTheme(!isDark);
-    try{ localStorage.setItem('mcd_theme', !isDark ? 'dark' : 'light'); }catch(e){}
+    try{ localStorage.setItem(THEME_KEY, !isDark ? 'dark' : 'light'); }catch(e){}
   });
 })();
 (function(){
@@ -2689,7 +2696,7 @@ renderAll();
   function tutorialClose(){
     tutorialOverlay.style.display = 'none';
     clearSpotlight();
-    try{ localStorage.setItem('mcd_tutorial_done','1'); }catch(e){}
+    try{ localStorage.setItem(TUTORIAL_KEY,'1'); }catch(e){}
   }
   var n1=document.getElementById('tutorial-next-1'), n2=document.getElementById('tutorial-next-2'), nc=document.getElementById('tutorial-close');
   if(n1) n1.addEventListener('click', function(){ tutorialShowStep(2); });
@@ -2704,7 +2711,7 @@ renderAll();
   });
   var tutorialAlreadyDone = false;
   window.mcdMaybeShowTutorial = function(){
-    try{ tutorialAlreadyDone = localStorage.getItem('mcd_tutorial_done')==='1'; }catch(e){}
+    try{ tutorialAlreadyDone = localStorage.getItem(TUTORIAL_KEY)==='1'; }catch(e){}
     if(!tutorialAlreadyDone && tutorialOverlay){ tutorialShowStep(1); tutorialOverlay.style.display = 'flex'; }
   };
   // Expuesto para el botón de ayuda: siempre relanza el tutorial, sin importar si ya se completó antes
