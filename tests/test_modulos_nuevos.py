@@ -1658,3 +1658,21 @@ def test_entrega_filtra_y_arma_markdown_con_pagina_web(tmp_path, monkeypatch):
     assert "rrhh@depositosituzaingo.com.ar" in md
     assert "Ituzaingó" in md
     assert "Empresa Fantasma" not in md
+
+
+def test_base_vieja_se_migra_sola_al_abrir_conexion(tmp_path, monkeypatch):
+    """Una base creada antes de que existiera una columna nueva rompía con
+    'no such column' en cualquier comando que no llamara a init_db()."""
+    import app.db as db
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "vieja.sqlite")
+    db._MIGRADA = False
+    db.init_db()
+    conn = db.get_conn()
+    conn.execute("ALTER TABLE companies DROP COLUMN triage_score")
+    conn.commit()
+    conn.close()
+    db._MIGRADA = False
+    conn = db.get_conn()
+    columnas = [r["name"] for r in conn.execute("PRAGMA table_info(companies)")]
+    conn.close()
+    assert "triage_score" in columnas

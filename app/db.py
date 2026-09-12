@@ -12,11 +12,33 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_MIGRADA = False
+
+
+def _migrar_una_vez(conn):
+    """Las migraciones vivían solo dentro de init_db(), que casi ningún comando
+    llama: una base creada antes de que existiera una columna nueva rompía con
+    "no such column". Caso real: `procesar-todo` moría en el paso de triage con
+    "no such column: triage_score" sobre una base con 1778 candidatas. Ahora
+    cualquier comando que abra la base la pone al día una sola vez por proceso."""
+    global _MIGRADA
+    if _MIGRADA:
+        return
+    _MIGRADA = True
+    existe = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='companies'").fetchone()
+    if not existe:
+        return  # base nueva: init_db crea el esquema completo y migra después
+    _migrar_columnas_nuevas(conn)
+    conn.commit()
+
+
 def get_conn() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    _migrar_una_vez(conn)
     return conn
 
 
