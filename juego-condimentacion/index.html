@@ -864,7 +864,7 @@ document.addEventListener('mcd:devicechange', function(e){
       </ul>
     </div>
     <button class="portada-btn" id="portadaStart">🚀 Empezar a practicar</button>
-    <button class="portada-btn" id="portadaDemo" style="background:transparent;border:2px solid var(--gold);color:var(--gold);margin-top:10px;">▶ Ver demo automática</button>
+    <button class="portada-btn" id="portadaDemo" style="background:transparent;border:2px solid var(--gold);color:var(--gold);margin-top:10px;">▶ Ver demo automática (Big Mac)</button>
     <div class="portada-foot">Versión 1.0 · Julio 2026 · Creado con transparencia, por y para crews de cocina</div>
   </div>
 </div>
@@ -1230,12 +1230,14 @@ const DISPENSERS = {
   ketchup:{l:"Ketchup", c:"#c23a30"},
   tasty:{l:"Salsa Tasty", c:"#e8d9b0"},
   ranch:{l:"Salsa Ranch", c:"#7c93a8"},
+  bigmacSalsa:{l:"Salsa Big Mac", c:"#eab84e"},
   mayonesa:{l:"Mayonesa", c:"#fdfaf0"},
 };
 const TRAYS = {
   cebolla:{l:"Cebolla Fresca", c:"#f4f1e6"},
   lechuga:{l:"Lechuga", c:"#7fc47f"},
   tomate:{l:"Tomate", c:"#d6503f"},
+  pepino:{l:"Pepino", c:"#8fae5a"},
   bacon:{l:"Bacon en Tira", c:"#a15236"},
   baconEntero:{l:"Bacon Entero", c:"#a15236"},
   baconTriturado:{l:"Bacon Triturado", c:"#8a4327"},
@@ -1248,7 +1250,7 @@ const ING = Object.assign({}, DISPENSERS, TRAYS);
 const TEXTURE_CLASS = {
   cebolla:"tex-dice",
   lechuga:"tex-shred",
-  tomate:"tex-round-slice",
+  tomate:"tex-round-slice", pepino:"tex-round-slice-sm",
   bacon:"tex-strip", baconEntero:"tex-strip-wide", baconTriturado:"tex-crumble",
   queso:"tex-cheese", quesoBlanco:"tex-cheese",
 };
@@ -1366,6 +1368,17 @@ const RECIPES = [
  // Doble Royal: mayonesa lechuga tomate 2 quesos blancos, base nada.
  {id:"dobleroyal", name:"Doble Royal", target:15, tier:"doble",
    corona:["mayonesa","lechuga","tomate","quesoBlanco","quesoBlanco"], base:[], ensamble:["carne4","carne4"]},
+
+ // Big Mac: caso especial de 3 panes. El pan de ARRIBA real no se
+ // condimenta. La zona física que en todos los demás productos se
+ // llama "CORONA" acá visualiza el PAN DEL MEDIO y es donde se
+ // condimenta salsa+lechuga+pepino — la UI la relabelea como "PAN DEL
+ // MEDIO" en vez de "CORONA" para este producto (ver renderZoneHints).
+ // BASE = pan de abajo: salsa+lechuga+queso. Cebolla sale de manual →
+ // va con la carne 10:1 (regla general de todos los productos con
+ // carne 10:1, confirmada 20/07).
+ {id:"bigmac", name:"Big Mac", target:12, tier:"medio",
+   corona:["bigmacSalsa","lechuga","pepino"], base:["bigmacSalsa","lechuga","queso"], ensamble:["carne10","cebolla","club","carne10"]},
 ];
 
 // Tiempo de ensamble automático variable según complejidad del producto,
@@ -2839,13 +2852,13 @@ renderAll();
 
   window.mcdStartTour = function(){
     if(tourActive) return;
-    var demoRecipe = (typeof RECIPES!=='undefined' && RECIPES.length) ? RECIPES[0] : null;
-    var firstIngKey = demoRecipe ? demoRecipe.corona[0] : null;
+    var bigmac = (typeof RECIPES!=='undefined') ? RECIPES.filter(function(r){return r.id==='bigmac';})[0] : null;
+    var firstIngKey = bigmac ? bigmac.corona[0] : null;
     tourSteps = [
       { tab:'tab-armado', target: function(){ return firstIngKey ? document.querySelector('[data-ing="'+firstIngKey+'"]') : (document.getElementById('trayRack')||{}).firstElementChild; },
-        text: 'Este es un ingrediente real de la receta. Tocalo para agarrarlo en la mano — así arranca cada combo.' },
+        text: 'Este es un ingrediente real de la Big Mac. Tocalo para agarrarlo en la mano — así arranca cada combo.' },
       { tab:'tab-armado', target: function(){ return document.getElementById('zoneCorona'); },
-        text: 'Con el ingrediente en la mano, tocá acá para aplicarlo en la CORONA (el pan de arriba). Lo que queda en el medio del stack (carne, queso "en estrella") lo pone el ensamblador, no vos.' },
+        text: 'Con el ingrediente en la mano, tocá acá para aplicarlo en el PAN DEL MEDIO (en la Big Mac esta zona no es la corona real — el pan de arriba no lleva condimento — sino el pan del medio, que sí se condimenta). Lo del medio (carne, queso "en estrella") lo pone el ensamblador, no vos.' },
       { tab:'tab-receta', target: function(){ return document.getElementById('recipeCorona')||document.getElementById('recipeTitle'); },
         text: 'Esta lista te muestra la receta en vivo: lo que ya pusiste y lo que falta, para que nunca tengas que memorizar todo de una sola vez.' },
       { tab:'tab-armado', target: function(){ return document.getElementById('submitBtn'); },
@@ -2903,7 +2916,7 @@ renderAll();
 
   window.mcdStartAutoDemo = function(){
     if(demoActive) return;
-    var recipe = RECIPES.filter(function(r){ return r.id==='tastydoble'; })[0] || RECIPES[0];
+    var recipe = RECIPES.filter(function(r){ return r.id==='bigmac'; })[0];
     if(!recipe){ return; }
     demoActive = true;
     try{ resetState(); }catch(e){}
