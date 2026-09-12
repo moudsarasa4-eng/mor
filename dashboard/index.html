@@ -694,6 +694,65 @@ function guardarNotas(id){
 // ------------------------------------------------------------------
 // FICHA DE CLIENTE (modal)
 // ------------------------------------------------------------------
+// El cliente es la unidad central de memoria: la ficha reúne TODO lo suyo
+// cruzando los datos que ya existen (no hace falta re-cargar nada).
+function trabajosDeCliente(p){
+  const nom = normalizar(p.nombre);
+  return (trabajos || []).filter(t =>
+    (t.cliente_id != null && String(t.cliente_id) === String(p.id)) ||
+    (t.cliente && normalizar(t.cliente) === nom));
+}
+function visitasDeCliente(p){
+  const nom = normalizar(p.nombre);
+  return (visitas || []).filter(v =>
+    (v.cliente_id != null && String(v.cliente_id) === String(p.id)) ||
+    (v.cliente && normalizar(v.cliente) === nom))
+    .sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+}
+function renderExpedienteCliente(p){
+  const cli = trabajosDeCliente(p);
+  const vis = visitasDeCliente(p);
+  const c = getConfigNegocio();
+  const garDias = Number(c.garantia_dias || (configuracion && configuracion.garantia_dias) || 365);
+  const facturado = cli.reduce((s, t) => s + (t.monto_total || 0), 0);
+  const cobrado = cli.reduce((s, t) => s + (t.monto_cobrado || 0), 0);
+  const saldo = cli.reduce((s, t) => s + Math.max(0, saldoTrabajo(t)), 0);
+  const garantias = cli.filter(t => t.estado_pago === "COBRADO" && _fechaDe(t.created_at)).map(t => {
+    const vence = new Date(_fechaDe(t.created_at).getTime() + garDias * DIA_MS);
+    return {tipo: t.tipo, dias: _dias(new Date(), vence)};
+  });
+  const waLink = p.telefono ? whatsappLink(p.telefono, `Hola ${p.nombre || ""}, te escribo de ${c.negocio}. `) : "";
+  const cab = txt => `<div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em; margin-top:14px;">${txt}</div>`;
+  return `
+  <div style="margin-top:16px; border-top:1px solid var(--line); padding-top:12px;">
+    ${cab("Expediente")}
+    <div class="res-metric" style="margin-top:6px;">
+      <div class="rm"><div class="l">Trabajos</div><div class="v">${cli.length}</div></div>
+      <div class="rm"><div class="l">Facturado</div><div class="v">${fmt(facturado)}</div></div>
+      <div class="rm"><div class="l">Cobrado</div><div class="v" style="color:var(--ok);">${fmt(cobrado)}</div></div>
+      <div class="rm"><div class="l">Saldo</div><div class="v" style="color:${saldo > 0 ? 'var(--bad)' : 'var(--ink)'};">${fmt(saldo)}</div></div>
+    </div>
+    <div class="row" style="justify-content:flex-start; gap:6px; margin-top:8px; flex-wrap:wrap;">
+      ${waLink ? `<a class="btn sm" href="${esc(waLink)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+      <button class="btn sm ghost" data-action="ir-a-tab" data-tab="agenda">Agendar visita</button>
+      ${saldo > 0 ? `<button class="btn sm ghost" data-action="ir-a-tab" data-tab="cobros">Ver cobros</button>` : ""}
+    </div>
+    ${cli.length ? cab("Trabajos") + cli.map(t => {
+      const s = saldoTrabajo(t);
+      const sim = String(t.cae || "").startsWith("SIMULADO");
+      return `<div class="row" style="padding:6px 0; border-bottom:1px solid var(--line); gap:8px; flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="font-size:13px; font-weight:600;">${esc(t.tipo || "")}</div>
+          <div class="footnote">${fmt(t.monto_total)} · <span class="pill ${pillClass(t.estado_pago)}">${esc(t.estado_pago)}</span>${s > 0 ? " · saldo " + fmt(s) : ""}${t.cae ? " · " + (sim ? '<span class="pill simulado">SIMULADO</span>' : "CAE " + esc(String(t.cae).slice(-6))) : ""}</div>
+        </div>
+        ${s > 0 ? `<button class="btn sm" data-action="cobro-modal-pago" data-id="${esc(t.id)}">Registrar pago</button>` : ""}
+      </div>`;
+    }).join("") : `<div class="footnote" style="margin-top:8px;">Sin trabajos cargados todavía para este cliente.</div>`}
+    ${garantias.length ? cab("Garantías") + garantias.map(g => `<div class="footnote">🛡️ ${esc(g.tipo || "")} — ${g.dias >= 0 ? "vence en " + g.dias + " día(s)" : "vencida hace " + Math.abs(g.dias) + " día(s)"}</div>`).join("") : ""}
+    ${vis.length ? cab("Visitas") + vis.slice(0, 4).map(v => `<div class="footnote">📅 ${esc(fmtFechaCorta(v.fecha_hora))} ${esc(fmtHora(v.fecha_hora))} — <span class="pill ${estadoVisitaClass(v.estado)}">${esc(v.estado)}</span></div>`).join("") : ""}
+  </div>`;
+}
+
 function abrirFicha(id, refresh){
   const p = prospectos.find(x=> String(x.id)===String(id));
   if(!p) return;
@@ -722,6 +781,8 @@ function abrirFicha(id, refresh){
         ${d.preguntas_pendientes && d.preguntas_pendientes.length ? `
           <div class="footnote" style="margin-top:6px;">Preguntas sugeridas: ${esc(d.preguntas_pendientes.join(" / "))}</div>` : ""}
       </div>
+
+      ${renderExpedienteCliente(p)}
 
       <div style="margin-top:18px;">
         <div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Upsells sugeridos (catálogo)</div>
