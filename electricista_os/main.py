@@ -13,7 +13,7 @@ from .database import Base, engine
 from . import models  # noqa: F401 (registra los modelos en Base)
 from .seed import seed_all
 from .routers import (auth, empresa, prospectos, trabajos, gastos, insumos,
-                      agenda, diagnostico, facturacion)
+                      agenda, diagnostico, facturacion, cobros)
 
 app = FastAPI(title="Electricista OS API", version="1.0.0")
 
@@ -30,7 +30,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 seed_all()
 
-for r in (auth, empresa, prospectos, trabajos, gastos, insumos, agenda, diagnostico, facturacion):
+for r in (auth, empresa, prospectos, trabajos, gastos, insumos, agenda, diagnostico, facturacion, cobros):
     app.include_router(r.router)
 
 

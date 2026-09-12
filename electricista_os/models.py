@@ -148,6 +148,27 @@ class GastoOperativo(Base):
                 "fecha": self.fecha.isoformat() if self.fecha else None}
 
 
+class Movimiento(Base):
+    """Movimiento de caja: ingreso (pago cobrado) o egreso (compra/gasto)."""
+    __tablename__ = "movimientos"
+    id = Column(Integer, primary_key=True)
+    tipo = Column(String, default="INGRESO")  # INGRESO | EGRESO
+    monto = Column(Float, default=0)
+    medio = Column(String, default="")        # efectivo | transferencia | mercadopago | otro
+    concepto = Column(String, default="")
+    cliente = Column(String, default="")
+    trabajo_id = Column(Integer, ForeignKey("trabajos.id"), nullable=True)
+    fecha = Column(DateTime, default=datetime.utcnow)
+
+    def as_dict(self):
+        return {
+            "id": self.id, "tipo": self.tipo, "monto": self.monto, "medio": self.medio,
+            "concepto": self.concepto, "cliente": self.cliente, "trabajo_id": self.trabajo_id,
+            "fecha": self.fecha.isoformat() if self.fecha else None,
+            "origen": "movimiento",
+        }
+
+
 class Visita(Base):
     __tablename__ = "visitas"
     id = Column(String, primary_key=True)

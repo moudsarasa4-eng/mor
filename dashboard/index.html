@@ -287,6 +287,7 @@ let trabajos = [];
 let gastosOperativos = [];
 let insumos = [];
 let visitas = [];
+let movimientos = [];   // caja: ingresos (pagos) y egresos (backend o localStorage en demo)
 let usandoDatosDemo = false;
 let sesionVencida = false;   // true cuando la API rechaza el token (401/403)
 let cargando = false;        // true mientras cargarDatos() está en vuelo
@@ -348,6 +349,7 @@ function datosDemo(){
     {id:"v1", cliente:"Laura Gimenez", telefono:"11-3344-XXXX", trabajo_tipo:"Tablero seguro (Opción C)", fecha_hora:new Date(Date.now()+3600e3).toISOString(), duracion_min:60, zona:"ZONA_1", estado:"CONFIRMADA", notas:"Revisión final", link_maps:null},
     {id:"v2", cliente:"Diego Martinez", telefono:"11-5566-XXXX", trabajo_tipo:"Visita de diagnóstico", fecha_hora:new Date(Date.now()+7200e3).toISOString(), duracion_min:45, zona:"ZONA_2", estado:"PENDIENTE", notas:"", link_maps:null},
   ];
+  movimientos = getMovimientosLocal();
   usandoDatosDemo = true;
 }
 
@@ -381,6 +383,8 @@ async function cargarDatos(){
     visitas = agen;
     usandoDatosDemo = false;
     sesionVencida = false;
+    // Movimientos de caja: fetch aparte y NO fatal (backends viejos sin la ruta no rompen la carga).
+    try{ movimientos = await apiFetch("/caja/movimientos"); }catch(e){ movimientos = []; }
   }catch(e){
     if(e && (e.status === 401 || e.status === 403)){
       // La API respondió, pero rechazó el token. NO caemos a datos
@@ -1214,6 +1218,7 @@ const tabs = [
   {id:"prospectos", label:"Prospectos"},
   {id:"escenarios", label:"🧠 Escenarios"},
   {id:"trabajos", label:"Trabajos"},
+  {id:"cobros", label:"💵 Cobros y Caja"},
   {id:"presupuesto", label:"Presupuesto"},
   {id:"calculadora", label:"🧮 Calculadora"},
   {id:"whatsapp", label:"💬 WhatsApp"},
@@ -1410,6 +1415,7 @@ const RENDERERS = {
   prospectos: renderProspectos,
   escenarios: renderEscenarios,
   trabajos: renderTrabajos,
+  cobros: renderCobros,
   presupuesto: renderPresupuesto,
   calculadora: renderCalculadora,
   whatsapp: renderWhatsapp,
@@ -2615,6 +2621,7 @@ const CONFIG_NEGOCIO_DEFAULT = {
   pesos:{rent:30,tras:25,urg:15,conf:15,ajuste:15}, cortes:{conviene:70,negociable:40},
   zonas:["Hurlingham","Morón","Castelar","Haedo","Ituzaingó","Padua","Otra"],
   matriz:{"Hurlingham|Morón":12,"Hurlingham|Castelar":20,"Hurlingham|Haedo":15,"Hurlingham|Ituzaingó":18,"Morón|Castelar":12,"Morón|Haedo":10,"Castelar|Ituzaingó":10,"Haedo|Morón":10,"Padua|Castelar":12,"Padua|Ituzaingó":10},
+  monotributo:{activo:true, categoria:"", tope_anual:0, dia_venc:20},
 };
 function getConfigNegocio(){
   try{ const g = JSON.parse(localStorage.getItem("eos_config_negocio")||"{}");
@@ -3300,6 +3307,9 @@ function construirRecordatorios(){
           waTexto: null, prioridad: (f && f <= now) ? 2 : 1, tab: "avisos", manual: true});
   });
 
+  // 8) IMPUESTOS (monotributo: pago mensual + recategorización)
+  try{ getRecImpuestos().forEach(push); }catch(e){}
+
   // Estado (hecho / pospuesto) + orden.
   const visibles = [];
   items.forEach(it => {
@@ -3461,6 +3471,370 @@ function iniciarAvisos(){
   }
 }
 
+// ==================================================================
+// 💵 COBROS Y CAJA + MONOTRIBUTO
+// Cobranzas con antigüedad (aging 0-30/31-60/61-90/+90), registrar pagos
+// (parciales, con medio y fecha), caja diaria (entró/salió/saldo) y control
+// de monotributo (facturación 12 meses vs tope EDITABLE + avisos de pago y
+// recategorización). Pagos/caja se persisten en el backend; en demo, local.
+// ==================================================================
+let cajaFiltro = "mes";
+const MEDIOS_PAGO = [["efectivo", "Efectivo"], ["transferencia", "Transferencia (CBU/alias)"], ["mercadopago", "Mercado Pago"], ["otro", "Otro"]];
+const CAT_MONO = ["A", "B", "C", "D", "E", "F", "G", "H"]; // servicios llega hasta H
+
+function getMovimientosLocal(){ try{ return JSON.parse(localStorage.getItem("eos_mov_local") || "[]"); }catch(e){ return []; } }
+function addMovimientoLocal(m){ const a = getMovimientosLocal(); a.push(m); localStorage.setItem("eos_mov_local", JSON.stringify(a)); }
+
+function getMonotributo(){
+  const c = getConfigNegocio();
+  return {...{activo: true, categoria: "", tope_anual: 0, dia_venc: 20}, ...(c.monotributo || {})};
+}
+function guardarMonotributo(){
+  const c = getConfigNegocio();
+  c.monotributo = {
+    activo: (document.getElementById("mono-activo") || {}).checked !== false,
+    categoria: (document.getElementById("mono-cat") || {}).value || "",
+    tope_anual: numId("mono-tope"),
+    dia_venc: numId("mono-dia") || 20,
+  };
+  setConfigNegocio(c);
+  toast("Datos de monotributo guardados.", "ok");
+  render("cobros");
+}
+
+function telefonoDeCliente(nombre){
+  if(!nombre) return "";
+  const p = prospectos.find(x => normalizar(x.nombre) === normalizar(nombre));
+  return p ? (p.telefono || "") : "";
+}
+
+function saldoTrabajo(t){ return (t.monto_total || 0) - (t.monto_cobrado || 0); }
+function diasDeuda(t){ const b = _fechaDe(t.created_at); return b ? _dias(b, new Date()) : null; }
+
+// ---- Registrar pago ----
+function abrirModalPago(id){
+  const t = trabajos.find(x => String(x.id) === String(id));
+  if(!t) return;
+  const saldo = saldoTrabajo(t);
+  const root = document.getElementById("modal-root");
+  const hoyLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  root.innerHTML = `
+  <div class="modal-bg" data-action="cerrar-modal">
+    <div class="modal" data-action="stop" style="max-width:460px;" role="dialog" aria-modal="true" aria-label="Registrar pago">
+      <button class="modal-close" data-action="cerrar-modal" aria-label="Cerrar">✕</button>
+      <h3 style="margin-top:0;">Registrar pago — ${esc(t.cliente || "")}</h3>
+      <div class="sub">${esc(t.tipo || "")} · Total ${fmt(t.monto_total)} · Cobrado ${fmt(t.monto_cobrado || 0)} · Saldo ${fmt(saldo)}</div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <div><label class="field-label" for="pago-monto">Monto que cobrás (ARS)</label><input id="pago-monto" type="number" value="${Math.max(0, Math.round(saldo))}"></div>
+        <div><label class="field-label" for="pago-medio">Medio</label><select id="pago-medio">${MEDIOS_PAGO.map(m => `<option value="${m[0]}">${esc(m[1])}</option>`).join("")}</select></div>
+        <div><label class="field-label" for="pago-fecha">Fecha</label><input id="pago-fecha" type="datetime-local" value="${hoyLocal}"></div>
+      </div>
+      <div class="row" style="margin-top:16px;">
+        <button class="btn" data-action="cerrar-modal">Cancelar</button>
+        <button class="btn primary" data-action="cobro-registrar-pago" data-id="${esc(t.id)}">Registrar pago</button>
+      </div>
+      <div id="pago-error" class="footnote" style="color:var(--bad); margin-top:8px;" role="alert"></div>
+    </div>
+  </div>`;
+  activarModal(true);
+}
+
+async function registrarPago(id){
+  const t = trabajos.find(x => String(x.id) === String(id));
+  if(!t) return;
+  const monto = numId("pago-monto");
+  const medio = (document.getElementById("pago-medio") || {}).value || "";
+  const fechaLocal = (document.getElementById("pago-fecha") || {}).value;
+  const err = document.getElementById("pago-error");
+  if(!(monto > 0)){ if(err) err.textContent = "El monto debe ser mayor a 0."; return; }
+  const fechaISO = fechaLocal ? new Date(fechaLocal).toISOString() : new Date().toISOString();
+  if(!usandoDatosDemo && !sesionVencida){
+    try{
+      await apiFetch(`/trabajos/${id}/pago`, {method: "POST", body: JSON.stringify({monto, medio, fecha: fechaISO})});
+      cerrarModal();
+      await cargarDatos();
+      render("cobros");
+      toast("Pago registrado.", "ok");
+    }catch(e){ if(err) err.textContent = e.message; }
+    return;
+  }
+  // Demo: actualizar en memoria + guardar movimiento local.
+  t.monto_cobrado = (t.monto_cobrado || 0) + monto;
+  if(t.monto_cobrado >= (t.monto_total || 0)){ t.estado_pago = "COBRADO"; t.monto_cobrado = t.monto_total; }
+  else if(t.monto_cobrado > 0){ t.estado_pago = "PARCIAL"; }
+  const mov = {id: "mv" + Date.now(), tipo: "INGRESO", monto, medio, concepto: "Cobro: " + (t.tipo || "trabajo"), cliente: t.cliente || "", fecha: fechaISO, origen: "movimiento"};
+  movimientos.unshift(mov); addMovimientoLocal(mov);
+  cerrarModal();
+  render("cobros");
+  toast("Pago registrado (demo).", "ok");
+}
+
+function mostrarRecibo(id){
+  const t = trabajos.find(x => String(x.id) === String(id));
+  if(!t) return;
+  const c = getConfigNegocio();
+  const saldo = saldoTrabajo(t);
+  const hoy = new Date().toLocaleDateString("es-AR");
+  const texto = `RECIBO — ${c.negocio}
+Fecha: ${hoy}
+Cliente: ${t.cliente || "(sin nombre)"}
+Concepto: ${t.tipo || "trabajo eléctrico"}
+
+Monto total:   ${fmt(t.monto_total)}
+Cobrado:       ${fmt(t.monto_cobrado || 0)}
+Saldo:         ${fmt(saldo)}
+Estado:        ${t.estado_pago}
+
+${c.titular} — ${c.negocio}`;
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+  <div class="modal-bg" data-action="cerrar-modal">
+    <div class="modal" data-action="stop" style="max-width:460px;" role="dialog" aria-modal="true" aria-label="Recibo">
+      <button class="modal-close" data-action="cerrar-modal" aria-label="Cerrar">✕</button>
+      <h3 style="margin-top:0;">Recibo</h3>
+      <pre class="prompt-box" id="recibo-txt">${esc(texto)}</pre>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" data-action="cerrar-modal">Cerrar</button>
+        <button class="btn primary" data-action="copiar-texto" data-target="recibo-txt">Copiar recibo</button>
+      </div>
+    </div>
+  </div>`;
+  activarModal(true);
+}
+
+// ---- Caja ----
+function movimientosCombinados(){
+  const out = (movimientos || []).map(m => ({...m}));
+  (gastosOperativos || []).forEach(g => {
+    out.push({id: "gasto-" + (g.id != null ? g.id : normalizar(g.categoria)), tipo: "EGRESO", monto: g.monto,
+              medio: "", concepto: g.categoria || "Gasto", cliente: "", fecha: g.fecha || null, origen: "gasto"});
+  });
+  out.sort((a, b) => (_fechaDe(b.fecha) || new Date()) - (_fechaDe(a.fecha) || new Date()));
+  return out;
+}
+function _enPeriodo(fechaISO, filtro){
+  const f = _fechaDe(fechaISO);
+  if(filtro === "todos") return true;
+  if(!f) return filtro === "mes"; // sin fecha: lo contamos en "mes"
+  const now = new Date();
+  if(filtro === "hoy") return f.toDateString() === now.toDateString();
+  if(filtro === "semana") return f >= new Date(now.getTime() - 7 * DIA_MS);
+  return f.getMonth() === now.getMonth() && f.getFullYear() === now.getFullYear(); // mes
+}
+function renderCajaContenido(){
+  const movs = movimientosCombinados().filter(m => _enPeriodo(m.fecha, cajaFiltro));
+  const ingresos = movs.filter(m => m.tipo === "INGRESO").reduce((s, m) => s + (m.monto || 0), 0);
+  const egresos = movs.filter(m => m.tipo === "EGRESO").reduce((s, m) => s + (m.monto || 0), 0);
+  const filas = movs.length ? movs.map(m => {
+    const f = _fechaDe(m.fecha);
+    const signo = m.tipo === "INGRESO" ? "+" : "−";
+    const color = m.tipo === "INGRESO" ? "var(--ok)" : "var(--bad)";
+    return `<tr>
+      <td>${f ? esc(f.toLocaleDateString("es-AR")) : "—"}</td>
+      <td>${esc(m.concepto || "")}${m.cliente ? `<div class="footnote">${esc(m.cliente)}</div>` : ""}</td>
+      <td>${esc(m.medio || (m.origen === "gasto" ? "gasto" : ""))}</td>
+      <td style="color:${color}; font-weight:600; white-space:nowrap;">${signo} ${fmt(m.monto)}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="4"><div class="empty">Sin movimientos en este período.</div></td></tr>`;
+  return `
+    <div class="res-metric" style="margin-bottom:12px;">
+      <div class="rm"><div class="l">Entró</div><div class="v" style="color:var(--ok);">${fmt(ingresos)}</div></div>
+      <div class="rm"><div class="l">Salió</div><div class="v" style="color:var(--bad);">${fmt(egresos)}</div></div>
+      <div class="rm"><div class="l">Saldo</div><div class="v">${fmt(ingresos - egresos)}</div></div>
+      <div class="rm"><div class="l">Movimientos</div><div class="v">${movs.length}</div></div>
+    </div>
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th>Monto</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>`;
+}
+function abrirModalMovimiento(){
+  const root = document.getElementById("modal-root");
+  const hoyLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  root.innerHTML = `
+  <div class="modal-bg" data-action="cerrar-modal">
+    <div class="modal" data-action="stop" style="max-width:460px;" role="dialog" aria-modal="true" aria-label="Nuevo movimiento">
+      <button class="modal-close" data-action="cerrar-modal" aria-label="Cerrar">✕</button>
+      <h3 style="margin-top:0;">Nuevo movimiento de caja</h3>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <div><label class="field-label" for="mov-tipo">Tipo</label><select id="mov-tipo"><option value="INGRESO">Ingreso (entró)</option><option value="EGRESO">Egreso (salió)</option></select></div>
+        <div><label class="field-label" for="mov-monto">Monto (ARS)</label><input id="mov-monto" type="number" placeholder="0"></div>
+        <div><label class="field-label" for="mov-concepto">Concepto</label><input id="mov-concepto" placeholder="Ej: nafta, compra de térmicas, seña"></div>
+        <div><label class="field-label" for="mov-medio">Medio</label><select id="mov-medio">${MEDIOS_PAGO.map(m => `<option value="${m[0]}">${esc(m[1])}</option>`).join("")}</select></div>
+        <div><label class="field-label" for="mov-fecha">Fecha</label><input id="mov-fecha" type="datetime-local" value="${hoyLocal}"></div>
+      </div>
+      <div class="row" style="margin-top:16px;">
+        <button class="btn" data-action="cerrar-modal">Cancelar</button>
+        <button class="btn primary" data-action="caja-guardar-mov">Guardar</button>
+      </div>
+      <div id="mov-error" class="footnote" style="color:var(--bad); margin-top:8px;" role="alert"></div>
+    </div>
+  </div>`;
+  activarModal(true);
+}
+async function guardarMovimiento(){
+  const tipo = (document.getElementById("mov-tipo") || {}).value || "INGRESO";
+  const monto = numId("mov-monto");
+  const concepto = ((document.getElementById("mov-concepto") || {}).value || "").trim();
+  const medio = (document.getElementById("mov-medio") || {}).value || "";
+  const fechaLocal = (document.getElementById("mov-fecha") || {}).value;
+  const err = document.getElementById("mov-error");
+  if(!(monto > 0)){ if(err) err.textContent = "El monto debe ser mayor a 0."; return; }
+  const fechaISO = fechaLocal ? new Date(fechaLocal).toISOString() : new Date().toISOString();
+  const payload = {tipo, monto, medio, concepto, fecha: fechaISO};
+  if(!usandoDatosDemo && !sesionVencida){
+    try{
+      await apiFetch("/caja/movimiento", {method: "POST", body: JSON.stringify(payload)});
+      cerrarModal();
+      await cargarDatos();
+      render("cobros");
+      toast("Movimiento guardado.", "ok");
+    }catch(e){ if(err) err.textContent = e.message; }
+    return;
+  }
+  const mov = {id: "mv" + Date.now(), origen: "movimiento", ...payload};
+  movimientos.unshift(mov); addMovimientoLocal(mov);
+  cerrarModal();
+  render("cobros");
+  toast("Movimiento guardado (demo).", "ok");
+}
+
+// ---- Monotributo ----
+function facturacion12m(){
+  const limite = new Date(Date.now() - 365 * DIA_MS);
+  return (trabajos || []).filter(t => t.estado_pago === "COBRADO").reduce((s, t) => {
+    const f = _fechaDe(t.created_at);
+    if(f && f < limite) return s;   // fuera de los últimos 12 meses
+    return s + (t.monto_total || 0);
+  }, 0);
+}
+function renderMonotributo(){
+  const m = getMonotributo();
+  const fact = facturacion12m();
+  const tope = Number(m.tope_anual || 0);
+  let estado = "";
+  if(m.activo && tope > 0){
+    const pct = Math.round(fact / tope * 100);
+    const color = pct >= 100 ? "var(--bad)" : (pct >= 80 ? "var(--warn)" : "var(--ok)");
+    const msg = pct >= 100 ? "⚠️ Te pasaste del tope — hay que recategorizar (o revisar exclusión con tu contador)."
+              : (pct >= 80 ? "Estás cerca del tope: ojo con la próxima recategorización." : "Dentro del tope de tu categoría.");
+    estado = `
+      <div style="margin-top:10px;">
+        <div class="row" style="font-size:12px;"><span>Facturado 12 meses vs tope categoría ${esc(m.categoria || "?")}</span><span>${pct}%</span></div>
+        <div style="height:12px; background:var(--bg); border-radius:6px; overflow:hidden; margin-top:4px;"><div style="height:100%; width:${clamp100(pct)}%; background:${color};"></div></div>
+        <div class="footnote">${fmt(fact)} de ${fmt(tope)}. ${esc(msg)}</div>
+      </div>`;
+  }else if(m.activo){
+    estado = `<div class="aviso" style="margin-top:10px;">Cargá el <strong>tope anual</strong> de tu categoría para ver cuánto te queda. Facturado últimos 12 meses: ${fmt(fact)}.</div>`;
+  }
+  return `
+  <h3 class="seccion">🧾 Monotributo</h3>
+  <div class="card">
+    <div class="grid g4">
+      <div style="display:flex; align-items:flex-end;"><label class="chk-item"><input type="checkbox" id="mono-activo" ${m.activo ? "checked" : ""}> Soy monotributista</label></div>
+      <div><label class="field-label" for="mono-cat">Categoría (servicios)</label><select id="mono-cat"><option value="">—</option>${CAT_MONO.map(x => `<option value="${x}" ${m.categoria === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div><label class="field-label" for="mono-tope">Tope anual (ARS)</label><input id="mono-tope" type="number" value="${esc(m.tope_anual || "")}" placeholder="según ARCA"></div>
+      <div><label class="field-label" for="mono-dia">Día de pago mensual</label><input id="mono-dia" type="number" value="${esc(m.dia_venc || 20)}"></div>
+    </div>
+    <button class="btn primary" style="margin-top:10px;" data-action="guardar-monotributo">Guardar</button>
+    ${estado}
+    <div class="footnote" style="margin-top:8px;">Los valores del monotributo los fija ARCA y cambian cada ~6 meses (recategorización enero/julio). Cargá el tope de tu categoría con tu contador. El aviso de pago (día ${esc(m.dia_venc || 20)}) y de recategorización aparecen en 🔔 Avisos.</div>
+  </div>`;
+}
+
+// Recordatorios de impuestos (se suman al motor de Avisos).
+function getRecImpuestos(){
+  const m = getMonotributo();
+  if(!m.activo) return [];
+  const c = getConfigNegocio();
+  const now = new Date();
+  const out = [];
+  // Pago mensual (día de vencimiento).
+  const dia = Number(m.dia_venc || 20);
+  let fechaPago = new Date(now.getFullYear(), now.getMonth(), dia, 12, 0, 0);
+  if(now.getDate() > dia) fechaPago = new Date(now.getFullYear(), now.getMonth() + 1, dia, 12, 0, 0);
+  out.push({id: "mono-pago-" + fechaPago.getFullYear() + "-" + (fechaPago.getMonth() + 1), tipo: "IMPUESTO", icono: "🧾",
+            titulo: "Pagar monotributo", detalle: "Vence el día " + dia + " de este mes.",
+            fecha: fechaPago, cliente: null, telefono: null, waTexto: null, prioridad: 2, tab: "cobros"});
+  // Recategorización (enero y julio).
+  const anchos = [new Date(now.getFullYear(), 0, 20, 12), new Date(now.getFullYear(), 6, 20, 12), new Date(now.getFullYear() + 1, 0, 20, 12)];
+  const prox = anchos.find(d => d >= new Date(now.getTime() - 3 * DIA_MS));
+  if(prox){
+    out.push({id: "mono-recat-" + prox.getFullYear() + "-" + (prox.getMonth() + 1), tipo: "IMPUESTO", icono: "🧾",
+              titulo: "Recategorización de monotributo", detalle: "Revisá tu categoría (últimos 12 meses de facturación).",
+              fecha: prox, cliente: null, telefono: null, waTexto: null, prioridad: 1, tab: "cobros"});
+  }
+  return out;
+}
+
+function renderCobros(){
+  // --- Cuentas por cobrar (aging) ---
+  const pendientes = (trabajos || []).filter(t => ["PENDIENTE", "PARCIAL"].includes(t.estado_pago) && saldoTrabajo(t) > 0);
+  const buckets = {b1: 0, b2: 0, b3: 0, b4: 0};
+  pendientes.forEach(t => {
+    const d = diasDeuda(t);
+    const s = saldoTrabajo(t);
+    if(d == null || d <= 30) buckets.b1 += s;
+    else if(d <= 60) buckets.b2 += s;
+    else if(d <= 90) buckets.b3 += s;
+    else buckets.b4 += s;
+  });
+  const totalPorCobrar = pendientes.reduce((s, t) => s + saldoTrabajo(t), 0);
+
+  const filasCobros = pendientes.length ? pendientes
+    .sort((a, b) => (diasDeuda(b) || 0) - (diasDeuda(a) || 0))
+    .map(t => {
+      const s = saldoTrabajo(t);
+      const d = diasDeuda(t);
+      const tel = telefonoDeCliente(t.cliente);
+      const c = getConfigNegocio();
+      const wa = tel ? `<a class="btn sm" href="${esc(whatsappLink(tel, `Hola ${t.cliente || ""}, te paso el recordatorio del saldo pendiente de ${fmt(s)} por ${t.tipo || "el trabajo"}. Podés abonar por transferencia o Mercado Pago. ¡Gracias! — ${c.negocio}`))}" target="_blank" rel="noopener">WhatsApp</a>` : "";
+      const diasPill = d == null ? "" : `<span class="pill ${d > 90 ? "pendiente" : (d > 60 ? "alta" : (d > 30 ? "parcial" : "media"))}">${d} día(s)</span>`;
+      return `<tr>
+        <td>${esc(t.cliente || "")}<div class="footnote">${esc(t.tipo || "")}</div></td>
+        <td>${fmt(s)}${t.estado_pago === "PARCIAL" ? `<div class="footnote">Parcial: cobrado ${fmt(t.monto_cobrado || 0)}</div>` : ""}</td>
+        <td>${diasPill}</td>
+        <td><div class="visita-acciones">
+          <button class="btn sm primary" data-action="cobro-modal-pago" data-id="${esc(t.id)}">Registrar pago</button>
+          ${wa}
+          <button class="btn sm ghost" data-action="cobro-recibo" data-id="${esc(t.id)}">Recibo</button>
+        </div></td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="4"><div class="empty">No tenés cobros pendientes. 🎉</div></td></tr>`;
+
+  return `
+  <div class="card banner-info">
+    <strong>💵 Cobros y Caja</strong>
+    <div class="sub" style="margin:4px 0 0;">Quién te debe y desde cuándo, registrar pagos (parciales también), tu caja diaria, y el control de monotributo. ${usandoDatosDemo ? "<em>En modo demo los pagos no se guardan en el servidor.</em>" : ""}</div>
+  </div>
+
+  <h3 class="seccion">📥 Cuentas por cobrar</h3>
+  <div class="res-metric" style="margin-bottom:12px;">
+    <div class="rm"><div class="l">Total por cobrar</div><div class="v" style="color:var(--bad);">${fmt(totalPorCobrar)}</div></div>
+    <div class="rm"><div class="l">0–30 días</div><div class="v">${fmt(buckets.b1)}</div></div>
+    <div class="rm"><div class="l">31–60</div><div class="v" style="color:var(--warn);">${fmt(buckets.b2)}</div></div>
+    <div class="rm"><div class="l">+60 días</div><div class="v" style="color:var(--bad);">${fmt(buckets.b3 + buckets.b4)}</div></div>
+  </div>
+  <div class="card">
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Cliente</th><th>Saldo</th><th>Antigüedad</th><th>Acciones</th></tr></thead>
+      <tbody>${filasCobros}</tbody>
+    </table></div>
+  </div>
+
+  <h3 class="seccion">🧮 Caja</h3>
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Período de caja">
+      ${[["hoy", "Hoy"], ["semana", "Semana"], ["mes", "Mes"], ["todos", "Todo"]].map(f => `<button class="${cajaFiltro === f[0] ? "active" : ""}" data-action="caja-filtro" data-value="${f[0]}">${esc(f[1])}</button>`).join("")}
+    </div>
+    <button class="btn primary" data-action="caja-modal-mov">+ Movimiento</button>
+  </div>
+  <div class="card"><div id="caja-contenido">${renderCajaContenido()}</div></div>
+
+  ${renderMonotributo()}
+  `;
+}
+
 // ------------------------------------------------------------------
 // DELEGACIÓN DE EVENTOS — un solo listener por tipo, en lugar de ~37
 // onclick inline con datos interpolados a mano. Más seguro (no hay
@@ -3532,6 +3906,17 @@ function handleAction(action, el, ev){
       document.querySelectorAll('[data-action="avisos-filtro"]').forEach(b=>b.classList.toggle("active", b===el));
       const cont = document.getElementById("avisos-lista"); if(cont) cont.innerHTML = renderAvisosLista();
       break;
+    case "cobro-modal-pago": abrirModalPago(d.id); break;
+    case "cobro-registrar-pago": registrarPago(d.id); break;
+    case "cobro-recibo": mostrarRecibo(d.id); break;
+    case "caja-modal-mov": abrirModalMovimiento(); break;
+    case "caja-guardar-mov": guardarMovimiento(); break;
+    case "caja-filtro":
+      cajaFiltro = d.value;
+      document.querySelectorAll('[data-action="caja-filtro"]').forEach(b=>b.classList.toggle("active", b===el));
+      const cc = document.getElementById("caja-contenido"); if(cc) cc.innerHTML = renderCajaContenido();
+      break;
+    case "guardar-monotributo": guardarMonotributo(); break;
   }
 }
 

@@ -25,6 +25,22 @@ class AgendaIn(BaseModel):
     notas: Optional[str] = None
 
 
+class PagoIn(BaseModel):
+    monto: float
+    medio: Optional[str] = ""
+    fecha: Optional[str] = None
+    concepto: Optional[str] = ""
+
+
+class MovimientoIn(BaseModel):
+    tipo: str = "INGRESO"          # INGRESO | EGRESO
+    monto: float
+    medio: Optional[str] = ""
+    concepto: Optional[str] = ""
+    cliente: Optional[str] = ""
+    fecha: Optional[str] = None
+
+
 class ProspectoIn(BaseModel):
     nombre: str
     telefono: Optional[str] = ""
