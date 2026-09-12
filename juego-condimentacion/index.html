@@ -1229,6 +1229,7 @@ const DISPENSERS = {
   mostaza:{l:"Mostaza", c:"#ffd93d"},
   ketchup:{l:"Ketchup", c:"#c23a30"},
   tasty:{l:"Salsa Tasty", c:"#e8d9b0"},
+  ranch:{l:"Salsa Ranch", c:"#7c93a8"},
   mayonesa:{l:"Mayonesa", c:"#fdfaf0"},
 };
 const TRAYS = {
@@ -1239,6 +1240,7 @@ const TRAYS = {
   baconEntero:{l:"Bacon Entero", c:"#a15236"},
   baconTriturado:{l:"Bacon Triturado", c:"#8a4327"},
   queso:{l:"Queso Cheddar", c:"#ffb100"},
+  quesoBlanco:{l:"Queso Blanco", c:"#fdf6e3"},
 };
 const ING = Object.assign({}, DISPENSERS, TRAYS);
 
@@ -1248,7 +1250,7 @@ const TEXTURE_CLASS = {
   lechuga:"tex-shred",
   tomate:"tex-round-slice",
   bacon:"tex-strip", baconEntero:"tex-strip-wide", baconTriturado:"tex-crumble",
-  queso:"tex-cheese",
+  queso:"tex-cheese", quesoBlanco:"tex-cheese",
 };
 // Color de texto legible (claro/oscuro) según el color de fondo del insumo.
 function textColorFor(hex){
@@ -1357,6 +1359,13 @@ const RECIPES = [
  // Bacon Triple: igual que la Turbo Bacon Doble + 1 queso en base.
  {id:"bacontriple", name:"Bacon Triple", target:20, tier:"premium",
    corona:["tasty","cebolla","baconTriturado","lechuga","tomate","bacon","queso","queso","queso"], base:["queso"], ensamble:["carne4","carne4","carne4"]},
+
+ // Crispy Ranch: corona ranch lechuga tomate bacon queso, base ranch.
+ {id:"crispyranch", name:"Crispy Ranch", target:13, tier:"medio",
+   corona:["ranch","lechuga","tomate","bacon","queso"], base:["ranch"], ensamble:["polloCrispy"]},
+ // Doble Royal: mayonesa lechuga tomate 2 quesos blancos, base nada.
+ {id:"dobleroyal", name:"Doble Royal", target:15, tier:"doble",
+   corona:["mayonesa","lechuga","tomate","quesoBlanco","quesoBlanco"], base:[], ensamble:["carne4","carne4"]},
 ];
 
 // Tiempo de ensamble automático variable según complejidad del producto,
