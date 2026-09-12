@@ -257,6 +257,20 @@ main{padding:6px 18px; max-width:1220px; margin:0 auto; width:100%; box-sizing:b
 }
 .kvs-item-main{ font-weight:800; }
 .kvs-item-side{ color:#6b7680; padding-left:6px; }
+/* Modificador del pedido (mismo lenguaje visual que el Standalone:
+   SIN en rojo, SOLO/PLAIN en verde/violeta). Va debajo del nombre
+   del producto, con sangría, para que se lea como una "línea de
+   modificación" del ítem — igual que en el ticket real. */
+.kvs-item-mod{ font-size:9.5px; font-weight:800; padding-left:10px; margin-top:1px; letter-spacing:.1px; text-transform:uppercase; }
+.kvs-mod-sin .kvs-mod-prefix{ color:#dc2626; }
+.kvs-mod-solo .kvs-mod-prefix{ color:#15803d; }
+.kvs-mod-plain{ color:#7c3aed; }
+.kvs-item-mod .kvs-mod-ing{ color:#111; }
+.kvs-mod-plain .kvs-mod-ing{ color:#7c3aed; }
+.recipe-mod{ display:inline-block; margin-left:8px; font-size:0.7rem; font-weight:800; letter-spacing:.4px; padding:2px 6px; border-radius:4px; vertical-align:middle; }
+.recipe-mod-sin{ background:#fee2e2; color:#b91c1c; }
+.recipe-mod-solo{ background:#dcfce7; color:#166534; }
+.recipe-mod-plain{ background:#ede9fe; color:#6d28d9; }
 .kvs-ticket-foot{
   background:#f87171; text-align:right; color:#fff; font-weight:800; font-size:11.5px;
   padding:2px 6px; letter-spacing:.2px; display:flex; justify-content:space-between; align-items:center;
@@ -1914,15 +1928,59 @@ function stopShift(){ clearInterval(state.spawnTimer); clearInterval(state.tickT
 /* ============================================================
    ORDER SPAWNING / QUEUE
 ============================================================ */
+// MODIFICADORES DE PEDIDO (inyectados desde Standalone 1: SIN pepino,
+// SIN mostaza, PLAIN "solo quesos", etc.) — aparecen de forma
+// PROGRESIVA según el nivel del jugador y el modo de juego, para que
+// los aprendices practiquen primero recetas puras y los crews más
+// experimentados tengan que leer el ticket antes de tirar la mano.
+// Ingredientes que pueden desaparecer con "SIN": los condimentos que
+// realmente son removibles en el local (nunca la carne/pollo automático
+// ni la salsa "de firma" que define el producto tipo mequinesse/tasty
+// en su base).
+const REMOVABLE_INGS = new Set(["mostaza","ketchup","cebolla","pepino","lechuga","tomate","mayonesa","bacon","baconEntero","baconTriturado"]);
+// Nivel del jugador (0 = Aprendiz, ... 5 = Kitchen Master) según XP
+// acumulada — mismo criterio que usa refreshLevelStrip().
+function currentLevelIdx(){
+  let idx=0;
+  for(let i=0;i<LEVELS.length;i++){ if(state.xp>=LEVELS[i].xp) idx=i; }
+  return idx;
+}
+// Probabilidad progresiva de que un pedido traiga un modificador:
+// entrenamiento nunca; el resto sube 8pp por nivel hasta 40%.
+function modifierChanceForNow(){
+  if(state.mode==="entrenamiento") return 0;
+  return Math.min(0.40, currentLevelIdx()*0.08 + (state.mode==="caos"?0.12:0));
+}
+// Elige un modificador para la receta ya clonada. Muta la receta
+// (filtra corona/base) y devuelve el objeto modifier para adjuntarlo
+// al pedido y mostrarlo en el ticket del KVS.
+function applyModifier(recipe){
+  if(Math.random() >= modifierChanceForNow()) return null;
+  // 25% chance de PLAIN si el producto tiene al menos un queso (si no,
+  // "solo queso" no tiene sentido) y al menos un condimento removible.
+  const hasQueso = [...recipe.corona,...recipe.base].some(x=>x==="queso"||x==="quesoBlanco");
+  const removables = [...recipe.corona,...recipe.base].filter(x=>REMOVABLE_INGS.has(x));
+  if(hasQueso && removables.length>=2 && Math.random()<0.25){
+    recipe.corona = recipe.corona.filter(x=>x==="queso"||x==="quesoBlanco");
+    recipe.base = recipe.base.filter(x=>x==="queso"||x==="quesoBlanco");
+    return {prefix:"PLAIN", ing:"(solo queso)"};
+  }
+  if(removables.length===0) return null;
+  const target = removables[Math.floor(Math.random()*removables.length)];
+  recipe.corona = recipe.corona.filter(x=>x!==target);
+  recipe.base = recipe.base.filter(x=>x!==target);
+  return {prefix:"SIN", ing: (ING[target]?ING[target].l:target)};
+}
 function spawnOrder(){
   const recipe=pickRecipe();
+  const modifier = applyModifier(recipe);
   // FIX BUG TIMERS CONCURRENTES: antes se calculaba el deadline acá mismo
   // para CUALQUIER pedido (activo o recién puesto en cola), así que todos
   // los pedidos en espera perdían tiempo real mientras nadie los tocaba.
   // Ahora el pedido nace SIN deadline (null); recién se calcula cuando el
   // pedido pasa a ser el activo, en activateOrder(). Mientras está en
   // cola, queda "congelado": no cuenta tiempo hasta que le toca el turno.
-  const order={ recipe, arrivedAt:Date.now(), deadline:null, no:(++state.orderSeq),
+  const order={ recipe, modifier, arrivedAt:Date.now(), deadline:null, no:(++state.orderSeq),
     orderType: KVS_ORDER_TYPES[Math.floor(Math.random()*KVS_ORDER_TYPES.length)],
     orderStorage: KVS_STORAGE[Math.floor(Math.random()*KVS_STORAGE.length)] };
   if(!state.active) activateOrder(order); else state.queue.push(order);
@@ -2013,6 +2071,13 @@ function renderKVS(){
     const body=document.createElement("div"); body.className="kvs-ticket-body";
     const main=document.createElement("div"); main.className="kvs-item-main"; main.textContent="1 "+it.o.recipe.name;
     body.appendChild(main);
+    if(it.o.modifier){
+      const mod=document.createElement("div"); mod.className="kvs-item-mod kvs-mod-"+it.o.modifier.prefix.toLowerCase();
+      const pref=document.createElement("span"); pref.className="kvs-mod-prefix"; pref.textContent=it.o.modifier.prefix;
+      const ing=document.createElement("span"); ing.className="kvs-mod-ing"; ing.textContent=" "+it.o.modifier.ing;
+      mod.appendChild(pref); mod.appendChild(ing);
+      body.appendChild(mod);
+    }
     kvsSideItems(it.o).forEach(function(line){
       const s=document.createElement("div"); s.className="kvs-item-side"; s.textContent=line;
       body.appendChild(s);
@@ -2252,7 +2317,10 @@ function renderRecipeCard(){
   if(!titleEl || !cEl || !bEl) return;
   if(!state.active){ titleEl.textContent="Sin pedido activo"; cEl.innerHTML=""; bEl.innerHTML=""; return; }
   const a=state.active, r=a.recipe;
-  titleEl.textContent=r.name;
+  const mod = a.order && a.order.modifier;
+  titleEl.innerHTML = r.name + (mod
+    ? ' <span class="recipe-mod recipe-mod-'+mod.prefix.toLowerCase()+'">'+mod.prefix+' '+mod.ing+'</span>'
+    : '');
   const showRecipe = state.mode!=="caos" && (state.mode!=="almuerzo" || Date.now()<a.revealedUntil);
   if(!showRecipe){
     cEl.innerHTML='<li class="recipe-hidden">¿ ? (memoria)</li>';
