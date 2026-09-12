@@ -1233,6 +1233,7 @@ const DISPENSERS = {
   tasty:{l:"Salsa Tasty", c:"#e8d9b0"},
   ranch:{l:"Salsa Ranch", c:"#7c93a8"},
   bigmacSalsa:{l:"Salsa Big Mac", c:"#eab84e"},
+  quesoFundido:{l:"Cheddar Fundido", c:"#f2a900"},
   mayonesa:{l:"Mayonesa", c:"#fdfaf0"},
 };
 const TRAYS = {
@@ -1381,6 +1382,14 @@ const RECIPES = [
  // carne 10:1, confirmada 20/07).
  {id:"bigmac", name:"Big Mac", target:12, tier:"medio",
    corona:["bigmacSalsa","lechuga","pepino"], base:["bigmacSalsa","lechuga","queso"], ensamble:["carne10","cebolla","club","carne10"]},
+
+ // Bacon Cheddar McMelt: corona cheddar fundido (salsa), bacon, queso —
+ // base cebolla.
+ {id:"mcmelt", name:"Bacon Cheddar McMelt", target:13, tier:"medio",
+   corona:["quesoFundido","bacon","queso"], base:["cebolla"], ensamble:["carne4"]},
+ // Bacon Cheddar McMelt Doble: igual que la simple + un queso más en base.
+ {id:"mcmeltd", name:"Bacon Cheddar McMelt Doble", target:16, tier:"doble",
+   corona:["quesoFundido","bacon","queso"], base:["cebolla","queso"], ensamble:["carne4","carne4"]},
 ];
 
 // Tiempo de ensamble automático variable según complejidad del producto,
