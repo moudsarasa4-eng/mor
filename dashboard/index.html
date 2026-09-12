@@ -1,0 +1,2087 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electricista OS</title>
+<style>
+  :root{
+    --bg:#F4F6F8; --card:#FFFFFF; --line:#E2E6EA;
+    --ink:#101828; --ink-soft:#475467; --ink-muted:#98A2B3;
+    --accent:#0E7C66; --accent-soft:#E3F3EF; --accent-dark:#0A5E4D;
+    --navy:#0B1B33;
+    --ok:#12805A; --ok-soft:#E3F5EC;
+    --warn:#8A4A05; --warn-soft:#FDF1E2;
+    --bad:#B21F30; --bad-soft:#FBE7EA;
+    --info:#1C5FA8; --info-soft:#E7F0FA;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --focus:0 0 0 3px rgba(14,124,102,.35);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Inter","Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    font-size:14.5px; -webkit-font-smoothing:antialiased;
+  }
+  /* Foco visible y consistente en todo lo interactivo (accesibilidad AA). */
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible,
+  .kcard:focus-visible, .card[data-action]:focus-visible{
+    outline:none; box-shadow:var(--focus); border-radius:8px;
+  }
+  header{
+    padding:16px 24px; border-bottom:1px solid var(--line);
+    background:var(--navy); color:#fff;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  header .brand{display:flex; align-items:center; gap:10px; min-width:0;}
+  header .logo{
+    width:32px; height:32px; border-radius:8px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;
+  }
+  header h1{margin:0; font-size:16px; font-weight:600; letter-spacing:-0.01em; color:#fff;}
+  header p{margin:1px 0 0; color:#9AA7BD; font-size:12.5px;}
+  header .estado-conexion{font-size:12px; color:#9AA7BD; white-space:nowrap; text-align:right;}
+  nav{
+    display:flex; gap:2px; padding:0 16px; background:var(--card);
+    border-bottom:1px solid var(--line); overflow-x:auto; -webkit-overflow-scrolling:touch;
+  }
+  nav button{
+    border:none; background:none; padding:13px 15px; font-size:13.5px;
+    font-weight:500; color:var(--ink-muted); cursor:pointer;
+    border-bottom:2px solid transparent; white-space:nowrap;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  nav button:hover{color:var(--ink-soft);}
+  nav button.active,nav button[aria-selected="true"]{color:var(--accent-dark); border-bottom-color:var(--accent);}
+  main{padding:22px 24px 60px; max-width:1360px; margin:0 auto;}
+  /* Transición suave al cambiar de pestaña. */
+  @keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  main.fade{animation:fadeIn .18s ease;}
+  @media (prefers-reduced-motion:reduce){ main.fade{animation:none;} }
+  .grid{display:grid; gap:14px;}
+  .g5{grid-template-columns:repeat(5,1fr);}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g2{grid-template-columns:repeat(2,1fr);}
+  @media(max-width:900px){ .g5,.g4,.g3,.g2{grid-template-columns:1fr 1fr;} }
+  @media(max-width:480px){ .g5,.g4,.g3{grid-template-columns:1fr 1fr;} }
+  .metric{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); transition:border-color .15s ease, box-shadow .15s ease;}
+  .metric[data-action]{cursor:pointer;}
+  .metric[data-action]:hover{border-color:var(--accent); box-shadow:0 2px 6px rgba(16,24,40,.10);}
+  .metric .lbl{font-size:11.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.03em; font-weight:600;}
+  .metric .val{font-size:24px; font-weight:700; margin-top:6px; letter-spacing:-0.02em;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; box-shadow:var(--shadow);}
+  .card.banner-bad{border-color:var(--bad); background:var(--bad-soft);}
+  .card h3{margin:0 0 4px; font-size:15px; font-weight:600;}
+  .card .sub{color:var(--ink-soft); font-size:13px; margin-bottom:10px;}
+  .row{display:flex; justify-content:space-between; align-items:center; gap:12px;}
+  .pill{
+    display:inline-block; padding:3px 10px; border-radius:20px;
+    font-size:11.5px; font-weight:600;
+  }
+  .pill.lead{background:var(--info-soft); color:var(--info);}
+  .pill.calificando{background:var(--warn-soft); color:var(--warn);}
+  .pill.calificado{background:var(--accent-soft); color:var(--accent-dark);}
+  .pill.visita_propuesta{background:#EEEDFE; color:#3C3489;}
+  .pill.visita{background:#EEEDFE; color:#3C3489;}
+  .pill.convertido{background:var(--ok-soft); color:var(--ok);}
+  .pill.descartado{background:var(--bad-soft); color:var(--bad);}
+  .pill.pendiente{background:var(--bad-soft); color:var(--bad);}
+  .pill.parcial{background:var(--warn-soft); color:var(--warn);}
+  .pill.cobrado{background:var(--ok-soft); color:var(--ok);}
+  .pill.critica{background:var(--bad-soft); color:var(--bad);}
+  .pill.alta{background:var(--warn-soft); color:var(--warn);}
+  .pill.media{background:var(--info-soft); color:var(--info);}
+  .pill.baja{background:var(--ok-soft); color:var(--ok);}
+  .pill.confirmada{background:var(--ok-soft); color:var(--ok);}
+  .pill.en_camino{background:var(--warn-soft); color:var(--warn);}
+  .pill.realizada{background:var(--accent-soft); color:var(--accent-dark);}
+  .pill.cancelada{background:var(--bad-soft); color:var(--bad);}
+  .pill.reprogramada{background:var(--info-soft); color:var(--info);}
+  .pill.simulado{background:#EEE4FB; color:#5B21B6;}
+  .visita-row{display:flex; align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid var(--line);}
+  .visita-row:last-child{border-bottom:none;}
+  .visita-hora{font-size:15px; font-weight:700; min-width:56px; color:var(--ink);}
+  .visita-info{flex:1; min-width:0;}
+  .visita-info .nombre{font-weight:600; font-size:13.5px;}
+  .visita-info .sub{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .visita-acciones{display:flex; gap:6px; flex-wrap:wrap;}
+  h3.seccion{font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin:28px 0 12px; color:var(--ink-soft);}
+  h3.seccion:first-child{margin-top:8px;}
+  h3.seccion.urgente{color:var(--bad);}
+  .dcard.critica{border-left:4px solid var(--bad);}
+  .dcard.alta{border-left:4px solid var(--warn);}
+  .checklist{margin-top:8px;}
+  .chk-item{display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0;}
+  .chk-item span.done{text-decoration:line-through; color:var(--ink-muted);}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  .tabla-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  th{text-align:left; color:var(--ink-muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.02em; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap;}
+  td{padding:10px 10px; border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:var(--bg);}
+  .opciones{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:8px;}
+  @media(max-width:700px){ .opciones{grid-template-columns:1fr;} }
+  .opcion{border:1px solid var(--line); border-radius:var(--radius); padding:14px; transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;}
+  .opcion:hover{border-color:var(--accent); box-shadow:0 2px 6px rgba(16,24,40,.08);}
+  .opcion.reco{border:2px solid var(--accent);}
+  .opcion .tag{font-size:11px; font-weight:600; text-transform:uppercase; color:var(--ink-muted);}
+  .opcion.reco .tag{color:var(--accent-dark);}
+  .opcion .precio{font-size:20px; font-weight:700; margin:6px 0;}
+  .opcion .desc{font-size:13px; color:var(--ink-soft); line-height:1.4;}
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:12px; flex-wrap:wrap;}
+  .btn{
+    border:1px solid var(--line); background:var(--card); border-radius:8px;
+    padding:8px 14px; font-size:13px; font-weight:500; cursor:pointer; color:var(--ink);
+    transition:background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
+    text-decoration:none; display:inline-flex; align-items:center; gap:6px; line-height:1.2;
+  }
+  .btn:hover{border-color:var(--accent); color:var(--accent-dark);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .btn.primary:hover{background:var(--accent-dark); color:#fff; border-color:var(--accent-dark);}
+  .btn.sm{padding:4px 9px; font-size:12px;}
+  .btn.ghost{background:transparent; border-color:transparent; color:var(--ink-soft);}
+  .btn.ghost:hover{background:var(--bg); color:var(--ink);}
+  .seg{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .seg button{border:none; background:var(--card); padding:7px 13px; font-size:12.5px; font-weight:500; color:var(--ink-soft); cursor:pointer; transition:background .15s ease, color .15s ease;}
+  .seg button:hover{background:var(--bg);}
+  .seg button.active{background:var(--accent); color:#fff;}
+  input,select,textarea{
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+    font-size:13px; background:#fff; font-family:inherit; color:var(--ink);
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  input:hover,select:hover,textarea:hover{border-color:var(--ink-muted);}
+  label{color:var(--ink-soft);}
+  .field-label{display:block; font-size:13px; color:var(--ink-soft); margin-bottom:4px; font-weight:500;}
+  .empty{color:var(--ink-muted); font-size:13px; padding:20px 0; text-align:center;}
+  .footnote{font-size:12px; color:var(--ink-muted); margin-top:6px;}
+  .aviso{font-size:12px; color:var(--warn); background:var(--warn-soft); border-radius:8px; padding:6px 10px; margin-top:8px; display:inline-block;}
+  .input-token{display:flex; gap:6px; align-items:stretch;}
+  .input-token input{flex:1;}
+
+  /* Kanban */
+  .kanban{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; align-items:start;}
+  @media(max-width:1100px){ .kanban{grid-template-columns:repeat(3,1fr);} }
+  /* En celular real (~390px): scroll horizontal con columnas de ancho fijo,
+     así Marco no pierde ninguna etapa del embudo. */
+  @media(max-width:700px){
+    .kanban{display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px; scroll-snap-type:x proximity;}
+    .kanban .kcol{flex:0 0 78vw; max-width:280px; scroll-snap-align:start;}
+  }
+  .kcol{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:10px; min-height:80px;}
+  .kcol h4{margin:2px 4px 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); display:flex; justify-content:space-between;}
+  .kcard{background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:10px 11px; margin-bottom:8px; cursor:pointer; font-size:13px; transition:border-color .15s ease, box-shadow .15s ease, transform .1s ease;}
+  .kcard:hover{border-color:var(--accent); box-shadow:0 2px 6px rgba(16,24,40,.08);}
+  .kcard:active{transform:translateY(1px);}
+  .kcard .nombre{font-weight:600; font-size:13px;}
+  .kcard .diag{color:var(--ink-soft); font-size:11.5px; margin-top:3px;}
+  .kcard .meta{display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:6px; flex-wrap:wrap;}
+
+  /* Modal ficha */
+  @keyframes modalIn{from{opacity:0;} to{opacity:1;}}
+  @keyframes modalUp{from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:none;}}
+  .modal-bg{position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:50; animation:modalIn .16s ease;}
+  .modal{background:var(--card); border-radius:var(--radius); max-width:720px; width:100%; padding:26px 28px; box-shadow:0 20px 40px rgba(0,0,0,.2); animation:modalUp .18s ease;}
+  @media (prefers-reduced-motion:reduce){ .modal-bg,.modal{animation:none;} }
+  @media(max-width:520px){ .modal{padding:20px 18px;} .modal-bg{padding:20px 10px;} }
+  .modal-close{float:right; cursor:pointer; color:var(--ink-muted); font-size:22px; line-height:1; background:none; border:none; padding:2px 6px;}
+  .modal-close:hover{color:var(--ink);}
+  .upsell-row{display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);}
+  .upsell-row:last-child{border-bottom:none;}
+  .upsell-row .txt{flex:1;}
+  .upsell-row .precio{font-weight:600; white-space:nowrap;}
+
+  /* Orquestador */
+  .orq-item{display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:9px; margin-bottom:8px; background:var(--card);}
+  .orq-item .orden{width:24px; height:24px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;}
+  .orq-item .info{flex:1; min-width:0;}
+  .orq-item .hora{font-size:12px; color:var(--ink-muted);}
+  .orq-item .mover{display:flex; flex-direction:column; gap:2px;}
+
+  pre.prompt-box{white-space:pre-wrap; background:var(--bg); padding:14px; border-radius:9px; font-size:12.5px; max-height:360px; overflow:auto; border:1px solid var(--line); font-family:ui-monospace,Menlo,Consolas,monospace;}
+
+  /* Estados de carga (skeleton) */
+  @keyframes shimmer{0%{background-position:-400px 0;} 100%{background-position:400px 0;}}
+  .skeleton{background:linear-gradient(90deg,#eceff2 25%,#f6f8fa 50%,#eceff2 75%); background-size:800px 100%; animation:shimmer 1.2s infinite linear; border-radius:8px; color:transparent;}
+  @media (prefers-reduced-motion:reduce){ .skeleton{animation:none;} }
+  .sk-line{height:14px; margin:8px 0;}
+  .spinner{display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px;}
+  .spinner.dark{border-color:rgba(16,24,40,.25); border-top-color:var(--accent);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Toasts / notificaciones (reemplazan a alert()) */
+  #toast-root{position:fixed; right:16px; bottom:16px; z-index:100; display:flex; flex-direction:column; gap:8px; max-width:min(360px, calc(100vw - 32px));}
+  .toast{background:var(--navy); color:#fff; padding:11px 14px; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.25); font-size:13px; display:flex; gap:8px; align-items:flex-start; animation:modalUp .18s ease;}
+  .toast .cerrar{margin-left:auto; cursor:pointer; opacity:.7;}
+  .toast.ok{background:#0B5A45;}
+  .toast.warn{background:#7A3E05;}
+  .toast.bad{background:#8F1A29;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">⚡</div>
+    <div>
+      <h1>Electricista OS</h1>
+      <p>Marco Florentino — Hurlingham, GBA Oeste</p>
+    </div>
+  </div>
+  <div class="estado-conexion" id="header-estado" role="status" aria-live="polite"></div>
+</header>
+
+<nav id="nav" role="tablist" aria-label="Secciones"></nav>
+<main id="main" role="tabpanel" tabindex="-1"></main>
+<div id="modal-root"></div>
+<div id="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+// ------------------------------------------------------------------
+// CONEXIÓN A LA API REAL (FastAPI)
+// Ajustá API_BASE al host donde corre tu backend. Lo normal es que
+// Marco no toque nada: inicia sesión con usuario/contraseña en la
+// pestaña "Conexión" (POST /auth/login) y el token queda guardado.
+//
+// NOTA DE SEGURIDAD (token en localStorage):
+// El JWT se guarda en localStorage. Para una app de un solo usuario
+// que corre local (Marco en su notebook/celular) es un trade-off
+// aceptable: sobrevive al refresco y no hay que copiarlo a mano cada
+// vez. La contra: cualquier script que llegue a ejecutarse en esta
+// página podría leerlo (por eso este dashboard escapa TODO dato que
+// venga del cliente/WhatsApp — ver escapeHtml más abajo). Si algún
+// día esto se sirve a varios usuarios o en un dominio público,
+// conviene pasar a una cookie httpOnly emitida por el backend.
+// ------------------------------------------------------------------
+
+let API_BASE = localStorage.getItem("eos_api_base") || "http://localhost:8000";
+let API_TOKEN = localStorage.getItem("eos_api_token") || "";
+
+let configuracion = { margen_insumos_default: 40, precio_visita_base: 35000, garantia_dias: 365 };
+let prospectos = [];
+let trabajos = [];
+let gastosOperativos = [];
+let insumos = [];
+let visitas = [];
+let usandoDatosDemo = false;
+let sesionVencida = false;   // true cuando la API rechaza el token (401/403)
+let cargando = false;        // true mientras cargarDatos() está en vuelo
+
+async function apiFetch(path, options={}){
+  const resp = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(API_TOKEN ? {"Authorization": "Bearer " + API_TOKEN} : {}),
+      ...(options.headers||{})
+    }
+  });
+  if(!resp.ok){
+    const texto = await resp.text().catch(()=> "");
+    const err = new Error(`${resp.status} ${resp.statusText} — ${texto.slice(0,200)}`);
+    err.status = resp.status;      // clave para distinguir auth (401/403) de otros errores
+    throw err;
+  }
+  // 204 No Content, etc.
+  const ct = resp.headers.get("content-type") || "";
+  if(!ct.includes("application/json")) return {};
+  return resp.json();
+}
+
+// ------------------------------------------------------------------
+// ESCAPE HTML — todo dato que venga del cliente (nombre, teléfono,
+// notas, diagnóstico, texto de mensajes de WhatsApp que llegan por
+// /prospectos/procesar) pasa por acá ANTES de inyectarse en el DOM.
+// El texto del cliente llega crudo desde WhatsApp y lo guarda una IA:
+// sin escapar, un mensaje con <script>/HTML se ejecutaría en el
+// navegador de Marco (XSS). esc() sirve tanto para contenido de texto
+// como para valores de atributos (escapa comillas simples y dobles).
+// ------------------------------------------------------------------
+function esc(s){
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Datos de respaldo — se usan SOLO si la API no responde (error de
+// RED, no de credenciales), para que el dashboard no quede en blanco
+// mientras Marco no tiene el servidor corriendo.
+function datosDemo(){
+  configuracion = { margen_insumos_default: 40, precio_visita_base: 35000, garantia_dias: 365 };
+  prospectos = [
+    {id:1, nombre:"Laura Gimenez", telefono:"11-3344-XXXX", estado:"CALIFICADO", riesgo_tablero_detectado:true, presupuesto_estimado_rango:"120000-250000", proximo_recordatorio:"18/08"},
+    {id:2, nombre:"Diego Martinez", telefono:"11-5566-XXXX", estado:"VISITA_PROPUESTA", riesgo_tablero_detectado:false, presupuesto_estimado_rango:"35000-60000", proximo_recordatorio:"16/08"},
+  ];
+  trabajos = [
+    {id:101, cliente:"Laura Gimenez", tipo:"Tablero seguro (Opción C)", monto_total:245000, estado_pago:"PENDIENTE", monto_cobrado:0, cae:null, insumos:[{nombre:"Térmica Schneider 25A", cant:3, costo:8500}]},
+  ];
+  gastosOperativos = [{categoria:"COMBUSTIBLE", monto:42000}];
+  insumos = [{nombre:"Térmica Schneider 25A", proveedor:"Casa Eléctrica Once", costo:8500, stock:12, stock_min:5}];
+  visitas = [
+    {id:"v1", cliente:"Laura Gimenez", telefono:"11-3344-XXXX", trabajo_tipo:"Tablero seguro (Opción C)", fecha_hora:new Date(Date.now()+3600e3).toISOString(), duracion_min:60, zona:"ZONA_1", estado:"CONFIRMADA", notas:"Revisión final", link_maps:null},
+    {id:"v2", cliente:"Diego Martinez", telefono:"11-5566-XXXX", trabajo_tipo:"Visita de diagnóstico", fecha_hora:new Date(Date.now()+7200e3).toISOString(), duracion_min:45, zona:"ZONA_2", estado:"PENDIENTE", notas:"", link_maps:null},
+  ];
+  usandoDatosDemo = true;
+}
+
+// Adapta la forma que devuelve tu API (SQLAlchemy -> JSON) a lo que
+// espera el render. Ajustá los nombres de campo si tu serializer
+// devuelve otros nombres (ej: snake_case vs camelCase).
+async function cargarDatos(){
+  cargando = true;
+  actualizarHeaderEstado();
+  try{
+    const [emp, pros, trab, gastos, ins, agen] = await Promise.all([
+      apiFetch("/empresa/configuracion"),
+      apiFetch("/prospectos"),
+      apiFetch("/trabajos"),
+      apiFetch("/gastos-operativos"),
+      apiFetch("/insumos"),
+      apiFetch("/agenda"),
+    ]);
+    configuracion = emp;
+    prospectos = pros;
+    trabajos = trab.map(t => ({
+      ...t,
+      insumos: (t.insumos_usados||[]).map(i => ({
+        nombre: i.insumo?.nombre || i.nombre,
+        cant: i.cantidad,
+        costo: Number(i.costo_unitario_historico)
+      }))
+    }));
+    gastosOperativos = gastos;
+    insumos = ins;
+    visitas = agen;
+    usandoDatosDemo = false;
+    sesionVencida = false;
+  }catch(e){
+    if(e && (e.status === 401 || e.status === 403)){
+      // La API respondió, pero rechazó el token. NO caemos a datos
+      // demo en silencio: es un problema de sesión, no de red. Puede
+      // pasar si el SECRET_KEY del backend rotó (README: es aleatorio
+      // cuando no está seteado en el entorno) y el JWT viejo dejó de
+      // valer. Mostramos un aviso claro y pedimos re-login.
+      sesionVencida = true;
+      console.warn("La API rechazó el token (" + e.status + "):", e.message);
+    }else{
+      // Error de red / servidor apagado -> datos de ejemplo.
+      console.warn("No se pudo conectar a la API, usando datos de ejemplo:", e.message);
+      datosDemo();
+    }
+  }finally{
+    cargando = false;
+    actualizarHeaderEstado();
+  }
+}
+
+// ------------------------------------------------------------------
+// LÓGICA — misma que finanzas_service.py (rentabilidad + reporte)
+// ------------------------------------------------------------------
+
+const fmt = n => "$" + Math.round(Number(n)||0).toLocaleString("es-AR");
+
+function calcularRentabilidad(trabajo){
+  const costoMateriales = (trabajo.insumos||[]).reduce((s,i)=> s + i.cant*i.costo, 0);
+  const gananciaNeta = trabajo.monto_total - costoMateriales;
+  const margen = trabajo.monto_total > 0 ? (gananciaNeta/trabajo.monto_total*100) : 0;
+  return {costoMateriales, gananciaNeta, margen};
+}
+
+function precioVenta(costo, margenPersonalizado){
+  const margen = margenPersonalizado ?? configuracion.margen_insumos_default;
+  return costo * (1 + margen/100);
+}
+
+function reporteMensual(){
+  const ingresos = trabajos.filter(t=>t.estado_pago==="COBRADO").reduce((s,t)=>s+t.monto_total,0);
+  const costoMateriales = trabajos.filter(t=>t.estado_pago==="COBRADO")
+    .reduce((s,t)=> s + (t.insumos||[]).reduce((x,i)=>x+i.cant*i.costo,0), 0);
+  const gastos = gastosOperativos.reduce((s,g)=>s+g.monto,0);
+  return {ingresos, costoMateriales, gastos, neta: ingresos - costoMateriales - gastos};
+}
+
+// El resultado se usa como CLASE CSS del pill, así que lo dejamos en
+// [a-z_] para que un estado inesperado no rompa el marcado.
+const pillClass = e => String(e ?? "").toLowerCase().replace(/[^a-z_]/g, "");
+
+// ------------------------------------------------------------------
+// NOTIFICACIONES (toast) — reemplazan a alert() y unifican el manejo
+// de errores/avisos con el resto del diseño.
+// ------------------------------------------------------------------
+function toast(mensaje, tipo="info", ms=4200){
+  const root = document.getElementById("toast-root");
+  if(!root) return;
+  const el = document.createElement("div");
+  el.className = "toast " + (tipo || "");
+  el.setAttribute("role", tipo === "bad" ? "alert" : "status");
+  el.innerHTML = `<span>${esc(mensaje)}</span><span class="cerrar" data-action="cerrar-toast" aria-hidden="true">✕</span>`;
+  root.appendChild(el);
+  const quitar = ()=>{ el.style.opacity="0"; el.style.transition="opacity .2s"; setTimeout(()=>el.remove(), 200); };
+  el.querySelector(".cerrar").addEventListener("click", quitar);
+  if(ms) setTimeout(quitar, ms);
+}
+
+// ------------------------------------------------------------------
+// CHECKLIST "qué llevar" — lista tildable de materiales por prospecto.
+// Se guarda en localStorage, por eso no hace falta endpoint nuevo.
+// ------------------------------------------------------------------
+const checklistKey = id => "eos_checklist_" + id;
+
+function getChecklist(id){
+  try{ return JSON.parse(localStorage.getItem(checklistKey(id)) || "[]"); }
+  catch(e){ return []; }
+}
+
+function addChecklistItem(id){
+  const input = document.getElementById("chk-input-" + id);
+  if(!input) return;
+  const texto = input.value.trim();
+  if(!texto) return;
+  const items = getChecklist(id);
+  items.push({texto, tildado:false});
+  localStorage.setItem(checklistKey(id), JSON.stringify(items));
+  refrescarChecklist(id, true);
+}
+
+function toggleChecklistItem(id, idx){
+  const items = getChecklist(id);
+  if(items[idx]) items[idx].tildado = !items[idx].tildado;
+  localStorage.setItem(checklistKey(id), JSON.stringify(items));
+}
+
+function quitarChecklistItem(id, idx){
+  const items = getChecklist(id);
+  items.splice(idx, 1);
+  localStorage.setItem(checklistKey(id), JSON.stringify(items));
+  refrescarChecklist(id, false);
+}
+
+// Refresca SOLO el bloque de checklist (sin re-render de toda la
+// pestaña), así el <details> queda abierto y no se pierde el foco.
+function refrescarChecklist(id, focoInput){
+  const cont = document.getElementById("chk-" + id);
+  if(!cont) return;
+  cont.outerHTML = renderChecklist(id);
+  if(focoInput){
+    const nuevo = document.getElementById("chk-input-" + id);
+    if(nuevo) nuevo.focus();
+  }
+}
+
+function renderChecklist(id){
+  const items = getChecklist(id);
+  const sid = esc(id);
+  return `
+    <div class="checklist" id="chk-${sid}">
+      ${items.length ? items.map((it,idx)=>`
+        <label class="chk-item">
+          <input type="checkbox" ${it.tildado?"checked":""} data-change="toggle-checklist" data-id="${sid}" data-idx="${idx}">
+          <span class="${it.tildado?'done':''}">${esc(it.texto)}</span>
+          <span style="margin-left:auto; cursor:pointer; color:var(--ink-muted);" data-action="quitar-checklist" data-id="${sid}" data-idx="${idx}" role="button" tabindex="0" aria-label="Quitar material">✕</span>
+        </label>`).join("") : '<div class="footnote">Sin materiales cargados todavía.</div>'}
+      <div class="row" style="margin-top:8px; gap:6px;">
+        <input id="chk-input-${sid}" placeholder="Ej: térmica 25A x3" style="flex:1;" data-keydown="add-checklist" data-id="${sid}" aria-label="Nuevo material">
+        <button class="btn" data-action="add-checklist" data-id="${sid}">Agregar</button>
+      </div>
+    </div>`;
+}
+
+// ------------------------------------------------------------------
+// DASHBOARD — "qué hacer ahora": agrupa por urgencia/turno/cierre.
+// ------------------------------------------------------------------
+const ORDEN_URGENCIA = {CRITICA:4, ALTA:3, MEDIA:2, BAJA:1};
+
+function urgenciaDe(p){
+  return p.urgencia || (p.riesgo_tablero_detectado ? "ALTA" : "BAJA");
+}
+
+function iconoUrgencia(u){
+  return {CRITICA:"🔴", ALTA:"🟠", MEDIA:"🟡", BAJA:"🟢"}[u] || "";
+}
+
+function diagnosticoResumen(p){
+  if(p.diagnostico && p.diagnostico.problema_nombre){
+    return `${esc(p.diagnostico.problema_nombre)} — confianza ${esc(p.diagnostico.confianza_clasificacion)}%`;
+  }
+  return "Sin diagnóstico clasificado";
+}
+
+function fmtRango(r){
+  if(!r) return "";
+  const [a,b] = String(r).split("-").map(Number);
+  if(isNaN(a) || isNaN(b)) return esc(r);
+  return `${fmt(a)} – ${fmt(b)}`;
+}
+
+function esHoy(fechaStr){
+  if(!fechaStr) return false;
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2,"0");
+  const mm = String(hoy.getMonth()+1).padStart(2,"0");
+  return String(fechaStr).trim() === `${dd}/${mm}`;
+}
+
+// ------------------------------------------------------------------
+// CATÁLOGO DE TRABAJOS + UPSELLS — de CATALOGO_UPSELLS.md.
+// Precios de referencia AAIERIC/Todo Resuelto/Muovi jul-ago 2026 —
+// NO son el precio final de Marco (ver aviso visible en la UI, y
+// recalibrar con precio_service.py cuando exista el catálogo real).
+// ------------------------------------------------------------------
+const AVISO_PRECIOS_REF = "Precios de referencia (jul–ago 2026) — no son el precio final. Confirmar antes de cotizar.";
+const CATALOGO_UPSELLS = [
+  { id:"visita", nombre:"Visita / diagnóstico", demanda:"alta",
+    keywords:["visita","diagnostico","inspeccion","evaluacion"],
+    precio_ref:"$54.310", precio_desde:54310,
+    upsells:[
+      {texto:"Chequeo general del tablero (aunque no lo hayan pedido)"},
+      {texto:"Certificado de instalación si nunca lo tuvo"},
+    ]},
+  { id:"boca", nombre:"Boca simple (toma o punto de luz)", demanda:"alta",
+    keywords:["boca","toma","punto de luz","enchufe"],
+    precio_ref:"$26.000–$106.000", precio_desde:26000,
+    upsells:[
+      {texto:"Boca con salida a tierra si la instalación es vieja y no la tiene"},
+      {texto:"Toma con protección diferencial (GFCI) en cocina/baño"},
+      {texto:"Agrupar más bocas en la misma visita (menor costo combinado)"},
+    ]},
+  { id:"termica", nombre:"Térmica / disyuntor diferencial", demanda:"alta",
+    keywords:["termica","disyuntor","diferencial","corte de luz","cortocircuito","sobrecarga","fuga"],
+    precio_ref:"según tarifario del tablero", precio_desde:null,
+    upsells:[
+      {texto:"Disyuntor diferencial si el tablero no tiene (hallazgo OBSERVADO — norma IRAM)"},
+      {texto:"Térmicas de repuesto para todos los circuitos si son de marca vieja/no homologada"},
+    ]},
+  { id:"tablero", nombre:"Tablero principal monofásico (nuevo o refacción)", demanda:"media",
+    keywords:["tablero"],
+    precio_ref:"$253.859", precio_desde:253859,
+    upsells:[
+      {texto:"Puesta a tierra si no la incluye"},
+      {texto:"Cableado de tela/antiguo detrás del tablero (upsell de fondo)"},
+      {texto:"Certificado DCI (obligatorio en obra completa)"},
+    ]},
+  { id:"tierra", nombre:"Puesta a tierra (jabalina)", demanda:"media",
+    keywords:["tierra","jabalina","pat"],
+    precio_ref:"$128.855", precio_desde:128855,
+    upsells:[
+      {texto:"Si se está tocando el tablero de todos modos: ofrecer en el mismo viaje"},
+    ]},
+  { id:"urgencia", nombre:"Urgencia fuera de horario", demanda:"variable",
+    keywords:["urgencia","emergencia","fuera de horario","feriado"],
+    precio_ref:"$85.935–$130.203", precio_desde:85935,
+    upsells:[
+      {texto:"Ninguno en el momento (nunca vender presionado en una emergencia) — el upsell real es el chequeo de seguimiento a los pocos días"},
+    ]},
+  { id:"dci", nombre:"Certificado de instalación (DCI)", demanda:"media",
+    keywords:["certificado","dci"],
+    precio_ref:"según alcance", precio_desde:null,
+    upsells:[
+      {texto:"Ofrecerlo en cualquier trabajo chico de más de una boca — da garantía frente a seguros"},
+    ]},
+  { id:"iluminacion", nombre:"Iluminación y artefactos", demanda:"media-alta",
+    keywords:["ventilador","aplique","spot","luminaria","led","iluminacion","lampara"],
+    precio_ref:"$85.935–$107.453", precio_desde:85935,
+    upsells:[
+      {texto:"Cambio a LED en el resto de la instalación si detecta luces viejas"},
+      {texto:"Dimmer/regulador de intensidad"},
+    ]},
+  { id:"domotica", nombre:"Domótica / smart home", demanda:"upsell",
+    keywords:["domotica","smart","wifi","alexa","inteligente"],
+    precio_ref:"upsell puro", precio_desde:null,
+    upsells:[
+      {texto:"Tomas/enchufes inteligentes"},
+      {texto:"Térmicas o llaves con control remoto/app"},
+      {texto:"Cámaras de seguridad conectadas al mismo circuito nuevo"},
+    ]},
+  { id:"mantenimiento", nombre:"Mantenimiento preventivo", demanda:"recurrente",
+    keywords:["mantenimiento","revision anual","preventivo"],
+    precio_ref:"recurrente", precio_desde:null,
+    upsells:[
+      {texto:"Ofrecer al cerrar cualquier trabajo (nunca en la urgencia): \"¿querés que te agende una revisión anual?\""},
+    ]},
+];
+
+function normalizar(s){
+  return (s||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+function upsellsSugeridos(diagnostico){
+  if(!diagnostico) return [];
+  const texto = normalizar(
+    (diagnostico.problema_nombre||"") + " " +
+    (diagnostico.causas_posibles||[]).map(c=>c.descripcion).join(" ")
+  );
+  const matches = CATALOGO_UPSELLS.filter(cat =>
+    cat.keywords.some(k => texto.includes(normalizar(k)))
+  );
+  const usados = matches.length ? matches : [];
+  const vistos = new Set();
+  const resultado = [];
+  usados.forEach(cat=>{
+    cat.upsells.forEach(u=>{
+      if(!vistos.has(cat.id+u.texto)){
+        vistos.add(cat.id+u.texto);
+        resultado.push({categoria:cat.nombre, texto:u.texto, precio_ref:cat.precio_ref});
+      }
+    });
+  });
+  return resultado;
+}
+
+// ------------------------------------------------------------------
+// Selección de upsells tildados por prospecto (persistida).
+// ------------------------------------------------------------------
+const upsellKey = id => "eos_upsells_" + id;
+function getUpsellsElegidos(id){
+  try{ return JSON.parse(localStorage.getItem(upsellKey(id)) || "[]"); }
+  catch(e){ return []; }
+}
+function toggleUpsellElegido(id, texto){
+  const elegidos = getUpsellsElegidos(id);
+  const i = elegidos.indexOf(texto);
+  if(i>=0) elegidos.splice(i,1); else elegidos.push(texto);
+  localStorage.setItem(upsellKey(id), JSON.stringify(elegidos));
+  // No re-renderizamos: el checkbox ya refleja el cambio de forma
+  // nativa y así no perdemos el foco ni cerramos el modal. Al reabrir
+  // la ficha / generar el PDF se lee el estado persistido.
+}
+
+// ------------------------------------------------------------------
+// Notas libres de Marco por prospecto (ficha de cliente).
+// ------------------------------------------------------------------
+const notasKey = id => "eos_notas_" + id;
+function getNotas(id){ return localStorage.getItem(notasKey(id)) || ""; }
+function guardarNotas(id){
+  const ta = document.getElementById("ficha-notas-" + id);
+  if(!ta) return;
+  localStorage.setItem(notasKey(id), ta.value);
+  const btn = document.getElementById("ficha-notas-btn-" + id);
+  if(btn){ const orig = btn.textContent; btn.textContent = "Guardado ✓"; setTimeout(()=>btn.textContent=orig, 1200); }
+}
+
+// ------------------------------------------------------------------
+// FICHA DE CLIENTE (modal)
+// ------------------------------------------------------------------
+function abrirFicha(id, refresh){
+  const p = prospectos.find(x=> String(x.id)===String(id));
+  if(!p) return;
+  const root = document.getElementById("modal-root");
+  const d = p.diagnostico || {};
+  const sugeridos = upsellsSugeridos(d);
+  const elegidos = getUpsellsElegidos(p.id);
+  const u = urgenciaDe(p);
+  const sid = esc(p.id);
+
+  root.innerHTML = `
+  <div class="modal-bg" data-action="cerrar-modal">
+    <div class="modal" data-action="stop" role="dialog" aria-modal="true" aria-label="Ficha de ${esc(p.nombre || "cliente")}">
+      <button class="modal-close" data-action="cerrar-modal" aria-label="Cerrar">✕</button>
+      <h3 style="margin-top:0;">${esc(p.nombre || "Sin nombre")} <span class="pill ${pillClass(u)}">${iconoUrgencia(u)} ${esc(u)}</span></h3>
+      <div class="sub">${esc(p.telefono || "Sin teléfono")} · ${esc(p.zona || p.direccion || "Zona no cargada")}</div>
+      <span class="pill ${pillClass(p.estado)}">${esc(String(p.estado||"").replace("_"," "))}</span>
+
+      <div style="margin-top:16px;">
+        <div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Diagnóstico</div>
+        <div style="margin-top:4px; font-size:14px;">${d.problema_nombre ? `${esc(d.problema_nombre)} — confianza ${esc(d.confianza_clasificacion)}%` : "Sin clasificar en la biblioteca de problemas"}</div>
+        ${d.causas_posibles && d.causas_posibles.length ? `
+          <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">
+            ${d.causas_posibles.map(c=>`<li>${esc(c.descripcion)} (${esc(c.plausibilidad)})</li>`).join("")}
+          </ul>` : ""}
+        ${d.preguntas_pendientes && d.preguntas_pendientes.length ? `
+          <div class="footnote" style="margin-top:6px;">Preguntas sugeridas: ${esc(d.preguntas_pendientes.join(" / "))}</div>` : ""}
+      </div>
+
+      <div style="margin-top:18px;">
+        <div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Upsells sugeridos (catálogo)</div>
+        ${sugeridos.length ? `<div class="aviso">${esc(AVISO_PRECIOS_REF)}</div>` : ""}
+        ${sugeridos.length ? sugeridos.map(us=>`
+          <label class="upsell-row">
+            <input type="checkbox" ${elegidos.includes(us.texto)?"checked":""} data-change="toggle-upsell" data-id="${sid}" data-texto="${esc(us.texto)}">
+            <span class="txt">${esc(us.texto)}<div class="footnote">${esc(us.categoria)}</div></span>
+            <span class="precio">${esc(us.precio_ref)}</span>
+          </label>`).join("") : '<div class="footnote">Sin diagnóstico clasificado todavía — no hay upsells sugeridos.</div>'}
+      </div>
+
+      <div style="margin-top:18px;">
+        <div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Notas de Marco</div>
+        <textarea id="ficha-notas-${sid}" rows="3" style="width:100%; margin-top:6px;" placeholder="Notas libres sobre este cliente..." aria-label="Notas sobre el cliente">${esc(getNotas(p.id))}</textarea>
+        <button class="btn sm" id="ficha-notas-btn-${sid}" style="margin-top:6px;" data-action="guardar-notas" data-id="${sid}">Guardar notas</button>
+      </div>
+
+      <details style="margin-top:14px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Qué llevar</summary>
+        ${renderChecklist(p.id)}
+      </details>
+
+      <div class="row" style="margin-top:20px;">
+        <button class="btn" data-action="cerrar-modal">Cerrar</button>
+        <button class="btn primary" data-action="mostrar-prompt-pdf" data-id="${sid}">Generar prompt para PDF</button>
+      </div>
+      <div id="ficha-pdf-prompt-${sid}"></div>
+    </div>
+  </div>`;
+  activarModal(!refresh);
+}
+
+function cerrarModal(){
+  document.getElementById("modal-root").innerHTML = "";
+  if(_ultimoFocoAntesModal && document.contains(_ultimoFocoAntesModal)){
+    try{ _ultimoFocoAntesModal.focus(); }catch(e){}
+  }
+  _ultimoFocoAntesModal = null;
+}
+
+// Prompt plantilla para el chat de Claude que arma el PDF final.
+function mostrarPromptPDF(id){
+  const p = prospectos.find(x=> String(x.id)===String(id));
+  if(!p) return;
+  const elegidos = getUpsellsElegidos(id);
+  const d = p.diagnostico || {};
+  const prompt = `Tenés la plantilla de presupuesto adjunta (PDF/diseño base de Electricista OS).
+Completala con estos datos, SIN modificar el diseño ni el formato base:
+
+- Cliente: ${p.nombre || "(sin nombre)"}
+- Teléfono: ${p.telefono || "(sin dato)"}
+- Diagnóstico: ${d.problema_nombre || "(sin clasificar)"}${d.confianza_clasificacion ? " — confianza " + d.confianza_clasificacion + "%" : ""}
+- Trabajo base y precio: (completar con lo cotizado)
+- Upsells ofrecidos:
+${elegidos.length ? elegidos.map(e=>`  · ${e}`).join("\n") : "  (ninguno tildado todavía)"}
+- Mano de obra: (completar)
+- Gastos a trasladar (si corresponde): (completar)
+- Total: (completar)
+- Forma de pago: Mercado Pago / CBU (completar datos de Marco)
+
+Devolveme el PDF completo, prolijo y profesional, respetando el diseño de la plantilla.`;
+  const box = document.getElementById("ficha-pdf-prompt-" + id);
+  if(!box) return;
+  box.innerHTML = `
+    <div class="footnote" style="margin-top:14px; text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Prompt para pegar junto con la plantilla</div>
+    <pre class="prompt-box" id="pdf-prompt-txt-${esc(id)}">${esc(prompt)}</pre>
+    <button class="btn sm" data-action="copiar-texto" data-target="pdf-prompt-txt-${esc(id)}">Copiar prompt</button>`;
+}
+
+function copiarTexto(elId, btn){
+  const nodo = document.getElementById(elId);
+  if(!nodo) return;
+  const texto = nodo.textContent;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(texto).then(()=>{
+      if(btn){ const orig = btn.textContent; btn.textContent = "Copiado ✓"; setTimeout(()=>btn.textContent=orig, 1200); }
+    }).catch(()=> toast("No se pudo copiar automáticamente. Seleccioná el texto y copialo a mano.", "warn"));
+  }else{
+    toast("Tu navegador no permite copiar automáticamente. Seleccioná el texto y copialo a mano.", "warn");
+  }
+}
+
+// ------------------------------------------------------------------
+// MODAL: manejo de foco (foco inicial + trap de Tab + Escape)
+// ------------------------------------------------------------------
+let _ultimoFocoAntesModal = null;
+
+function _focusablesModal(modal){
+  return Array.from(modal.querySelectorAll(
+    'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+  )).filter(el => el.offsetParent !== null);
+}
+
+function activarModal(moverFoco){
+  const modal = document.querySelector("#modal-root .modal");
+  if(!modal) return;
+  if(moverFoco){
+    _ultimoFocoAntesModal = document.activeElement;
+    const f = _focusablesModal(modal);
+    (f[0] || modal).focus();
+  }
+  modal.onkeydown = (e)=>{
+    if(e.key !== "Tab") return;
+    const f = _focusablesModal(modal);
+    if(!f.length) return;
+    const first = f[0], last = f[f.length-1];
+    if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  };
+}
+
+// ------------------------------------------------------------------
+// ORQUESTADOR DEL DÍA
+// ------------------------------------------------------------------
+const ORQ_KEY = "eos_orquestador_orden";
+function getOrdenManual(){
+  try{ return JSON.parse(localStorage.getItem(ORQ_KEY) || "[]"); }catch(e){ return []; }
+}
+function setOrdenManual(ids){ localStorage.setItem(ORQ_KEY, JSON.stringify(ids)); }
+
+function ordenDelDia(items){
+  const manual = getOrdenManual();
+  const porUrgencia = [...items].sort((a,b)=> (ORDEN_URGENCIA[urgenciaDe(b)]||0) - (ORDEN_URGENCIA[urgenciaDe(a)]||0));
+  if(!manual.length) return porUrgencia;
+  const porId = Object.fromEntries(porUrgencia.map(p=>[String(p.id), p]));
+  const ordenados = manual.map(id=>porId[String(id)]).filter(Boolean);
+  const faltantes = porUrgencia.filter(p=>!manual.includes(String(p.id)));
+  return [...ordenados, ...faltantes];
+}
+
+function moverOrquestador(idx, dir){
+  const items = ordenDelDia(prospectosParaOrquestador());
+  const nuevoIdx = idx + dir;
+  if(nuevoIdx < 0 || nuevoIdx >= items.length) return;
+  [items[idx], items[nuevoIdx]] = [items[nuevoIdx], items[idx]];
+  setOrdenManual(items.map(p=>String(p.id)));
+  render(currentTab);
+}
+
+function prospectosParaOrquestador(){
+  const activos = prospectos.filter(p=>!["CONVERTIDO","DESCARTADO"].includes(p.estado));
+  return activos.filter(p=> ["CRITICA","ALTA"].includes(urgenciaDe(p)) || esHoy(p.proximo_recordatorio));
+}
+
+function renderOrquestador(){
+  const items = ordenDelDia(prospectosParaOrquestador());
+  if(!items.length) return `<div class="empty">Sin urgencias ni turnos para hoy — nada que ordenar.</div>`;
+  let horaCursor = 9*60;
+  return items.map((p, idx)=>{
+    const hh = String(Math.floor(horaCursor/60)).padStart(2,"0");
+    const mm = String(horaCursor%60).padStart(2,"0");
+    horaCursor += 60;
+    const u = urgenciaDe(p);
+    return `
+    <div class="orq-item">
+      <div class="orden">${idx+1}</div>
+      <div class="info">
+        <div style="font-weight:600;">${esc(p.nombre || "Sin nombre")} <span class="pill ${pillClass(u)}" style="margin-left:4px;">${iconoUrgencia(u)} ${esc(u)}</span></div>
+        <div class="hora">🕐 ~${hh}:${mm} estimado · traslado simulado (maps_service en modo real: Tanda 8)</div>
+      </div>
+      <div class="mover">
+        <button class="btn sm ghost" data-action="mover-orquestador" data-idx="${idx}" data-dir="-1" ${idx===0?"disabled":""} aria-label="Subir">▲</button>
+        <button class="btn sm ghost" data-action="mover-orquestador" data-idx="${idx}" data-dir="1" ${idx===items.length-1?"disabled":""} aria-label="Bajar">▼</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function dashboardCard(p){
+  const u = urgenciaDe(p);
+  const sid = esc(p.id);
+  return `
+  <div class="card dcard ${pillClass(u)}" data-action="abrir-ficha" data-id="${sid}" role="button" tabindex="0" style="cursor:pointer;">
+    <div class="row">
+      <div>
+        <h3>${esc(p.nombre || "Sin nombre")} <span class="pill ${pillClass(u)}">${iconoUrgencia(u)} ${esc(u)}</span></h3>
+        <div class="sub">${diagnosticoResumen(p)}</div>
+      </div>
+      <span class="pill ${pillClass(p.estado)}">${esc(String(p.estado||"").replace("_"," "))}</span>
+    </div>
+    <div class="row" style="margin-top:2px; font-size:13px; color:var(--ink-soft);">
+      <span>${p.presupuesto_estimado_rango ? "💰 " + fmtRango(p.presupuesto_estimado_rango) : ""}</span>
+      <span>${p.proximo_recordatorio ? "📅 " + esc(p.proximo_recordatorio) : ""}</span>
+    </div>
+    <details data-action="stop" style="margin-top:10px;">
+      <summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Qué llevar</summary>
+      ${renderChecklist(p.id)}
+    </details>
+  </div>`;
+}
+
+function renderDashboard(){
+  const activos = prospectos.filter(p=>!["CONVERTIDO","DESCARTADO"].includes(p.estado));
+  const urgentes = activos.filter(p=>["CRITICA","ALTA"].includes(urgenciaDe(p)))
+    .sort((a,b)=> (ORDEN_URGENCIA[urgenciaDe(b)]||0) - (ORDEN_URGENCIA[urgenciaDe(a)]||0));
+  const infoFaltante = activos.filter(p=> !p.diagnostico || !p.diagnostico.problema_nombre);
+  const turnosHoy = activos.filter(p=>esHoy(p.proximo_recordatorio));
+  const visitasHoy = visitas.filter(v=>esHoy(v.fecha_hora) && !["CANCELADA","REALIZADA"].includes(v.estado));
+  const presupuestosPorCerrar = activos.filter(p=>p.escenarios_presupuesto && p.escenarios_presupuesto.length);
+  const idsDestacados = new Set([...urgentes, ...turnosHoy, ...presupuestosPorCerrar].map(p=>p.id));
+  const resto = activos.filter(p=>!idsDestacados.has(p.id));
+  const cobrosPendientes = trabajos.filter(t=>["PENDIENTE","PARCIAL"].includes(t.estado_pago));
+  const stockBajo = insumos.filter(i=> i.stock <= i.stock_min);
+  const gastosTotal = gastosOperativos.reduce((s,g)=>s+g.monto,0);
+  const r = reporteMensual();
+
+  if(usandoDatosDemo){
+    return `<div class="card"><div class="sub">Sin conexión a la API — conectate en la pestaña "Conexión" para ver el panel real.</div></div>`;
+  }
+
+  return `
+  <div class="grid g5" style="margin-bottom:8px;">
+    <div class="metric"><div class="lbl">🔴 Urgencias</div><div class="val" style="color:var(--bad);">${urgentes.length}</div></div>
+    <div class="metric"><div class="lbl">🟠 Info faltante</div><div class="val" style="color:var(--warn);">${infoFaltante.length}</div></div>
+    <div class="metric" data-action="ir-a-tab" data-tab="agenda" role="button" tabindex="0"><div class="lbl">📅 Turnos hoy</div><div class="val">${visitasHoy.length}</div></div>
+    <div class="metric"><div class="lbl">💰 Presupuestos por cerrar</div><div class="val">${presupuestosPorCerrar.length}</div></div>
+    <div class="metric"><div class="lbl">Cobros pendientes</div><div class="val">${cobrosPendientes.length}</div></div>
+  </div>
+
+  <h3 class="seccion">📅 Próximos turnos (agenda real)</h3>
+  <div class="card">
+    ${visitasHoy.length ? visitasHoy.slice(0,4).map(visitaRow).join("") : '<div class="empty">Sin turnos agendados para hoy. <a href="#" data-action="ir-a-tab" data-tab="agenda">Ir a Agenda</a></div>'}
+  </div>
+
+  <h3 class="seccion">🗺️ Orquestador del día — orden de visitas</h3>
+  <div class="card">${renderOrquestador()}</div>
+
+  <div class="grid g3" style="margin-top:4px;">
+    <div class="card" style="margin-bottom:0;">
+      <h3>📦 Bodega</h3>
+      <div class="sub">${stockBajo.length ? stockBajo.length + " insumo(s) bajo el mínimo" : "Stock OK"}</div>
+      ${stockBajo.length ? stockBajo.map(i=>`<div class="footnote">⚠️ ${esc(i.nombre)} — quedan ${esc(i.stock)}</div>`).join("") : ""}
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <h3>💸 Gastos</h3>
+      <div class="sub">Operativos registrados: ${fmt(gastosTotal)}</div>
+      ${gastosOperativos.slice(0,3).map(g=>`<div class="footnote">${esc(g.categoria)}: ${fmt(g.monto)}</div>`).join("")}
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <h3>💵 Facturación</h3>
+      <div class="sub">Cobrado (COBRADO): ${fmt(r.ingresos)}</div>
+      <div class="footnote">Ganancia neta estimada: ${fmt(r.neta)}</div>
+    </div>
+  </div>
+
+  ${urgentes.length ? `<h3 class="seccion urgente">🔴 Urgencias</h3>${urgentes.map(dashboardCard).join("")}` : ""}
+  ${infoFaltante.length ? `<h3 class="seccion">🟠 Trabajos con info faltante</h3>${infoFaltante.map(dashboardCard).join("")}` : ""}
+  ${turnosHoy.length ? `<h3 class="seccion">📅 Turnos de hoy</h3>${turnosHoy.map(dashboardCard).join("")}` : ""}
+  ${presupuestosPorCerrar.length ? `<h3 class="seccion">💰 Presupuestos por cerrar</h3>${presupuestosPorCerrar.map(dashboardCard).join("")}` : ""}
+
+  <h3 class="seccion">Resto de prospectos activos</h3>
+  ${resto.length ? resto.map(dashboardCard).join("") : '<div class="empty">Nada más pendiente por ahora.</div>'}
+
+  ${cobrosPendientes.length ? `
+  <h3 class="seccion">Trabajos con cobro pendiente</h3>
+  <div class="card">
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Cliente</th><th>Trabajo</th><th>Monto</th><th>Estado</th></tr></thead>
+      <tbody>
+        ${cobrosPendientes.map(t=>`
+        <tr>
+          <td>${esc(t.cliente)}</td><td>${esc(t.tipo)}</td><td>${fmt(t.monto_total)}</td>
+          <td><span class="pill ${pillClass(t.estado_pago)}">${esc(t.estado_pago)}</span></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>` : ""}
+  `;
+}
+
+// ------------------------------------------------------------------
+// AGENDA
+// ------------------------------------------------------------------
+
+function irATab(tabId){ render(tabId); }
+
+let agendaFechaSeleccionada = null; // null = "todas las próximas"
+
+function fmtHora(iso){
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function fmtFechaCorta(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-AR", {weekday:"short", day:"2-digit", month:"2-digit"});
+}
+function estadoVisitaClass(e){ return pillClass(e); }
+
+function whatsappLink(telefono, texto){
+  const tel = String(telefono||"").replace(/[^\d]/g,"");
+  return `https://wa.me/${tel}?text=${encodeURIComponent(texto||"")}`;
+}
+
+function visitaRow(v){
+  const texto = `Hola ${v.cliente}, te confirmo la visita para el ${fmtFechaCorta(v.fecha_hora)} a las ${fmtHora(v.fecha_hora)}.`;
+  const telDigits = String(v.telefono||"").replace(/[^\d+]/g,"");
+  const sid = esc(v.id);
+  return `
+  <div class="visita-row">
+    <div class="visita-hora">${esc(fmtHora(v.fecha_hora))}</div>
+    <div class="visita-info">
+      <div class="nombre">${esc(v.cliente)} <span class="pill ${estadoVisitaClass(v.estado)}" style="margin-left:6px;">${esc(v.estado)}</span></div>
+      <div class="sub">${esc(v.trabajo_tipo || "Sin trabajo asociado")} ${v.zona ? "· " + esc(v.zona) : ""} ${v.telefono ? "· " + esc(v.telefono) : ""}</div>
+      ${v.notas ? `<div class="sub">📝 ${esc(v.notas)}</div>` : ""}
+    </div>
+    <div class="visita-acciones">
+      ${v.telefono ? `<a class="btn sm" href="${esc(whatsappLink(v.telefono, texto))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+      ${v.telefono ? `<a class="btn sm" href="tel:${esc(telDigits)}">Llamar</a>` : ""}
+      ${v.link_maps ? `<a class="btn sm" href="${esc(v.link_maps)}" target="_blank" rel="noopener">Maps</a>` : ""}
+      ${!["REALIZADA","CANCELADA"].includes(v.estado) ? `
+        <button class="btn sm" data-action="cambiar-estado-visita" data-id="${sid}" data-estado="CONFIRMADA" ${v.estado==="CONFIRMADA"?"disabled":""}>Confirmar</button>
+        <button class="btn sm" data-action="cambiar-estado-visita" data-id="${sid}" data-estado="REALIZADA">Realizada</button>
+        <button class="btn sm ghost" data-action="cambiar-estado-visita" data-id="${sid}" data-estado="CANCELADA">Cancelar</button>
+      ` : ""}
+    </div>
+  </div>`;
+}
+
+async function cambiarEstadoVisita(id, estado){
+  try{
+    await apiFetch(`/agenda/${id}/estado`, {method:"PATCH", body: JSON.stringify({estado})});
+    await cargarDatos();
+    render(currentTab);
+    toast("Visita actualizada a " + estado.toLowerCase() + ".", "ok");
+  }catch(e){
+    toast("No se pudo actualizar la visita: " + e.message, "bad");
+  }
+}
+
+function renderAgenda(){
+  const filtradas = agendaFechaSeleccionada
+    ? visitas.filter(v => v.fecha_hora.slice(0,10) === agendaFechaSeleccionada)
+    : visitas.filter(v => !["CANCELADA","REALIZADA"].includes(v.estado));
+  const ordenadas = [...filtradas].sort((a,b)=> new Date(a.fecha_hora) - new Date(b.fecha_hora));
+
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const opcionesFecha = [
+    {v:"", label:"Próximas (todas)"},
+    {v:hoyStr, label:"Hoy"},
+    {v:new Date(Date.now()+86400e3).toISOString().slice(0,10), label:"Mañana"},
+  ];
+
+  if(usandoDatosDemo){
+    return `<div class="card"><div class="sub">Sin conexión a la API — conectate en la pestaña "Conexión" para ver la agenda real.</div></div>`;
+  }
+
+  return `
+  <div class="toolbar">
+    <div class="seg">
+      ${opcionesFecha.map(o=>`<button class="${agendaFechaSeleccionada===o.v || (o.v==="" && !agendaFechaSeleccionada) ? 'active':''}" data-action="agenda-set-fecha" data-value="${esc(o.v)}">${esc(o.label)}</button>`).join("")}
+      <input type="date" value="${esc(agendaFechaSeleccionada||'')}" data-change="agenda-fecha-input" style="border:none; padding:7px 10px; font-size:12.5px;" aria-label="Elegir fecha">
+    </div>
+    <button class="btn primary" data-action="abrir-modal-nueva-visita">+ Agendar visita</button>
+  </div>
+  <div class="card">
+    ${ordenadas.length ? ordenadas.map(visitaRow).join("") : '<div class="empty">No hay visitas agendadas para este filtro.</div>'}
+  </div>
+  `;
+}
+
+function abrirModalNuevaVisita(){
+  const root = document.getElementById("modal-root");
+  // Clientes reales: unimos prospectos (que tienen id + nombre) con los
+  // clientes que ya aparecen en trabajos. El <select> guarda el id como
+  // value; si el cliente todavía no está cargado, "Otro" habilita un
+  // campo para escribir el id a mano (arregla el bug de cliente_id manual).
+  const porId = new Map();
+  prospectos.forEach(p=>{ if(p && p.id!=null) porId.set(String(p.id), p.nombre || ("#"+p.id)); });
+  trabajos.forEach(t=>{ if(t && t.cliente_id!=null && !porId.has(String(t.cliente_id))) porId.set(String(t.cliente_id), t.cliente || ("#"+t.cliente_id)); });
+  const clientes = [...porId.entries()].sort((a,b)=> String(a[1]).localeCompare(String(b[1]), "es"));
+
+  const trabajosOpts = trabajos
+    .filter(t=> t && t.id!=null)
+    .map(t=> `<option value="${esc(t.id)}">${esc((t.cliente? t.cliente+" — ":"") + (t.tipo||("#"+t.id)))}</option>`)
+    .join("");
+
+  root.innerHTML = `
+  <div class="modal-bg" data-action="cerrar-modal">
+    <div class="modal" data-action="stop" style="max-width:480px;" role="dialog" aria-modal="true" aria-label="Agendar visita">
+      <button class="modal-close" data-action="cerrar-modal" aria-label="Cerrar">✕</button>
+      <h3 style="margin-top:0;">Agendar visita</h3>
+      <div class="sub">Elegí el cliente de la lista. Si todavía no está cargado, usá "Otro" e ingresá el ID a mano.</div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <div>
+          <label class="field-label" for="nv-cliente-sel">Cliente</label>
+          <select id="nv-cliente-sel" style="width:100%;" data-change="nv-cliente-sel">
+            ${clientes.length ? clientes.map(([id,nombre])=>`<option value="${esc(id)}">${esc(nombre)}</option>`).join("") : ""}
+            <option value="__otro__">Otro (ingresar ID a mano)…</option>
+          </select>
+        </div>
+        <div id="nv-cliente-manual-wrap" ${clientes.length ? 'hidden' : ''}>
+          <label class="field-label" for="nv-cliente">ID de Cliente</label>
+          <input id="nv-cliente" style="width:100%;" placeholder="cliente_id">
+        </div>
+        <div>
+          <label class="field-label" for="nv-trabajo">Trabajo (opcional)</label>
+          <select id="nv-trabajo" style="width:100%;">
+            <option value="">— Sin trabajo asociado —</option>
+            ${trabajosOpts}
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="nv-fecha">Fecha y hora</label>
+          <input id="nv-fecha" type="datetime-local" style="width:100%;">
+        </div>
+        <div>
+          <label class="field-label" for="nv-duracion">Duración (min)</label>
+          <input id="nv-duracion" type="number" value="60" style="width:100%;">
+        </div>
+        <div>
+          <label class="field-label" for="nv-zona">Zona</label>
+          <input id="nv-zona" style="width:100%;" placeholder="ZONA_1">
+        </div>
+        <div>
+          <label class="field-label" for="nv-notas">Notas</label>
+          <textarea id="nv-notas" rows="2" style="width:100%;"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:18px;">
+        <button class="btn" data-action="cerrar-modal">Cancelar</button>
+        <button class="btn primary" data-action="guardar-nueva-visita">Agendar</button>
+      </div>
+      <div id="nv-error" class="footnote" style="color:var(--bad); margin-top:8px;" role="alert"></div>
+    </div>
+  </div>`;
+  // Si no hay clientes cargados, arrancamos directo en modo manual.
+  if(!clientes.length){
+    const sel = document.getElementById("nv-cliente-sel");
+    if(sel) sel.value = "__otro__";
+  }
+  activarModal(true);
+}
+
+// Muestra/oculta el campo de ID manual según la opción "Otro".
+function nvClienteSelChange(){
+  const sel = document.getElementById("nv-cliente-sel");
+  const wrap = document.getElementById("nv-cliente-manual-wrap");
+  if(!sel || !wrap) return;
+  const manual = sel.value === "__otro__";
+  wrap.hidden = !manual;
+  if(manual){ const inp = document.getElementById("nv-cliente"); if(inp) inp.focus(); }
+}
+
+async function guardarNuevaVisita(){
+  const sel = document.getElementById("nv-cliente-sel");
+  let cliente_id = "";
+  if(sel && sel.value && sel.value !== "__otro__"){
+    cliente_id = sel.value;
+  }else{
+    const manual = document.getElementById("nv-cliente");
+    cliente_id = manual ? manual.value.trim() : "";
+  }
+  const trabajoSel = document.getElementById("nv-trabajo");
+  const trabajo_id = (trabajoSel && trabajoSel.value.trim()) || null;
+  const fechaLocal = document.getElementById("nv-fecha").value;
+  const duracion_min = Number(document.getElementById("nv-duracion").value) || 60;
+  const zona = document.getElementById("nv-zona").value.trim() || null;
+  const notas = document.getElementById("nv-notas").value.trim() || null;
+  const errBox = document.getElementById("nv-error");
+
+  if(!cliente_id || !fechaLocal){
+    errBox.textContent = "Falta elegir cliente o cargar fecha/hora.";
+    return;
+  }
+  try{
+    await apiFetch("/agenda", {
+      method: "POST",
+      body: JSON.stringify({
+        cliente_id, trabajo_id,
+        fecha_hora: new Date(fechaLocal).toISOString(),
+        duracion_min, zona, notas,
+      }),
+    });
+    cerrarModal();
+    await cargarDatos();
+    render("agenda");
+    toast("Visita agendada.", "ok");
+  }catch(e){
+    errBox.textContent = e.message;
+  }
+}
+
+// ------------------------------------------------------------------
+// RENDER
+// ------------------------------------------------------------------
+
+const tabs = [
+  {id:"dashboard", label:"🎯 Hoy"},
+  {id:"agenda", label:"📅 Agenda"},
+  {id:"prospectos", label:"Prospectos"},
+  {id:"escenarios", label:"🧠 Escenarios"},
+  {id:"trabajos", label:"Trabajos"},
+  {id:"presupuesto", label:"Presupuesto"},
+  {id:"prompts", label:"🤖 Prompts IA"},
+  {id:"finanzas", label:"Finanzas"},
+  {id:"proveedores", label:"Bodega y proveedores"},
+  {id:"config", label:"Conexión"},
+];
+
+// Banner de sesión vencida (se muestra arriba de cualquier pestaña).
+function bannerSesion(){
+  if(!sesionVencida) return "";
+  return `
+  <div class="card banner-bad" role="alert">
+    <div class="row" style="flex-wrap:wrap; gap:10px;">
+      <div>
+        <h3 style="margin:0; color:var(--bad);">⛔ Sesión vencida</h3>
+        <div class="sub" style="margin:4px 0 0;">Tu token dejó de ser válido (probablemente el servidor reinició y rotó su clave). Volvé a iniciar sesión para ver tus datos reales — no estamos mostrando datos de ejemplo para no confundirte.</div>
+      </div>
+      <button class="btn primary" data-action="ir-a-tab" data-tab="config">Ir a iniciar sesión</button>
+    </div>
+  </div>`;
+}
+
+function renderSkeleton(){
+  const linea = w => `<div class="skeleton sk-line" style="width:${w};">.</div>`;
+  const card = `<div class="card">${linea("40%")}${linea("90%")}${linea("70%")}</div>`;
+  return `
+    <div class="grid g4" style="margin-bottom:14px;">
+      ${Array(4).fill(`<div class="metric">${linea("50%")}${linea("30%")}</div>`).join("")}
+    </div>
+    ${card}${card}
+    <div class="footnote">Cargando datos del servidor…</div>`;
+}
+
+function renderConfig(){
+  const conectado = !usandoDatosDemo && !sesionVencida;
+  return `
+  <div class="card">
+    <h3>Iniciar sesión</h3>
+    <div class="sub">Ingresá con tu usuario y contraseña. No hace falta ir a /docs ni copiar el token a mano — el sistema lo genera y lo guarda solo.</div>
+    <form data-action="login" style="display:flex; flex-direction:column; gap:10px; max-width:420px; margin-top:10px;">
+      <div>
+        <label class="field-label" for="login-user">Usuario</label>
+        <input id="login-user" autocomplete="username" style="width:100%;" placeholder="usuario">
+      </div>
+      <div>
+        <label class="field-label" for="login-pass">Contraseña</label>
+        <div class="input-token">
+          <input id="login-pass" type="password" autocomplete="current-password" style="width:100%;" placeholder="contraseña">
+          <button type="button" class="btn" data-action="toggle-pass" data-target="login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
+        </div>
+      </div>
+      <button class="btn primary" type="submit" style="width:fit-content;" id="login-btn">Ingresar</button>
+      <div id="login-error" class="footnote" style="color:var(--bad);" role="alert"></div>
+    </form>
+    ${conectado ? `<div style="margin-top:12px;"><span class="pill cobrado">Conectado</span> <button class="btn sm" data-action="logout" style="margin-left:8px;">Cerrar sesión</button></div>` : ""}
+  </div>
+
+  <details class="card" ${API_TOKEN ? "" : "open"}>
+    <summary style="cursor:pointer; font-weight:600;">Configuración avanzada (URL del servidor y token manual)</summary>
+    <div class="sub" style="margin-top:8px;">${usandoDatosDemo
+      ? '<span class="pill pendiente">Sin conexión — mostrando datos de ejemplo</span>'
+      : (sesionVencida ? '<span class="pill pendiente">Sesión vencida</span>' : '<span class="pill cobrado">Conectado</span>')}</div>
+    <div style="display:flex; flex-direction:column; gap:10px; max-width:420px; margin-top:12px;">
+      <div>
+        <label class="field-label" for="cfg-base">URL base de la API (FastAPI)</label>
+        <input id="cfg-base" style="width:100%;" value="${esc(API_BASE)}">
+      </div>
+      <div>
+        <label class="field-label" for="cfg-token">Token (Bearer, de POST /auth/login)</label>
+        <div class="input-token">
+          <input id="cfg-token" type="password" style="width:100%;" value="${esc(API_TOKEN)}" placeholder="pegá el JWT acá" autocomplete="off">
+          <button type="button" class="btn" data-action="toggle-pass" data-target="cfg-token" aria-label="Mostrar u ocultar token">👁</button>
+        </div>
+      </div>
+      <button class="btn primary" style="width:fit-content;" data-action="guardar-config">Guardar y reconectar</button>
+    </div>
+    <div class="footnote" style="margin-top:10px;">
+      Endpoints que este dashboard espera: GET /empresa/configuracion, /prospectos, /trabajos
+      (con insumos_usados anidado), /gastos-operativos, /insumos, /agenda. Si tus rutas tienen
+      otro nombre, ajustalas en la función cargarDatos() del HTML.
+    </div>
+  </details>
+  `;
+}
+
+// Login real: intenta primero el formato estándar de FastAPI
+// (OAuth2PasswordRequestForm -> x-www-form-urlencoded) y, si el
+// backend responde 415/422, reintenta como JSON. Lee el token de
+// access_token / token / access. Ajustá si tu /auth/login difiere.
+async function login(){
+  const user = (document.getElementById("login-user")||{}).value?.trim() || "";
+  const pass = (document.getElementById("login-pass")||{}).value || "";
+  const errBox = document.getElementById("login-error");
+  const btn = document.getElementById("login-btn");
+  if(errBox) errBox.textContent = "";
+  if(!user || !pass){ if(errBox) errBox.textContent = "Ingresá usuario y contraseña."; return; }
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Ingresando…'; }
+
+  const leerToken = d => d && (d.access_token || d.token || d.access || d.jwt);
+  const intento = async (body, headers)=>{
+    const resp = await fetch(API_BASE + "/auth/login", {method:"POST", headers, body});
+    if(!resp.ok){ const e = new Error(await resp.text().catch(()=> resp.statusText)); e.status = resp.status; throw e; }
+    return resp.json().catch(()=> ({}));
+  };
+
+  try{
+    let data;
+    try{
+      const form = new URLSearchParams({username:user, password:pass});
+      data = await intento(form.toString(), {"Content-Type":"application/x-www-form-urlencoded"});
+    }catch(e1){
+      if(e1.status === 415 || e1.status === 422 || e1.status === 400){
+        data = await intento(JSON.stringify({username:user, password:pass}), {"Content-Type":"application/json"});
+      }else{ throw e1; }
+    }
+    const token = leerToken(data);
+    if(!token) throw new Error("El servidor no devolvió un token reconocible (esperaba access_token).");
+    API_TOKEN = token;
+    localStorage.setItem("eos_api_token", API_TOKEN);
+    sesionVencida = false;
+    await cargarDatos();
+    render("dashboard");
+    toast("Sesión iniciada.", "ok");
+  }catch(e){
+    if(e.status === 401 || e.status === 403){
+      if(errBox) errBox.textContent = "Usuario o contraseña incorrectos.";
+    }else if(e.status){
+      if(errBox) errBox.textContent = "Error del servidor (" + e.status + "). Revisá la URL de la API en Configuración avanzada.";
+    }else{
+      if(errBox) errBox.textContent = "No se pudo conectar al servidor. ¿Está corriendo y la URL es correcta?";
+    }
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = "Ingresar"; }
+  }
+}
+
+function logout(){
+  API_TOKEN = "";
+  localStorage.removeItem("eos_api_token");
+  sesionVencida = false;
+  datosDemo();
+  render("config");
+  toast("Sesión cerrada.", "info");
+}
+
+function guardarConfig(){
+  API_BASE = document.getElementById("cfg-base").value.trim();
+  API_TOKEN = document.getElementById("cfg-token").value.trim();
+  localStorage.setItem("eos_api_base", API_BASE);
+  localStorage.setItem("eos_api_token", API_TOKEN);
+  sesionVencida = false;
+  cargarDatos().then(()=> render("config"));
+}
+
+function togglePass(targetId, btn){
+  const inp = document.getElementById(targetId);
+  if(!inp) return;
+  const ver = inp.type === "password";
+  inp.type = ver ? "text" : "password";
+  if(btn) btn.textContent = ver ? "🙈" : "👁";
+}
+
+// Nav accesible: role=tab + aria-selected.
+document.getElementById("nav").innerHTML = tabs.map((t,i)=>
+  `<button role="tab" data-action="ir-a-tab" data-tab="${t.id}" aria-selected="${i===0?'true':'false'}" class="${i===0?'active':''}">${t.label}</button>`
+).join("");
+
+function actualizarNav(tab){
+  document.querySelectorAll("nav button").forEach(b=>{
+    const activo = b.dataset.tab === tab;
+    b.classList.toggle("active", activo);
+    b.setAttribute("aria-selected", activo ? "true" : "false");
+  });
+}
+
+function actualizarHeaderEstado(){
+  const est = document.getElementById("header-estado");
+  if(!est) return;
+  if(cargando) est.innerHTML = '<span class="spinner"></span> Cargando…';
+  else if(sesionVencida) est.textContent = "⛔ Sesión vencida";
+  else est.textContent = usandoDatosDemo ? "⚠ Sin conexión (datos de ejemplo)" : "● Conectado";
+}
+
+let currentTab = "dashboard";
+
+const RENDERERS = {
+  dashboard: renderDashboard,
+  agenda: renderAgenda,
+  prospectos: renderProspectos,
+  escenarios: renderEscenarios,
+  trabajos: renderTrabajos,
+  presupuesto: renderPresupuesto,
+  prompts: renderPrompts,
+  finanzas: renderFinanzas,
+  proveedores: renderProveedores,
+  config: renderConfig,
+};
+
+function render(tab){
+  currentTab = tab;
+  actualizarNav(tab);
+  const main = document.getElementById("main");
+  let contenido;
+  // Skeleton solo durante la primera carga (sin datos todavía).
+  if(cargando && !prospectos.length && !usandoDatosDemo && !sesionVencida){
+    contenido = renderSkeleton();
+  }else{
+    const fn = RENDERERS[tab] || renderDashboard;
+    contenido = fn();
+  }
+  main.innerHTML = bannerSesion() + contenido;
+  if(tab==="escenarios") cargarEscenarios(); // pobla el <select> después de pintar
+  // Re-dispara la animación de entrada.
+  main.classList.remove("fade"); void main.offsetWidth; main.classList.add("fade");
+  actualizarHeaderEstado();
+}
+
+// ------------------------------------------------------------------
+// ESCENARIOS — Scenario Engine
+// ------------------------------------------------------------------
+let listaEscenarios = [];
+
+async function cargarEscenarios(){
+  try{
+    listaEscenarios = await apiFetch("/diagnostico/escenarios");
+    const sel = document.getElementById("esc-select");
+    if(sel){
+      sel.innerHTML = listaEscenarios.map(e =>
+        `<option value="${esc(e.id)}">${e.es_urgencia_critica ? "🔴 " : ""}${esc(e.nombre)}</option>`
+      ).join("");
+    }
+  }catch(e){
+    console.warn("No se pudieron cargar escenarios:", e.message);
+  }
+}
+
+async function generarPromptEscenario(){
+  const escenarioId = document.getElementById("esc-select").value;
+  const texto = document.getElementById("esc-mensaje").value.trim();
+  const salida = document.getElementById("esc-salida");
+  if(!texto){ salida.textContent = "Pegá primero el mensaje del cliente."; return; }
+
+  salida.textContent = "Generando...";
+  try{
+    const r = await apiFetch("/diagnostico/prompt", {
+      method: "POST",
+      body: JSON.stringify({escenario_id: escenarioId, texto_cliente: texto})
+    });
+    salida.textContent = r.prompt;  // textContent: seguro, no interpreta HTML
+  }catch(e){
+    salida.textContent = "Error: " + e.message;
+  }
+}
+
+async function procesarComoProspecto(){
+  const texto = document.getElementById("esc-mensaje").value.trim();
+  const resultadoDiv = document.getElementById("esc-resultado");
+  if(!texto){ resultadoDiv.innerHTML = `<div class="footnote">Pegá primero el mensaje del cliente.</div>`; return; }
+
+  resultadoDiv.innerHTML = `<div class="footnote"><span class="spinner dark"></span> Procesando...</div>`;
+  try{
+    const r = await apiFetch("/prospectos/procesar", {
+      method: "POST",
+      body: JSON.stringify({texto})
+    });
+    const d = r.diagnostico;
+    resultadoDiv.innerHTML = `
+      <div class="card">
+        <h3>Prospecto guardado — #${r.prospecto_id ? esc(String(r.prospecto_id).slice(0,8)) : "?"}</h3>
+        <div class="sub">${esc(d.problema_nombre)} (confianza ${esc(d.confianza_clasificacion)}%)</div>
+        ${d.causas_posibles.length ? `
+          <div class="footnote">Causas: ${d.causas_posibles.map(c=>`${esc(c.descripcion)} (${esc(c.plausibilidad)})`).join(" · ")}</div>
+        ` : ""}
+        ${d.preguntas_pendientes.length ? `
+          <div class="footnote">Preguntas sugeridas: ${esc(d.preguntas_pendientes.join(" / "))}</div>
+        ` : ""}
+        <div class="opciones" style="margin-top:10px;">
+          ${r.escenarios.map(e => `
+            <div class="opcion ${e.opcion==="B_RECOMENDADO" ? "reco" : ""}">
+              <div class="tag">${esc(e.titulo)}</div>
+              <div class="precio">${fmt(e.total_estimado)}</div>
+              <div class="desc">${esc(e.descripcion)}</div>
+            </div>`).join("")}
+        </div>
+      </div>
+    `;
+    await cargarDatos();
+    render(currentTab === "escenarios" ? "escenarios" : currentTab);
+  }catch(e){
+    resultadoDiv.innerHTML = `<div class="footnote">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function copiarPrompt(){
+  const texto = document.getElementById("esc-salida").textContent;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(texto).then(()=>{
+      const btn = document.getElementById("esc-btn-copiar");
+      if(btn){ const orig = btn.textContent; btn.textContent = "Copiado ✓"; setTimeout(()=>btn.textContent=orig, 1500); }
+    }).catch(()=> toast("No se pudo copiar. Seleccioná el texto a mano.", "warn"));
+  }
+}
+
+function renderEscenarios(){
+  return `
+  <div class="card">
+    <h3>🧠 Escenarios — biblioteca de problemas conocidos</h3>
+    <div class="sub">Elegí el tipo de caso, pegá el mensaje del cliente, y procesalo directo como Prospecto, o generá el prompt para pegarlo en Claude/ChatGPT manualmente.</div>
+
+    <label class="field-label" for="esc-select" style="margin-top:12px;">Escenario</label>
+    <select id="esc-select" style="width:100%;"></select>
+
+    <label class="field-label" for="esc-mensaje" style="margin-top:12px;">Mensaje del cliente</label>
+    <textarea id="esc-mensaje" rows="4" style="width:100%; font-family:inherit;" placeholder="Pegá acá el mensaje tal como lo mandó el cliente por WhatsApp..."></textarea>
+
+    <div class="row" style="margin-top:12px; gap:8px; justify-content:flex-start; flex-wrap:wrap;">
+      <button class="btn primary" data-action="procesar-prospecto">Procesar como Prospecto</button>
+      <button class="btn" data-action="generar-prompt-escenario">Generar prompt para Claude</button>
+    </div>
+  </div>
+
+  <div id="esc-resultado"></div>
+
+  <div class="card">
+    <h3>Prompt generado</h3>
+    <div class="sub">Copiá esto y pegalo en Claude/ChatGPT si preferís razonar el caso vos mismo antes de guardarlo.</div>
+    <pre id="esc-salida" style="white-space:pre-wrap; background:var(--bg); padding:12px; border-radius:6px; font-size:13px; max-height:400px; overflow:auto;">Elegí un escenario y pegá el mensaje del cliente arriba.</pre>
+    <button class="btn" id="esc-btn-copiar" data-action="copiar-prompt" style="margin-top:8px;">Copiar prompt</button>
+  </div>
+  `;
+}
+
+let vistaProspectos = localStorage.getItem("eos_vista_prospectos") || "kanban";
+const COLUMNAS_KANBAN = ["LEAD","CALIFICANDO","CALIFICADO","VISITA_PROPUESTA","CONVERTIDO","DESCARTADO"];
+
+function setVistaProspectos(v){
+  vistaProspectos = v;
+  localStorage.setItem("eos_vista_prospectos", v);
+  render("prospectos");
+}
+
+function renderProspectos(){
+  const activos = prospectos.filter(p=>!["CONVERTIDO","DESCARTADO"].includes(p.estado)).length;
+  const conRiesgo = prospectos.filter(p=>p.riesgo_tablero_detectado).length;
+  const hoy = prospectos.filter(p=>esHoy(p.proximo_recordatorio)).length;
+
+  return `
+  <div class="grid g4" style="margin-bottom:20px;">
+    <div class="metric"><div class="lbl">Prospectos activos</div><div class="val">${activos}</div></div>
+    <div class="metric"><div class="lbl">Con riesgo detectado</div><div class="val">${conRiesgo}</div></div>
+    <div class="metric"><div class="lbl">Total leads</div><div class="val">${prospectos.length}</div></div>
+    <div class="metric"><div class="lbl">Recordatorios hoy</div><div class="val">${hoy}</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="prosp-buscar" placeholder="Buscar por nombre..." style="min-width:220px;" data-input="filtrar-prospectos" aria-label="Buscar prospecto por nombre">
+    <div class="row" style="gap:8px;">
+      <select id="prosp-filtro-urgencia" data-change="filtrar-prospectos" aria-label="Filtrar por urgencia">
+        <option value="">Urgencia: todas</option>
+        <option value="CRITICA">Crítica</option>
+        <option value="ALTA">Alta</option>
+        <option value="MEDIA">Media</option>
+        <option value="BAJA">Baja</option>
+      </select>
+      <div class="seg" role="group" aria-label="Vista de prospectos">
+        <button class="${vistaProspectos==='kanban'?'active':''}" data-action="set-vista-prospectos" data-vista="kanban">Kanban</button>
+        <button class="${vistaProspectos==='tabla'?'active':''}" data-action="set-vista-prospectos" data-vista="tabla">Tabla</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="prosp-contenido">${vistaProspectos==="kanban" ? renderKanban(prospectos) : renderTablaProspectos(prospectos)}</div>
+  <div class="footnote">Click en una tarjeta o fila para abrir la ficha del cliente.</div>
+  `;
+}
+
+function filtrarProspectos(){
+  const texto = normalizar(document.getElementById("prosp-buscar").value);
+  const urg = document.getElementById("prosp-filtro-urgencia").value;
+  const filtrados = prospectos.filter(p=>{
+    const okTexto = !texto || normalizar(p.nombre).includes(texto);
+    const okUrg = !urg || urgenciaDe(p)===urg;
+    return okTexto && okUrg;
+  });
+  document.getElementById("prosp-contenido").innerHTML =
+    vistaProspectos==="kanban" ? renderKanban(filtrados) : renderTablaProspectos(filtrados);
+}
+
+function renderKanban(lista){
+  return `<div class="kanban">
+    ${COLUMNAS_KANBAN.map(col=>{
+      const items = lista.filter(p=>p.estado===col);
+      return `
+      <div class="kcol">
+        <h4>${esc(col.replace("_"," "))} <span>${items.length}</span></h4>
+        ${items.length ? items.map(p=>{
+          const u = urgenciaDe(p);
+          return `<div class="kcard" data-action="abrir-ficha" data-id="${esc(p.id)}" role="button" tabindex="0">
+            <div class="nombre">${esc(p.nombre || "Sin nombre")}</div>
+            <div class="diag">${diagnosticoResumen(p)}</div>
+            <div class="meta">
+              <span class="pill ${pillClass(u)}">${iconoUrgencia(u)} ${esc(u)}</span>
+              ${p.proximo_recordatorio ? `<span class="footnote">📅 ${esc(p.proximo_recordatorio)}</span>` : ""}
+            </div>
+          </div>`;
+        }).join("") : '<div class="footnote" style="padding:4px;">Vacío</div>'}
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function renderTablaProspectos(lista){
+  return `
+  <div class="card">
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Cliente</th><th>Urgencia</th><th>Estado</th><th>Riesgo tablero</th><th>Rango estimado</th><th>Próximo recordatorio</th></tr></thead>
+      <tbody>
+        ${lista.map(p=>{ const u = urgenciaDe(p); return `
+          <tr class="clickable" data-action="abrir-ficha" data-id="${esc(p.id)}">
+            <td>${esc(p.nombre)}<div class="footnote">${esc(p.telefono)}</div><div class="footnote">${diagnosticoResumen(p)}</div></td>
+            <td><span class="pill ${pillClass(u)}">${iconoUrgencia(u)} ${esc(u)}</span></td>
+            <td><span class="pill ${pillClass(p.estado)}">${esc(String(p.estado||"").replace("_"," "))}</span></td>
+            <td>${p.riesgo_tablero_detectado ? '⚠️ Sí' : '—'}</td>
+            <td>${esc(p.presupuesto_estimado_rango)}</td>
+            <td>${esc(p.proximo_recordatorio)}</td>
+          </tr>`;}).join("")}
+      </tbody>
+    </table>
+    </div>
+    ${!lista.length ? '<div class="empty">Sin resultados.</div>' : ""}
+  </div>
+  `;
+}
+
+function renderTrabajos(){
+  return `
+  <div class="card">
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Cliente</th><th>Trabajo</th><th>Monto</th><th>Cobro</th><th>Factura</th></tr></thead>
+      <tbody>
+        ${trabajos.map(t=>{
+          const simulada = String(t.cae||"").startsWith("SIMULADO");
+          return `
+          <tr>
+            <td>${esc(t.cliente)}</td>
+            <td>${esc(t.tipo)}</td>
+            <td>${fmt(t.monto_total)}</td>
+            <td><span class="pill ${pillClass(t.estado_pago)}">${esc(t.estado_pago)}</span>
+                ${t.estado_pago==="PARCIAL" ? `<div class="footnote">Cobrado: ${fmt(t.monto_cobrado)}</div>` : ""}</td>
+            <td>${t.cae
+                  ? (simulada
+                      ? `<span class="pill simulado">SIMULADO</span> <span class="footnote">${esc(t.cae)}</span>`
+                      : `CAE ${esc(String(t.cae).slice(-6))}`)
+                  : `<button class="btn" data-action="facturar" data-id="${esc(t.id)}">Facturar</button>`}</td>
+          </tr>`;}).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="footnote">La etiqueta <span class="pill simulado">SIMULADO</span> marca facturas de prueba: el llamado real a facturacion_service.py (ARCA vía TusFacturasAPP) se hace cuando el backend expone la ruta y devuelve un CAE real. En modo demo/sin backend siempre se simula.</div>
+  `;
+}
+
+async function facturar(id){
+  const t = trabajos.find(x=>String(x.id)===String(id));
+  if(!t) return;
+  // Facturar emite un comprobante fiscal: es una acción deliberada, por
+  // eso se confirma antes (a diferencia de los errores, que van por toast).
+  if(!confirm(`¿Emitir factura para "${t.cliente}" por ${fmt(t.monto_total)}?`)) return;
+
+  if(usandoDatosDemo || sesionVencida){
+    t.cae = "SIMULADO" + Math.floor(Math.random()*100000);
+    render("trabajos");
+    toast("Facturación SIMULADA (sin backend conectado).", "warn");
+    return;
+  }
+  try{
+    // Endpoint real de facturación. Si el backend todavía no lo expone,
+    // caemos a una simulación CLARAMENTE marcada (pill SIMULADO).
+    const r = await apiFetch(`/trabajos/${id}/facturar`, {method:"POST"});
+    t.cae = r.cae || r.CAE || r.numero || ("SIMULADO" + Math.floor(Math.random()*100000));
+    if(r.pdf_url) t.pdf_url = r.pdf_url;
+    render("trabajos");
+    toast("Factura emitida" + (String(t.cae).startsWith("SIMULADO") ? " (simulada)" : " — CAE " + t.cae) + ".", "ok");
+  }catch(e){
+    t.cae = "SIMULADO" + Math.floor(Math.random()*100000);
+    render("trabajos");
+    toast("Facturación SIMULADA — el endpoint real no está disponible todavía (" + (e.status || "sin respuesta") + ").", "warn");
+  }
+}
+
+function renderPresupuesto(){
+  const conEscenarios = prospectos.filter(p => p.escenarios_presupuesto && p.escenarios_presupuesto.length);
+
+  if(usandoDatosDemo){
+    return `<div class="card"><div class="sub">Sin conexión a la API — no se muestran presupuestos de ejemplo. Conectate en la pestaña "Conexión" para ver datos reales.</div></div>`;
+  }
+
+  if(!conEscenarios.length){
+    return `<div class="card">
+      <h3>Presupuesto A/B/C</h3>
+      <div class="sub">Estado: pendiente de backend</div>
+      <div class="footnote">Ningún prospecto tiene escenarios guardados todavía. Se generan automáticamente al procesar un mensaje nuevo en /prospectos/procesar — los prospectos cargados antes de este cambio no los tienen.</div>
+    </div>`;
+  }
+
+  return `
+  <div class="footnote" style="margin-bottom:14px;">
+    El motor A/B/C queda pendiente de migrar en el backend (ESPECIFICACION_v2.md §3 lo reemplaza
+    por precio base + catálogo de upsells tildables). Mientras tanto se sigue mostrando lo que
+    devuelve <code>/prospectos/procesar</code>, y abajo de cada tarjeta se agregan los upsells
+    sugeridos por catálogo — los mismos que aparecen en la ficha del cliente.
+  </div>
+  ${conEscenarios.map(p => {
+    const elegidos = getUpsellsElegidos(p.id);
+    const sugeridos = upsellsSugeridos(p.diagnostico);
+    return `
+    <div class="card">
+      <h3>${esc(p.nombre || "Sin nombre")} <span class="pill ${pillClass(p.estado)}">${esc(String(p.estado||"").replace("_"," "))}</span></h3>
+      <div class="sub">
+        ${p.diagnostico && p.diagnostico.problema_nombre ? `Diagnóstico: ${esc(p.diagnostico.problema_nombre)} (confianza ${esc(p.diagnostico.confianza_clasificacion)}%)` : "Sin clasificar en la biblioteca de problemas"}
+      </div>
+      <div class="opciones">
+        ${p.escenarios_presupuesto.map(e => `
+          <div class="opcion ${e.opcion==="B_RECOMENDADO" ? "reco" : ""}">
+            <div class="tag">${esc(e.titulo)}</div>
+            <div class="precio">${fmt(e.total_estimado)}</div>
+            <div class="desc">${esc(e.descripcion)}</div>
+            ${e.nota_legal ? `<div class="footnote">⚠️ ${esc(e.nota_legal)}</div>` : ""}
+          </div>`).join("")}
+      </div>
+      ${p.diagnostico && p.diagnostico.causas_posibles && p.diagnostico.causas_posibles.length ? `
+        <div class="footnote" style="margin-top:10px;">
+          Causas posibles: ${p.diagnostico.causas_posibles.map(c => `${esc(c.descripcion)} (${esc(c.plausibilidad)})`).join(" · ")}
+        </div>` : ""}
+      ${sugeridos.length ? `
+        <div style="margin-top:14px;">
+          <div class="footnote" style="text-transform:uppercase; font-weight:700; letter-spacing:.04em;">Upsells de catálogo sugeridos</div>
+          <div class="aviso">${esc(AVISO_PRECIOS_REF)}</div>
+          ${sugeridos.map(u=>`
+            <label class="upsell-row">
+              <input type="checkbox" ${elegidos.includes(u.texto)?"checked":""} data-change="toggle-upsell" data-id="${esc(p.id)}" data-texto="${esc(u.texto)}">
+              <span class="txt">${esc(u.texto)}<div class="footnote">${esc(u.categoria)}</div></span>
+              <span class="precio">${esc(u.precio_ref)}</span>
+            </label>`).join("")}
+        </div>` : ""}
+      <button class="btn sm" style="margin-top:12px;" data-action="abrir-ficha" data-id="${esc(p.id)}">Abrir ficha completa</button>
+    </div>
+  `;}).join("")}
+  `;
+}
+
+// ------------------------------------------------------------------
+// PROMPTS DE IA
+// ------------------------------------------------------------------
+function renderPrompts(){
+  return `
+  <div class="card">
+    <h3>1. Diagnóstico inicial</h3>
+    <div class="sub">Pegá el mensaje/foto (descripción) del cliente y generá el prompt para clasificar el problema.</div>
+    <textarea id="pr-diag-texto" rows="3" style="width:100%;" placeholder="Ej: se me corta la luz de la cocina cuando prendo el microondas..." aria-label="Mensaje del cliente"></textarea>
+    <button class="btn primary" style="margin-top:8px;" data-action="generar-prompt-diagnostico">Generar prompt</button>
+    <div id="pr-diag-salida"></div>
+  </div>
+
+  <div class="card">
+    <h3>2. Armar upsell</h3>
+    <div class="sub">Elegí el prospecto ya diagnosticado y generá el prompt que sugiere qué ofrecer y con qué frase.</div>
+    <select id="pr-upsell-prospecto" style="width:100%;" aria-label="Prospecto">
+      <option value="">Elegí un prospecto...</option>
+      ${prospectos.filter(p=>p.diagnostico && p.diagnostico.problema_nombre).map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join("")}
+    </select>
+    <button class="btn primary" style="margin-top:8px;" data-action="generar-prompt-upsell">Generar prompt</button>
+    <div id="pr-upsell-salida"></div>
+  </div>
+
+  <div class="card">
+    <h3>3. Respuesta al cliente (WhatsApp)</h3>
+    <div class="sub">El tono no es fijo — lo elegís vos para cada cliente.</div>
+    <select id="pr-resp-tono" style="width:100%; margin-bottom:8px;" aria-label="Tono">
+      <option value="cercano">Cercano / de barrio</option>
+      <option value="profesional">Profesional / serio</option>
+    </select>
+    <textarea id="pr-resp-contexto" rows="3" style="width:100%;" placeholder="Qué le tenés que decir (ej: confirmar visita para mañana 18hs, avisar que subió el precio por urgencia, etc.)" aria-label="Contexto del mensaje"></textarea>
+    <button class="btn primary" style="margin-top:8px;" data-action="generar-prompt-respuesta">Generar prompt</button>
+    <div id="pr-resp-salida"></div>
+  </div>
+  `;
+}
+
+// Muestra el prompt usando textContent (nunca innerHTML con datos del
+// usuario): así un mensaje con < > no se interpreta como HTML.
+function mostrarPrompt(contenedorId, texto){
+  const box = document.getElementById(contenedorId);
+  if(!box) return;
+  const id = contenedorId + "-txt";
+  const pre = document.createElement("pre");
+  pre.className = "prompt-box";
+  pre.id = id;
+  pre.textContent = texto;
+  const btn = document.createElement("button");
+  btn.className = "btn sm";
+  btn.style.marginTop = "6px";
+  btn.dataset.action = "copiar-texto";
+  btn.dataset.target = id;
+  btn.textContent = "Copiar prompt";
+  box.innerHTML = "";
+  box.appendChild(pre);
+  box.appendChild(btn);
+}
+
+function generarPromptDiagnostico(){
+  const texto = document.getElementById("pr-diag-texto").value.trim();
+  if(!texto){ mostrarPrompt("pr-diag-salida", "Pegá primero el mensaje del cliente."); return; }
+  const prompt = `Sos el asistente de diagnóstico eléctrico de Electricista OS (Marco, electricista domiciliario en GBA Oeste).
+Mensaje del cliente: "${texto}"
+
+Clasificá el problema contra la biblioteca de problemas conocidos (cortocircuito, sobrecarga,
+fuga a tierra, boca/toma sin funcionar, tablero sin diferencial, etc.) y devolveme SOLO un JSON con:
+- problema_nombre
+- confianza_clasificacion (0-100)
+- causas_posibles: [{descripcion, plausibilidad: ALTA/MEDIA/BAJA}]
+- preguntas_pendientes: preguntas cortas para terminar de confirmar si falta info
+- urgencia: BAJA/MEDIA/ALTA/CRITICA (CRITICA solo si hay riesgo real de incendio/electrocución)`;
+  mostrarPrompt("pr-diag-salida", prompt);
+}
+
+function generarPromptUpsell(){
+  const id = document.getElementById("pr-upsell-prospecto").value;
+  if(!id){ mostrarPrompt("pr-upsell-salida", "Elegí un prospecto con diagnóstico primero."); return; }
+  const p = prospectos.find(x=>String(x.id)===String(id));
+  const d = p.diagnostico || {};
+  const sugeridos = upsellsSugeridos(d);
+  const prompt = `Sos un electricista domiciliario experto en ventas (Marco, GBA Oeste). No presiones nunca —
+cada upsell se justifica con un hallazgo real, nunca un catálogo genérico aplicado sin diagnóstico.
+
+Diagnóstico del cliente: ${d.problema_nombre || "(sin clasificar)"} (confianza ${d.confianza_clasificacion || "?"}%)
+Causas posibles: ${(d.causas_posibles||[]).map(c=>c.descripcion).join(", ") || "(sin datos)"}
+
+Upsells del catálogo que aplican a este trabajo:
+${sugeridos.length ? sugeridos.map(u=>`- ${u.texto} (${u.categoria}, ${u.precio_ref})`).join("\n") : "(ninguno matcheado — sugerí en base al diagnóstico)"}
+
+Para cada upsell aplicable, dame una frase simple y honesta para ofrecérselo al cliente, ligada
+al hallazgo real (no genérica). Priorizá siempre el upsell de seguridad (diferencial faltante,
+puesta a tierra faltante) porque es el más fácil de justificar objetivamente. Si la urgencia es
+CRITICA, no sugieras ningún upsell ahora — solo el chequeo de seguimiento post-trabajo.`;
+  mostrarPrompt("pr-upsell-salida", prompt);
+}
+
+function generarPromptRespuesta(){
+  const tono = document.getElementById("pr-resp-tono").value;
+  const contexto = document.getElementById("pr-resp-contexto").value.trim();
+  if(!contexto){ mostrarPrompt("pr-resp-salida", "Contame qué le tenés que decir al cliente."); return; }
+  const toneDesc = tono==="cercano"
+    ? "cercano, de barrio, tuteando, cálido pero sin informalidad excesiva"
+    : "profesional y serio, cordial pero directo, sin tecnicismos innecesarios";
+  const prompt = `Redactá un mensaje de WhatsApp para un cliente de Electricista OS (Marco, GBA Oeste).
+Tono: ${toneDesc}.
+Qué hay que comunicarle: ${contexto}
+
+Reglas: mensaje corto (máximo 4-5 líneas), sin emojis de más, terminá siempre dejando una
+pregunta o próximo paso claro (confirmar horario, confirmar presupuesto, etc.).`;
+  mostrarPrompt("pr-resp-salida", prompt);
+}
+
+function renderFinanzas(){
+  const r = reporteMensual();
+  const filas = trabajos.map(t=>{
+    const {costoMateriales, gananciaNeta, margen} = calcularRentabilidad(t);
+    return `<tr>
+      <td>${esc(t.cliente)}</td>
+      <td>${fmt(t.monto_total)}</td>
+      <td>${fmt(costoMateriales)}</td>
+      <td>${fmt(gananciaNeta)}</td>
+      <td>${margen.toFixed(0)}%</td>
+    </tr>`;
+  }).join("");
+  return `
+  <div class="grid g4" style="margin-bottom:20px;">
+    <div class="metric"><div class="lbl">Ingresos cobrados</div><div class="val">${fmt(r.ingresos)}</div></div>
+    <div class="metric"><div class="lbl">Costo materiales</div><div class="val">${fmt(r.costoMateriales)}</div></div>
+    <div class="metric"><div class="lbl">Gastos operativos</div><div class="val">${fmt(r.gastos)}</div></div>
+    <div class="metric"><div class="lbl">Ganancia neta</div><div class="val" style="color:var(--ok);">${fmt(r.neta)}</div></div>
+  </div>
+  <div class="card">
+    <h3>Rentabilidad por trabajo</h3>
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Cliente</th><th>Facturado</th><th>Costo materiales</th><th>Ganancia neta</th><th>Margen</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Gastos operativos del mes</h3>
+    <div class="tabla-scroll">
+    <table>
+      <tbody>
+        ${gastosOperativos.map(g=>`<tr><td>${esc(g.categoria)}</td><td>${fmt(g.monto)}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="footnote">Misma lógica que finanzas_service.py: reporte_mensual() filtra por estado_pago == COBRADO — por eso los trabajos PENDIENTE/PARCIAL no entran en "Ingresos cobrados" todavía.</div>
+  `;
+}
+
+// Directorio de PROVEEDORES_GBA_OESTE.md — lista de referencia.
+const PROVEEDORES_DIRECTORIO = [
+  {zona:"Hurlingham", nombre:"Cobla Electricidad", direccion:"Av. Roca 845", telefono:"4452-7426"},
+  {zona:"Hurlingham", nombre:"Omar Electricidad", direccion:"Av. Gdor. Vergara 3098", telefono:"4459-9462"},
+  {zona:"Hurlingham", nombre:"Electrofe (materiales eléctricos)", direccion:"Planes 1899", telefono:"4452-7939 / 4665-8109"},
+  {zona:"Hurlingham", nombre:"Gamarra Electricidad", direccion:"Av. Gdor. Vergara 4596", telefono:"4665-4062"},
+  {zona:"Hurlingham", nombre:"A.F.D. Comercios", direccion:"Álvarez Thomas 253", telefono:"4452-5310"},
+  {zona:"Hurlingham", nombre:"Hurlingham Electric", direccion:"Solís 1305 esq. Jauretche", telefono:"4452-1713"},
+  {zona:"Haedo", nombre:"Electricidad Haedo (mayorista, +200 marcas)", direccion:"electricidadhaedo.ar", telefono:"—", destacado:true},
+  {zona:"Haedo", nombre:"Electro Mayo S.A.", direccion:"Av. Rivadavia 15246", telefono:"4460-0900"},
+  {zona:"Haedo", nombre:"Materiales Eléctricos Foco", direccion:"Av. Rivadavia 15848", telefono:"15 5508-5601"},
+  {zona:"Haedo", nombre:"Ferretería Winkel 2", direccion:"Fasola 399", telefono:"4650-4228"},
+  {zona:"Haedo", nombre:"Electroservice Fasola", direccion:"Fasola 738", telefono:"4659-4450"},
+  {zona:"Morón", nombre:"Casa Gurlekian", direccion:"Av. E. Perón 3431", telefono:"4697-8680"},
+  {zona:"Morón", nombre:"Electro Morón SRL", direccion:"Mendoza 152", telefono:"4483-3267"},
+  {zona:"Morón", nombre:"Electricidad Serrano", direccion:"Av. Rivadavia 17958", telefono:"4629-0085"},
+  {zona:"Castelar", nombre:"Cobla Electricidad (sucursal 2)", direccion:"Av. Arias 3437", telefono:"4661-2482 / 4458-4535", destacado:true},
+];
+
+function renderProveedores(){
+  const stockBajo = insumos.filter(i=>i.stock <= i.stock_min);
+  return `
+  <div class="card">
+    <h3>📦 Insumos y stock</h3>
+    <div class="sub">${stockBajo.length ? `⚠️ ${stockBajo.length} insumo(s) por debajo del mínimo` : "Stock dentro de lo esperado"}</div>
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Insumo</th><th>Proveedor</th><th>Costo</th><th>Venta sugerida</th><th>Stock</th></tr></thead>
+      <tbody>
+        ${insumos.map(i=>{
+          const venta = precioVenta(i.costo);
+          const bajo = i.stock <= i.stock_min;
+          return `<tr>
+            <td>${esc(i.nombre)}</td>
+            <td>${esc(i.proveedor)}</td>
+            <td>${fmt(i.costo)}</td>
+            <td>${fmt(venta)}</td>
+            <td>${esc(i.stock)} ${bajo ? '<span class="pill pendiente">Reponer</span>' : ''}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="footnote">Precio de venta = costo × (1 + margen_insumos_default de Empresa.configuracion). Hoy ${esc(configuracion.margen_insumos_default)}%, no hardcodeado en el código.</div>
+
+  <h3 class="seccion">Directorio de proveedores — GBA Oeste</h3>
+  <div class="card">
+    <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Zona</th><th>Nombre</th><th>Dirección</th><th>Teléfono</th></tr></thead>
+      <tbody>
+        ${PROVEEDORES_DIRECTORIO.map(p=>`
+          <tr>
+            <td>${esc(p.zona)}</td>
+            <td>${esc(p.nombre)} ${p.destacado ? '<span class="pill baja">Prioridad</span>' : ''}</td>
+            <td>${esc(p.direccion)}</td>
+            <td>${esc(p.telefono)}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="footnote">
+    Lista de referencia sin verificar en persona (PROVEEDORES_GBA_OESTE.md). Antes de cargarlos
+    como Proveedor real en el sistema: confirmar si atienden con precio de gremio/profesional y
+    si tienen las marcas del catálogo de upsells (ej. térmicas y diferenciales Schneider).
+    Empezar por Electricidad Haedo y Cobla — son los de perfil más mayorista/profesional.
+  </div>
+  `;
+}
+
+// ------------------------------------------------------------------
+// DELEGACIÓN DE EVENTOS — un solo listener por tipo, en lugar de ~37
+// onclick inline con datos interpolados a mano. Más seguro (no hay
+// superficie de XSS por atributos) y sin bugs de escaping cuando un
+// texto trae comillas o backslashes.
+// ------------------------------------------------------------------
+function handleAction(action, el, ev){
+  const d = el.dataset;
+  switch(action){
+    case "stop": break; // swallow: evita que el click burbujee al contenedor clickeable
+    case "cerrar-toast": break; // lo maneja su propio listener
+    case "ir-a-tab": if(ev) ev.preventDefault(); irATab(d.tab); break;
+    case "abrir-ficha": abrirFicha(d.id); break;
+    case "cerrar-modal": cerrarModal(); break;
+    case "mover-orquestador": moverOrquestador(Number(d.idx), Number(d.dir)); break;
+    case "cambiar-estado-visita": cambiarEstadoVisita(d.id, d.estado); break;
+    case "abrir-modal-nueva-visita": abrirModalNuevaVisita(); break;
+    case "guardar-nueva-visita": guardarNuevaVisita(); break;
+    case "guardar-config": guardarConfig(); break;
+    case "login": if(ev) ev.preventDefault(); login(); break;
+    case "logout": logout(); break;
+    case "toggle-pass": togglePass(d.target, el); break;
+    case "facturar": facturar(d.id); break;
+    case "add-checklist": addChecklistItem(d.id); break;
+    case "quitar-checklist": quitarChecklistItem(d.id, Number(d.idx)); break;
+    case "mostrar-prompt-pdf": mostrarPromptPDF(d.id); break;
+    case "copiar-texto": copiarTexto(d.target, el); break;
+    case "guardar-notas": guardarNotas(d.id); break;
+    case "set-vista-prospectos": setVistaProspectos(d.vista); break;
+    case "agenda-set-fecha": agendaFechaSeleccionada = d.value || null; render("agenda"); break;
+    case "generar-prompt-escenario": generarPromptEscenario(); break;
+    case "procesar-prospecto": procesarComoProspecto(); break;
+    case "copiar-prompt": copiarPrompt(); break;
+    case "generar-prompt-diagnostico": generarPromptDiagnostico(); break;
+    case "generar-prompt-upsell": generarPromptUpsell(); break;
+    case "generar-prompt-respuesta": generarPromptRespuesta(); break;
+  }
+}
+
+function handleChange(change, el){
+  const d = el.dataset;
+  switch(change){
+    case "toggle-checklist": {
+      toggleChecklistItem(d.id, Number(d.idx));
+      const span = el.closest("label")?.querySelector("span");
+      if(span) span.classList.toggle("done", el.checked);
+      break;
+    }
+    case "toggle-upsell": toggleUpsellElegido(d.id, d.texto); break;
+    case "filtrar-prospectos": filtrarProspectos(); break;
+    case "agenda-fecha-input": agendaFechaSeleccionada = el.value || null; render("agenda"); break;
+    case "nv-cliente-sel": nvClienteSelChange(); break;
+  }
+}
+
+document.body.addEventListener("click", (ev)=>{
+  const el = ev.target.closest("[data-action]");
+  if(!el) return;
+  handleAction(el.dataset.action, el, ev);
+});
+
+document.body.addEventListener("submit", (ev)=>{
+  const el = ev.target.closest("[data-action]");
+  if(!el) return;
+  handleAction(el.dataset.action, el, ev);
+});
+
+document.body.addEventListener("change", (ev)=>{
+  const el = ev.target.closest("[data-change]");
+  if(!el) return;
+  handleChange(el.dataset.change, el);
+});
+
+document.body.addEventListener("input", (ev)=>{
+  const el = ev.target.closest("[data-input]");
+  if(!el) return;
+  if(el.dataset.input === "filtrar-prospectos") filtrarProspectos();
+});
+
+document.addEventListener("keydown", (ev)=>{
+  // Escape cierra cualquier modal abierto.
+  if(ev.key === "Escape"){
+    const root = document.getElementById("modal-root");
+    if(root && root.children.length){ cerrarModal(); return; }
+  }
+  // Enter en el input de checklist agrega el material.
+  const el = ev.target.closest && ev.target.closest("[data-keydown]");
+  if(el && ev.key === "Enter" && el.dataset.keydown === "add-checklist"){
+    ev.preventDefault();
+    addChecklistItem(el.dataset.id);
+  }
+  // Enter/Espacio activan los elementos con role=button (tarjetas clickeables).
+  if((ev.key === "Enter" || ev.key === " ")){
+    const b = ev.target.closest && ev.target.closest('[data-action][role="button"], [role="button"][data-action]');
+    if(b && b.getAttribute("role") === "button"){
+      ev.preventDefault();
+      handleAction(b.dataset.action, b, ev);
+    }
+  }
+});
+
+// ------------------------------------------------------------------
+// ARRANQUE
+// ------------------------------------------------------------------
+cargando = true;
+render("dashboard");                        // pinta el skeleton mientras carga
+cargarDatos().then(()=> render(currentTab)); // re-render con datos reales o demo
+</script>
+</body>
+</html>
