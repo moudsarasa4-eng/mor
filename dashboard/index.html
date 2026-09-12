@@ -206,6 +206,19 @@
 
   pre.prompt-box{white-space:pre-wrap; background:var(--bg); padding:14px; border-radius:9px; font-size:12.5px; max-height:360px; overflow:auto; border:1px solid var(--line); font-family:ui-monospace,Menlo,Consolas,monospace;}
 
+  /* Calculadora */
+  .esp-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--line);}
+  .esp-row:last-child{border-bottom:none;}
+  .esp-row .esp-nom{flex:1; min-width:140px; font-size:13px;}
+  .esp-row small{color:var(--ink-muted);}
+  .calc-num{width:96px;}
+  .res-metric{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  @media(max-width:600px){ .res-metric{grid-template-columns:1fr 1fr;} }
+  .res-metric .rm{background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:10px;}
+  .res-metric .rm .l{font-size:11px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.02em;}
+  .res-metric .rm .v{font-size:18px; font-weight:700; margin-top:2px; letter-spacing:-0.01em;}
+  .banner-info{border-color:var(--info); background:var(--info-soft);}
+
   /* Estados de carga (skeleton) */
   @keyframes shimmer{0%{background-position:-400px 0;} 100%{background-position:400px 0;}}
   .skeleton{background:linear-gradient(90deg,#eceff2 25%,#f6f8fa 50%,#eceff2 75%); background-size:800px 100%; animation:shimmer 1.2s infinite linear; border-radius:8px; color:transparent;}
@@ -1195,6 +1208,7 @@ const tabs = [
   {id:"escenarios", label:"🧠 Escenarios"},
   {id:"trabajos", label:"Trabajos"},
   {id:"presupuesto", label:"Presupuesto"},
+  {id:"calculadora", label:"🧮 Calculadora"},
   {id:"prompts", label:"🤖 Prompts IA"},
   {id:"finanzas", label:"Finanzas"},
   {id:"proveedores", label:"Bodega y proveedores"},
@@ -1386,6 +1400,7 @@ const RENDERERS = {
   escenarios: renderEscenarios,
   trabajos: renderTrabajos,
   presupuesto: renderPresupuesto,
+  calculadora: renderCalculadora,
   prompts: renderPrompts,
   finanzas: renderFinanzas,
   proveedores: renderProveedores,
@@ -1976,6 +1991,497 @@ function renderProveedores(){
 }
 
 // ------------------------------------------------------------------
+// CALCULADORA DE CABLES Y MATERIALES — orientativa según AEA 90364.
+// Todo el cálculo es client-side (no toca el backend). Da secciones,
+// protecciones y una lista de materiales + presupuesto para cotizar
+// rápido. NO reemplaza el proyecto eléctrico del matriculado: son
+// valores de referencia que Marco valida con las tablas oficiales.
+//
+// Fuentes de las constantes (aproximadas, método típico domiciliario):
+// - Corriente admisible por sección (cobre, PVC) — tablas AEA 90364-7-771.
+// - Factores de corrección por temperatura y por agrupamiento (IEC/AEA).
+// - Secciones y protecciones mínimas por tipo de circuito (IUG/TUG/…).
+// - Caída de tensión admisible: 3% iluminación, 5% otros usos.
+// ------------------------------------------------------------------
+const SECCIONES = [1.5, 2.5, 4, 6, 10, 16, 25, 35];
+// Corriente admisible (A) por sección y método de instalación.
+const AMPACIDAD = {
+  embutido:   {1.5:15,   2.5:21, 4:28, 6:36, 10:50, 16:66, 25:84,  35:104},
+  cablecanal: {1.5:17.5, 2.5:24, 4:32, 6:41, 10:57, 16:76, 25:101, 35:125},
+  aire:       {1.5:19.5, 2.5:27, 4:36, 6:46, 10:63, 16:85, 25:112, 35:138},
+  subterraneo:{1.5:22,   2.5:29, 4:38, 6:47, 10:63, 16:81, 25:104, 35:125},
+};
+const F_TEMP  = {25:1.03, 30:1.0, 35:0.94, 40:0.87, 45:0.79};
+const F_AGRUP = {1:1.0, 2:0.80, 3:0.70, 4:0.65, 5:0.60, 6:0.57, 7:0.54};
+const BREAKERS = [6, 10, 16, 20, 25, 32, 40, 50, 63];
+const RHO = 0.0179; // resistividad cobre (Ω·mm²/m) aprox. (conductividad ~56)
+
+const TIPOS_CIRCUITO = {
+  IUG: {label:"Iluminación (IUG)",        sMin:1.5, inMax:16, cosphi:1.0, caidaMax:3},
+  TUG: {label:"Tomas uso general (TUG)",  sMin:2.5, inMax:20, cosphi:0.9, caidaMax:5},
+  IUE: {label:"Iluminación especial (IUE)",sMin:2.5, inMax:16, cosphi:1.0, caidaMax:3},
+  TUE: {label:"Tomas uso especial (TUE)", sMin:2.5, inMax:25, cosphi:0.9, caidaMax:5},
+  ACU: {label:"Carga especial (ACU)",     sMin:2.5, inMax:63, cosphi:0.9, caidaMax:5},
+};
+
+const PRECIOS_DEFAULT = {
+  "cable_1.5":950, "cable_2.5":1450, "cable_4":2300, "cable_6":3300, "cable_10":5400, "cable_16":8200,
+  "termica_10":8000, "termica_16":8500, "termica_20":9200, "termica_25":11000, "termica_32":13500, "termica_40":16000,
+  "diferencial_30ma":46000,
+  "caja_embutir":1300, "modulo_toma":3800, "modulo_llave":3400, "tapa_bastidor":2600,
+  "cano_corrugado":750, "tablero_modulo":3500, "jabalina_pat":26000,
+  "mano_obra_boca":18000, "mano_obra_hora":12000, "visita_diagnostico":54310,
+};
+
+function getPrecios(){
+  try{ return {...PRECIOS_DEFAULT, ...JSON.parse(localStorage.getItem("eos_precios") || "{}")}; }
+  catch(e){ return {...PRECIOS_DEFAULT}; }
+}
+function setPrecios(p){ localStorage.setItem("eos_precios", JSON.stringify(p)); }
+
+const fmtSec = s => String(s).replace(".", ",") + " mm²";
+const valId  = id => { const e = document.getElementById(id); return e ? e.value : ""; };
+const numId  = id => { const e = document.getElementById(id); return e ? (Number(e.value) || 0) : 0; };
+
+let ultimoCalculo = null; // {circuitos, contexto, materiales, presupuesto, grado, meta}
+
+// Núcleo: dimensiona UN circuito. Devuelve sección, térmica, diferencial,
+// caída de tensión y alertas de norma.
+function dimensionarCircuito({nombre, tipo, P=null, I=null, V=230, L=10, metodo="embutido", nAgrup=1, tempC=30}){
+  const t = TIPOS_CIRCUITO[tipo] || TIPOS_CIRCUITO.ACU;
+  const cosphi = t.cosphi;
+  let Ib = I != null ? I : (P != null ? P / (V * cosphi) : 0);
+  if(!(Ib > 0)) Ib = 0.1;
+  const ft = F_TEMP[tempC] ?? 1.0;
+  const fa = F_AGRUP[Math.min(Math.max(nAgrup,1), 7)] ?? 0.54;
+  const amp = AMPACIDAD[metodo] || AMPACIDAD.embutido;
+  const alertas = [];
+
+  // 1) Sección por corriente admisible corregida.
+  let sAmp = SECCIONES.find(s => amp[s] * ft * fa >= Ib);
+  if(sAmp == null){ sAmp = 35; alertas.push("La corriente supera lo que cubre la tabla — verificá con un cálculo específico o subí de sección."); }
+  // 2) Sección mínima reglamentaria por tipo de circuito.
+  const sMin = t.sMin;
+  // 3) Sección por caída de tensión (monofásico).
+  const caidaEn = s => (2 * RHO * L * Ib * cosphi / s) / V * 100;
+  let sDv = SECCIONES.find(s => caidaEn(s) <= t.caidaMax) || 35;
+
+  let seccion = SECCIONES.find(s => s >= Math.max(sAmp, sMin, sDv)) || 35;
+
+  // 4) Térmica: menor estándar que cumpla Ib ≤ In ≤ Iz_corregida y ≤ máx del tipo.
+  let termica = null;
+  for(const s of SECCIONES){
+    if(s < seccion) continue;
+    const iz = amp[s] * ft * fa;
+    const b = BREAKERS.find(x => x >= Ib && x <= iz && x <= t.inMax);
+    if(b){ seccion = s; termica = b; break; }
+  }
+  if(!termica){ termica = BREAKERS.find(b => b >= Ib) || 63; alertas.push("Revisá la coordinación protección/conductor (In > corriente admisible)."); }
+
+  const caidaPct = caidaEn(seccion);
+  if(caidaEn(sMin) > t.caidaMax && seccion > sMin) alertas.push(`Sección elevada por longitud (${L} m): la caída de tensión exigía más cobre.`);
+
+  return {nombre: nombre || t.label, tipo, Ib, seccion, termica, diferencial:"30 mA", caidaPct, L, alertas};
+}
+
+function gradoElectrificacion(m2){
+  if(m2 <= 60)  return {grado:"Mínimo",   minCirc:2, nDif:1};
+  if(m2 <= 130) return {grado:"Medio",    minCirc:3, nDif:1};
+  if(m2 <= 200) return {grado:"Elevado",  minCirc:5, nDif:2};
+  return {grado:"Superior", minCirc:6, nDif:2};
+}
+
+function precioTermica(precios, In){
+  const keys = [10, 16, 20, 25, 32, 40];
+  const k = keys.includes(In) ? In : keys.reduce((a,b)=> Math.abs(b-In) < Math.abs(a-In) ? b : a, 10);
+  return Number(precios["termica_" + k] || 0);
+}
+
+// Arma la lista de materiales a partir de los circuitos dimensionados.
+function construirMateriales(circuitos, contexto, precios){
+  const {bocasIlum=0, bocasToma=0, nDif=1, incluyePAT=true, soloCircuito=false} = contexto;
+  const items = [];
+  const waste = 1.10;
+  const push = (item, cant, unidad, key) => {
+    if(cant <= 0) return;
+    const pu = Number(precios[key] || 0);
+    const c = Math.round(cant * 100) / 100;
+    items.push({item, cant:c, unidad, precio:pu, subtotal: pu * cant, key});
+  };
+
+  // Cable por sección: fase + neutro + tierra, cada uno = suma de largos.
+  const porSeccion = {};
+  circuitos.forEach(c => { porSeccion[c.seccion] = (porSeccion[c.seccion] || 0) + c.L; });
+  Object.keys(porSeccion).sort((a,b)=> a-b).forEach(s => {
+    const m = porSeccion[s] * waste;
+    push(`Cable ${fmtSec(s)} — Fase (castaño)`,        m, "m", `cable_${s}`);
+    push(`Cable ${fmtSec(s)} — Neutro (celeste)`,       m, "m", `cable_${s}`);
+    push(`Cable ${fmtSec(s)} — Tierra (verde/amarillo)`, m, "m", `cable_${s}`);
+  });
+
+  // Térmicas por amperaje.
+  const porTermica = {};
+  circuitos.forEach(c => { porTermica[c.termica] = (porTermica[c.termica] || 0) + 1; });
+  Object.keys(porTermica).sort((a,b)=> a-b).forEach(In => {
+    const cant = porTermica[In];
+    const pu = precioTermica(precios, Number(In));
+    items.push({item:`Termomagnética ${In} A`, cant, unidad:"u", precio:pu, subtotal: pu*cant, key:"termica_"+In});
+  });
+
+  push(`Interruptor diferencial 30 mA`, nDif, "u", "diferencial_30ma");
+
+  if(!soloCircuito){
+    push(`Caja de embutir`,            bocasIlum + bocasToma, "u", "caja_embutir");
+    push(`Módulo tomacorriente`,       bocasToma,             "u", "modulo_toma");
+    push(`Módulo llave/interruptor`,   bocasIlum,             "u", "modulo_llave");
+    push(`Tapa + bastidor`,            bocasIlum + bocasToma, "u", "tapa_bastidor");
+  }
+
+  const largoTotal = circuitos.reduce((s,c)=> s + c.L, 0);
+  push(`Caño corrugado`, Math.ceil(soloCircuito ? largoTotal : largoTotal * 0.6), "m", "cano_corrugado");
+
+  if(!soloCircuito){
+    const modulos = 2 /*main bipolar*/ + nDif * 2 + circuitos.length;
+    const conReserva = Math.ceil(modulos * 1.25);
+    const tam = [8, 12, 18, 24, 36].find(t => t >= conReserva) || 36;
+    push(`Tablero ${tam} módulos (aprox.)`, tam, "módulo", "tablero_modulo");
+    if(incluyePAT) push(`Puesta a tierra (jabalina + tomacable)`, 1, "u", "jabalina_pat");
+  }
+
+  return items;
+}
+
+function presupuestar(items, opts, precios){
+  const {bocas=0, margen, manoObra="boca", horas=0, incluyeVisita=true} = opts;
+  const materiales = items.reduce((s,i)=> s + i.subtotal, 0);
+  const m = margen ?? configuracion.margen_insumos_default;
+  const materialesConMargen = materiales * (1 + m/100);
+  const mo = manoObra === "boca"
+    ? bocas * Number(precios.mano_obra_boca || 0)
+    : horas * Number(precios.mano_obra_hora || 0);
+  const visita = incluyeVisita ? Number(precios.visita_diagnostico || 0) : 0;
+  return {materiales, materialesConMargen, mo, visita, total: materialesConMargen + mo + visita, margen:m};
+}
+
+// ---------- Render de resultados ----------
+function badgeAlertas(alertas){
+  if(!alertas || !alertas.length) return "";
+  return alertas.map(a=>`<div class="footnote" style="color:var(--warn);">⚠️ ${esc(a)}</div>`).join("");
+}
+
+function renderResultadoCircuito(c){
+  const t = TIPOS_CIRCUITO[c.tipo] || TIPOS_CIRCUITO.ACU;
+  const sobre = c.caidaPct > t.caidaMax;
+  return `<div class="card">
+    <h3>${esc(c.nombre)} <span class="pill ${sobre ? 'alta':'baja'}">${esc(t.label)}</span></h3>
+    <div class="res-metric" style="margin-top:10px;">
+      <div class="rm"><div class="l">Corriente</div><div class="v">${c.Ib.toFixed(1)} A</div></div>
+      <div class="rm"><div class="l">Sección cable</div><div class="v">${esc(fmtSec(c.seccion))}</div></div>
+      <div class="rm"><div class="l">Termomagnética</div><div class="v">${c.termica} A</div></div>
+      <div class="rm"><div class="l">Diferencial</div><div class="v">30 mA</div></div>
+    </div>
+    <div class="footnote" style="margin-top:8px;">Caída de tensión estimada: ${c.caidaPct.toFixed(2)}% (límite AEA ${t.caidaMax}%).</div>
+    ${badgeAlertas(c.alertas)}
+  </div>`;
+}
+
+function renderTablaCircuitos(circuitos){
+  return `<div class="card"><h3>⚡ Circuitos calculados (${circuitos.length})</h3>
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Circuito</th><th>Corriente</th><th>Sección</th><th>Térmica</th><th>Dif.</th><th>Caída</th></tr></thead>
+      <tbody>${circuitos.map(c=>{
+        const t = TIPOS_CIRCUITO[c.tipo] || TIPOS_CIRCUITO.ACU;
+        return `<tr>
+          <td>${esc(c.nombre)}</td>
+          <td>${c.Ib.toFixed(1)} A</td>
+          <td>${esc(fmtSec(c.seccion))}</td>
+          <td>${c.termica} A</td>
+          <td>30 mA</td>
+          <td style="${c.caidaPct> t.caidaMax ? 'color:var(--warn);' : ''}">${c.caidaPct.toFixed(1)}%</td>
+        </tr>`;}).join("")}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderTablaMateriales(items){
+  return `<div class="card"><h3>🧰 Lista de materiales</h3>
+    <div class="aviso">Cantidades estimadas (incluye ~10% de desperdicio en cable). Verificá en obra.</div>
+    <div class="tabla-scroll"><table>
+      <thead><tr><th>Material</th><th>Cantidad</th><th>Precio unit.</th><th>Subtotal</th></tr></thead>
+      <tbody>${items.map(i=>`<tr><td>${esc(i.item)}</td><td>${i.cant} ${esc(i.unidad)}</td><td>${fmt(i.precio)}</td><td>${fmt(i.subtotal)}</td></tr>`).join("")}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderResumenPresupuesto(pres){
+  return `<div class="card"><h3>💵 Presupuesto estimado</h3>
+    <div class="res-metric">
+      <div class="rm"><div class="l">Materiales</div><div class="v">${fmt(pres.materiales)}</div></div>
+      <div class="rm"><div class="l">+ Margen ${pres.margen}%</div><div class="v">${fmt(pres.materialesConMargen)}</div></div>
+      <div class="rm"><div class="l">Mano de obra</div><div class="v">${fmt(pres.mo)}</div></div>
+      <div class="rm"><div class="l">Total${pres.visita ? ' (con visita)' : ''}</div><div class="v" style="color:var(--accent-dark);">${fmt(pres.total)}</div></div>
+    </div>
+    <div class="footnote" style="margin-top:6px;">Total orientativo con la lista de precios de abajo. Actualizá los precios con tus valores reales de proveedor.</div>
+  </div>`;
+}
+
+function accionesResultado(){
+  const opts = prospectos.length
+    ? prospectos.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre || ('#'+p.id))}</option>`).join("")
+    : '<option value="">(sin clientes cargados)</option>';
+  return `<div class="card">
+    <h3>Guardar / usar este cálculo</h3>
+    <div class="row" style="flex-wrap:wrap; gap:8px; justify-content:flex-start;">
+      <select id="calc-cliente" aria-label="Cliente para guardar el cálculo">${opts}</select>
+      <button class="btn" data-action="calc-guardar-cliente">Guardar en cliente</button>
+      <button class="btn" data-action="calc-a-checklist">Mandar a "Qué llevar"</button>
+      <button class="btn" data-action="calc-copiar">Copiar lista</button>
+      <button class="btn primary" data-action="calc-pdf">Generar prompt PDF</button>
+    </div>
+    <div id="calc-pdf-box"></div>
+  </div>`;
+}
+
+function resumenCalculo(){
+  if(!ultimoCalculo) return "";
+  const c = ultimoCalculo;
+  if(c.meta.tipo === "obra"){
+    return `${c.grado.grado} · ${c.contexto.bocasIlum} bocas de luz + ${c.contexto.bocasToma} tomas · ${c.circuitos.length} circuitos (${c.meta.m2} m²)`;
+  }
+  const x = c.circuitos[0];
+  return x ? `Circuito ${(TIPOS_CIRCUITO[x.tipo]||{}).label}: ${fmtSec(x.seccion)}, térmica ${x.termica} A` : "";
+}
+
+function textoListaMateriales(){
+  if(!ultimoCalculo || !ultimoCalculo.materiales) return "";
+  return ultimoCalculo.materiales.map(m=>`- ${m.cant} ${m.unidad} · ${m.item}`).join("\n");
+}
+
+function calcularRapido(){
+  const tipo = valId("cr-tipo") || "TUG";
+  const modoEntrada = valId("cr-modo-entrada") || "P";
+  const P = modoEntrada === "P" ? numId("cr-potencia") : null;
+  const I = modoEntrada === "I" ? numId("cr-corriente") : null;
+  const L = numId("cr-longitud") || 10;
+  const metodo = valId("cr-metodo") || "embutido";
+  const agrup = numId("cr-agrup") || 1;
+  const temp = numId("cr-temp") || 30;
+  const c = dimensionarCircuito({tipo, P, I, L, metodo, nAgrup:agrup, tempC:temp});
+  const precios = getPrecios();
+  const materiales = construirMateriales([c], {soloCircuito:true, nDif:1}, precios);
+  const pres = presupuestar(materiales, {bocas:0, margen: numId("cr-margen") || configuracion.margen_insumos_default, incluyeVisita:false}, precios);
+  ultimoCalculo = {circuitos:[c], contexto:{soloCircuito:true, nDif:1}, materiales, presupuesto:pres, meta:{tipo:"rapido"}};
+  document.getElementById("calc-resultado").innerHTML =
+    renderResultadoCircuito(c) + renderTablaMateriales(materiales) + renderResumenPresupuesto(pres) + accionesResultado();
+}
+
+function calcularObra(){
+  const m2 = numId("co-m2") || 60;
+  const bocasIlum = numId("co-ilum") || 0;
+  const bocasToma = numId("co-toma") || 0;
+  const Lmed = numId("co-long") || 18;
+  const metodo = valId("co-metodo") || "embutido";
+  const agrup = numId("co-agrup") || 3;
+  const temp = numId("co-temp") || 30;
+  const margen = numId("co-margen") || configuracion.margen_insumos_default;
+  const incluyePAT = (document.getElementById("co-pat") || {}).checked;
+  const incluyeVisita = (document.getElementById("co-visita") || {}).checked;
+
+  const cargas = [];
+  document.querySelectorAll(".co-esp:checked").forEach(chk=>{
+    const row = chk.closest(".esp-row");
+    const potencia = Number(row.querySelector(".esp-w").value) || 0;
+    const longitud = Number(row.querySelector(".esp-l").value) || Lmed;
+    if(potencia > 0) cargas.push({nombre: chk.dataset.nombre, potencia, longitud});
+  });
+
+  const g = gradoElectrificacion(m2);
+  const circuitos = [];
+  const nIUG = Math.max(1, Math.ceil(bocasIlum / 15));
+  for(let i=0;i<nIUG;i++) circuitos.push(dimensionarCircuito({nombre:`Iluminación${nIUG>1?" "+(i+1):""}`, tipo:"IUG", I:10, L:Lmed, metodo, nAgrup:agrup, tempC:temp}));
+  const nTUG = Math.max(1, Math.ceil(bocasToma / 15));
+  for(let i=0;i<nTUG;i++) circuitos.push(dimensionarCircuito({nombre:`Tomacorrientes${nTUG>1?" "+(i+1):""}`, tipo:"TUG", I:16, L:Lmed, metodo, nAgrup:agrup, tempC:temp}));
+  cargas.forEach(c=> circuitos.push(dimensionarCircuito({nombre:c.nombre, tipo:"ACU", P:c.potencia, L:c.longitud, metodo, nAgrup:agrup, tempC:temp})));
+
+  const contexto = {bocasIlum, bocasToma, agrup, nDif:g.nDif, incluyePAT};
+  const precios = getPrecios();
+  const materiales = construirMateriales(circuitos, contexto, precios);
+  const pres = presupuestar(materiales, {bocas: bocasIlum + bocasToma, margen, manoObra:"boca", incluyeVisita}, precios);
+  ultimoCalculo = {circuitos, contexto, materiales, presupuesto:pres, grado:g, meta:{tipo:"obra", m2}};
+
+  const alertasGlobales = [`Instalación grado ${g.grado} (por ${m2} m²): mínimo ${g.minCirc} circuitos y ${g.nDif} interruptor(es) diferencial(es) de 30 mA.`];
+  if(circuitos.length < g.minCirc) alertasGlobales.push(`Calculaste ${circuitos.length} circuitos: la norma pide al menos ${g.minCirc} para este grado.`);
+  alertasGlobales.push("Todos los circuitos deben quedar bajo diferencial de 30 mA (alta sensibilidad) y con puesta a tierra.");
+
+  document.getElementById("calc-resultado").innerHTML =
+    `<div class="card banner-info"><strong>Resumen:</strong> ${esc(resumenCalculo())}${badgeAlertas(alertasGlobales)}</div>` +
+    renderTablaCircuitos(circuitos) +
+    renderTablaMateriales(materiales) +
+    renderResumenPresupuesto(pres) +
+    accionesResultado();
+}
+
+function guardarPrecios(){
+  const p = getPrecios();
+  document.querySelectorAll(".precio-input").forEach(inp=>{ p[inp.dataset.key] = Number(inp.value) || 0; });
+  setPrecios(p);
+  toast("Precios guardados. Recalculá para verlos aplicados.", "ok");
+}
+
+function guardarCalculoCliente(){
+  if(!ultimoCalculo){ toast("Primero hacé un cálculo.", "warn"); return; }
+  const sel = document.getElementById("calc-cliente");
+  const cid = sel ? sel.value : "";
+  if(!cid){ toast("Elegí un cliente de la lista.", "warn"); return; }
+  let all = {};
+  try{ all = JSON.parse(localStorage.getItem("eos_calculos") || "{}"); }catch(e){}
+  (all[cid] = all[cid] || []).push({
+    fecha: new Date().toISOString(),
+    resumen: resumenCalculo(),
+    total: ultimoCalculo.presupuesto ? ultimoCalculo.presupuesto.total : null,
+  });
+  localStorage.setItem("eos_calculos", JSON.stringify(all));
+  toast("Cálculo guardado en el cliente.", "ok");
+}
+
+function calcAChecklist(){
+  if(!ultimoCalculo || !ultimoCalculo.materiales){ toast("Primero calculá los materiales.", "warn"); return; }
+  const sel = document.getElementById("calc-cliente");
+  const cid = sel ? sel.value : "";
+  if(!cid){ toast("Elegí un cliente de la lista.", "warn"); return; }
+  const items = getChecklist(cid);
+  ultimoCalculo.materiales.forEach(m=> items.push({texto:`${m.cant} ${m.unidad} · ${m.item}`, tildado:false}));
+  localStorage.setItem(checklistKey(cid), JSON.stringify(items));
+  toast('Materiales agregados a "Qué llevar" del cliente.', "ok");
+}
+
+function calcCopiar(){
+  const txt = textoListaMateriales();
+  if(!txt){ toast("No hay lista para copiar.", "warn"); return; }
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=> toast("Lista copiada.", "ok")).catch(()=> toast("No se pudo copiar automáticamente.", "warn"));
+  }else{
+    toast("Tu navegador no permite copiar automáticamente.", "warn");
+  }
+}
+
+function calcPromptPDF(){
+  if(!ultimoCalculo){ toast("Primero hacé un cálculo.", "warn"); return; }
+  const p = ultimoCalculo.presupuesto;
+  const prompt = `Armá un presupuesto profesional de trabajo eléctrico (Electricista OS — Marco, electricista matriculado, GBA Oeste), con diseño prolijo y claro.
+
+Alcance: ${resumenCalculo()}
+
+Materiales:
+${textoListaMateriales()}
+${p ? `\nMateriales: ${fmt(p.materiales)}\nMano de obra: ${fmt(p.mo)}\nTotal estimado: ${fmt(p.total)}` : ""}
+
+Aclarar: trabajo matriculado, con garantía por escrito y según norma AEA 90364.
+Forma de pago: Mercado Pago / CBU (completar datos de Marco).
+Devolvé el presupuesto listo para mandar por WhatsApp.`;
+  const box = document.getElementById("calc-pdf-box");
+  if(!box) return;
+  box.innerHTML = `<pre class="prompt-box" id="calc-pdf-txt" style="margin-top:12px;">${esc(prompt)}</pre><button class="btn sm" data-action="copiar-texto" data-target="calc-pdf-txt">Copiar prompt</button>`;
+}
+
+function renderPreciosEditor(){
+  const p = getPrecios();
+  const labels = {
+    "cable_1.5":"Cable 1,5 mm² (m)", "cable_2.5":"Cable 2,5 mm² (m)", "cable_4":"Cable 4 mm² (m)",
+    "cable_6":"Cable 6 mm² (m)", "cable_10":"Cable 10 mm² (m)", "cable_16":"Cable 16 mm² (m)",
+    "termica_10":"Termomagnética 10 A", "termica_16":"Termomagnética 16 A", "termica_20":"Termomagnética 20 A",
+    "termica_25":"Termomagnética 25 A", "termica_32":"Termomagnética 32 A", "termica_40":"Termomagnética 40 A",
+    "diferencial_30ma":"Diferencial 30 mA", "caja_embutir":"Caja de embutir", "modulo_toma":"Módulo tomacorriente",
+    "modulo_llave":"Módulo llave/interruptor", "tapa_bastidor":"Tapa + bastidor", "cano_corrugado":"Caño corrugado (m)",
+    "tablero_modulo":"Tablero (por módulo)", "jabalina_pat":"Puesta a tierra", "mano_obra_boca":"Mano de obra por boca",
+    "mano_obra_hora":"Mano de obra por hora", "visita_diagnostico":"Visita / diagnóstico",
+  };
+  const rows = Object.keys(labels).map(k=>`<tr><td>${esc(labels[k])}</td><td><input class="calc-num precio-input" data-key="${esc(k)}" type="number" value="${esc(p[k] ?? "")}" aria-label="${esc(labels[k])}"></td></tr>`).join("");
+  return `<div class="aviso">Precios de referencia — actualizalos con tus valores reales de proveedor. Se guardan en este navegador.</div>
+    <div class="tabla-scroll"><table><thead><tr><th>Ítem</th><th>Precio (ARS)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <button class="btn primary" data-action="guardar-precios" style="margin-top:10px;">Guardar precios</button>`;
+}
+
+function renderCalculadora(){
+  const metodos = [["embutido","Embutido en caño (pared)"],["cablecanal","Cable canal / bandeja"],["aire","Al aire"],["subterraneo","Subterráneo"]];
+  const optMet = metodos.map(m=>`<option value="${m[0]}">${esc(m[1])}</option>`).join("");
+  const especiales = [["Aire acondicionado split",2200],["Termotanque eléctrico",1500],["Cocina / horno eléctrico",5000],["Bomba / pileta",1100]];
+
+  return `
+  <div class="card banner-info">
+    <strong>🧮 Calculadora orientativa según AEA 90364</strong>
+    <div class="sub" style="margin:4px 0 0;">Te da secciones de cable, protecciones y la lista de materiales para cotizar rápido. El dimensionamiento final lo validás vos como matriculado con las tablas oficiales — no reemplaza el proyecto eléctrico.</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Modo de cálculo">
+      <button class="active" data-action="calc-modo" data-modo="obra">Obra completa (según cliente)</button>
+      <button data-action="calc-modo" data-modo="rapido">Modo rápido (1 circuito)</button>
+    </div>
+  </div>
+
+  <div id="calc-obra">
+    <div class="card">
+      <h3>Detectar materiales según el trabajo</h3>
+      <div class="sub">Cargá los datos del inmueble y las cargas especiales. El sistema separa los circuitos como pide la norma (iluminación / tomas / cada carga especial en su circuito), los dimensiona, y arma la lista de materiales + presupuesto.</div>
+      <div class="grid g3">
+        <div><label class="field-label" for="co-m2">Superficie (m²)</label><input id="co-m2" type="number" value="70"></div>
+        <div><label class="field-label" for="co-ilum">Bocas de iluminación</label><input id="co-ilum" type="number" value="8"></div>
+        <div><label class="field-label" for="co-toma">Bocas de tomas (TUG)</label><input id="co-toma" type="number" value="10"></div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="field-label">Cargas especiales (cada una lleva su circuito propio)</div>
+        ${especiales.map(e=>`<label class="esp-row">
+          <input type="checkbox" class="co-esp" data-nombre="${esc(e[0])}">
+          <span class="esp-nom">${esc(e[0])}</span>
+          <small>Potencia</small><input class="calc-num esp-w" type="number" value="${e[1]}" aria-label="Potencia en watts"> <small>W</small>
+          <small>Largo</small><input class="calc-num esp-l" type="number" value="18" aria-label="Largo en metros"> <small>m</small>
+        </label>`).join("")}
+      </div>
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Opciones avanzadas</summary>
+        <div class="grid g4" style="margin-top:10px;">
+          <div><label class="field-label" for="co-long">Largo medio circuito (m)</label><input id="co-long" type="number" value="18"></div>
+          <div><label class="field-label" for="co-metodo">Instalación</label><select id="co-metodo">${optMet}</select></div>
+          <div><label class="field-label" for="co-agrup">Circuitos por caño</label><input id="co-agrup" type="number" value="1"><small style="color:var(--ink-muted);">Subilo si varios circuitos comparten el mismo caño (deratea la sección).</small></div>
+          <div><label class="field-label" for="co-temp">Temp. ambiente (°C)</label><input id="co-temp" type="number" value="30"></div>
+          <div><label class="field-label" for="co-margen">Margen materiales (%)</label><input id="co-margen" type="number" value="${esc(configuracion.margen_insumos_default)}"></div>
+        </div>
+        <label class="chk-item"><input type="checkbox" id="co-pat" checked> Incluir puesta a tierra</label>
+        <label class="chk-item"><input type="checkbox" id="co-visita" checked> Incluir visita/diagnóstico en el total</label>
+      </details>
+      <button class="btn primary" style="margin-top:14px;" data-action="calc-obra">Calcular materiales y presupuesto</button>
+    </div>
+  </div>
+
+  <div id="calc-rapido" hidden>
+    <div class="card">
+      <h3>Cálculo rápido de un circuito</h3>
+      <div class="sub">Para dimensionar un circuito puntual: sección de cable, térmica y caída de tensión.</div>
+      <div class="grid g3">
+        <div><label class="field-label" for="cr-tipo">Tipo de circuito</label><select id="cr-tipo">${Object.keys(TIPOS_CIRCUITO).map(k=>`<option value="${k}">${esc(TIPOS_CIRCUITO[k].label)}</option>`).join("")}</select></div>
+        <div><label class="field-label" for="cr-modo-entrada">Entrada</label><select id="cr-modo-entrada"><option value="P">Potencia (W)</option><option value="I">Corriente (A)</option></select></div>
+        <div><label class="field-label" for="cr-longitud">Longitud (m)</label><input id="cr-longitud" type="number" value="15"></div>
+        <div><label class="field-label" for="cr-potencia">Potencia (W)</label><input id="cr-potencia" type="number" value="2200"></div>
+        <div><label class="field-label" for="cr-corriente">Corriente (A)</label><input id="cr-corriente" type="number" value="10"></div>
+        <div><label class="field-label" for="cr-metodo">Instalación</label><select id="cr-metodo">${optMet}</select></div>
+        <div><label class="field-label" for="cr-agrup">Circuitos por caño</label><input id="cr-agrup" type="number" value="1"></div>
+        <div><label class="field-label" for="cr-temp">Temp. (°C)</label><input id="cr-temp" type="number" value="30"></div>
+      </div>
+      <button class="btn primary" style="margin-top:14px;" data-action="calc-rapido">Calcular circuito</button>
+    </div>
+  </div>
+
+  <div id="calc-resultado"></div>
+
+  <details class="card">
+    <summary style="cursor:pointer; font-weight:600;">Lista de precios (editar)</summary>
+    <div style="margin-top:10px;">${renderPreciosEditor()}</div>
+  </details>
+  `;
+}
+
+// ------------------------------------------------------------------
 // DELEGACIÓN DE EVENTOS — un solo listener por tipo, en lugar de ~37
 // onclick inline con datos interpolados a mano. Más seguro (no hay
 // superficie de XSS por atributos) y sin bugs de escaping cuando un
@@ -2011,6 +2517,23 @@ function handleAction(action, el, ev){
     case "generar-prompt-diagnostico": generarPromptDiagnostico(); break;
     case "generar-prompt-upsell": generarPromptUpsell(); break;
     case "generar-prompt-respuesta": generarPromptRespuesta(); break;
+    case "calc-modo": {
+      const modo = d.modo;
+      const fObra = document.getElementById("calc-obra");
+      const fRap = document.getElementById("calc-rapido");
+      if(fObra) fObra.hidden = modo !== "obra";
+      if(fRap) fRap.hidden = modo !== "rapido";
+      el.parentElement.querySelectorAll("button").forEach(b=>b.classList.toggle("active", b===el));
+      const r = document.getElementById("calc-resultado"); if(r) r.innerHTML = "";
+      break;
+    }
+    case "calc-obra": calcularObra(); break;
+    case "calc-rapido": calcularRapido(); break;
+    case "guardar-precios": guardarPrecios(); break;
+    case "calc-guardar-cliente": guardarCalculoCliente(); break;
+    case "calc-a-checklist": calcAChecklist(); break;
+    case "calc-copiar": calcCopiar(); break;
+    case "calc-pdf": calcPromptPDF(); break;
   }
 }
 
