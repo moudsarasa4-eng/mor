@@ -230,39 +230,41 @@ main{padding:6px 18px; max-width:1220px; margin:0 auto; width:100%; box-sizing:b
   overflow:hidden;
   box-shadow:inset 0 0 10px rgba(0,0,0,.25);
 }
+/* Estilo "ticket real de mostrador" (mismo lenguaje visual que la
+   OrderCard de McPractica KVS: cabecera violeta con Side→/tipo/código,
+   cuerpo blanco con los ítems del pedido, pie rojo con el estado y el
+   tiempo). El pedido activo se marca con el mismo borde verde grueso
+   que usa esa tarjeta para el pedido "en frente". */
 .kvs-ticket{
-  flex:0 0 auto; width:128px; background:#c7d3dc; border:1px solid #8fa1ad;
-  display:flex; flex-direction:column; border-radius:1px;
+  flex:0 0 auto; width:132px; background:#fff; border:1px solid #cfd6da;
+  display:flex; flex-direction:column; border-radius:2px;
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
 }
-.kvs-ticket.active{ border-color:var(--gold-ink); box-shadow:0 0 0 2px rgba(255,199,44,.35); }
+.kvs-ticket.active{ border:3px solid #4ade80; box-shadow:0 0 0 2px rgba(74,222,128,.35); }
 .kvs-ticket-head{
-  background:#4a4a52; color:#fff; display:flex; align-items:center; justify-content:space-between;
-  gap:3px; font-size:9.5px; font-weight:700; letter-spacing:.2px; padding:3px 5px; text-transform:uppercase;
+  background:#4c1d95; color:#fff; display:flex; align-items:center; justify-content:space-between;
+  gap:3px; font-size:9px; font-weight:800; letter-spacing:.2px; padding:3px 5px; text-transform:uppercase;
 }
-.kvs-ticket.active .kvs-ticket-head{ background:#7a5220; color:#fff8ea; }
 .kvs-ticket.crit .kvs-ticket-head{ background:var(--err); }
 .kvs-ticket-code{ font-weight:800; }
 .kvs-ticket-body{
-  flex:1; background:#dbe3e8; color:#1a1a1a; font-size:10px; line-height:1.55; padding:5px 6px 2px;
+  flex:1; background:#fff; color:#1a1a1a; font-size:10px; line-height:1.55; padding:5px 6px 4px;
   min-height:2.8em;
-  /* Antes esto tenía max-height:2.8em + overflow:hidden, pensado para nombres
-     cortos ("Hamburguesa con Queso"). Nombres largos como "Grand Tasty Turbo
-     Bacon Triple" necesitan más de ~1.8 líneas y quedaban recortados a la
-     mitad. Se saca el techo fijo: el ticket crece lo que necesite, y si el
-     conjunto no entra en el panel, mcdFitAll() ya se encarga de achicar todo
-     (mismo mecanismo que arregla el desborde de fitLayers()). */
+  /* El ticket crece lo que necesite (nombres largos tipo "Grand Tasty
+     Turbo Bacon Triple" no se recortan); si el conjunto no entra en el
+     panel, mcdFitAll() achica todo en conjunto (mismo mecanismo que
+     arregla el desborde de fitLayers()). */
 }
 .kvs-item-main{ font-weight:800; }
-.kvs-item-side{ color:#4b5760; }
+.kvs-item-side{ color:#6b7680; padding-left:6px; }
 .kvs-ticket-foot{
-  background:#9fb2bd; text-align:right; color:#c1541e; font-weight:800; font-size:12.5px;
-  padding:2px 6px; letter-spacing:.2px;
+  background:#f87171; text-align:right; color:#fff; font-weight:800; font-size:11.5px;
+  padding:2px 6px; letter-spacing:.2px; display:flex; justify-content:space-between; align-items:center;
 }
-.kvs-ticket.warn:not(.active) .kvs-ticket-head{ background:#6b5a3a; }
-.kvs-ticket.crit .kvs-ticket-foot{ color:var(--err); }
-.kvs-ticket.crit .kvs-ticket-body{ animation:pulse 1s infinite; }
-.kvs-ticket.queued-static .kvs-ticket-foot{ color:#6b7680; }
-.kvs-ticket.queued-static{ opacity:.8; }
+.kvs-ticket.warn:not(.active) .kvs-ticket-head{ background:#8a5a12; }
+.kvs-ticket.crit .kvs-ticket-foot{ background:var(--err); animation:pulse 1s infinite; }
+.kvs-ticket.queued-static .kvs-ticket-foot{ background:#9ca3af; }
+.kvs-ticket.queued-static{ opacity:.82; }
 .kvs-ticket.queued-static .kvs-ticket-body{ font-style:italic; }
 .kvs-empty{ color:#5a6570; font-size:0.72rem; padding:12px 8px; font-weight:600; }
 @media(max-width:880px){ .kvs-wrap{position:static;} }
@@ -1911,7 +1913,9 @@ function spawnOrder(){
   // Ahora el pedido nace SIN deadline (null); recién se calcula cuando el
   // pedido pasa a ser el activo, en activateOrder(). Mientras está en
   // cola, queda "congelado": no cuenta tiempo hasta que le toca el turno.
-  const order={ recipe, arrivedAt:Date.now(), deadline:null, no:(++state.orderSeq) };
+  const order={ recipe, arrivedAt:Date.now(), deadline:null, no:(++state.orderSeq),
+    orderType: KVS_ORDER_TYPES[Math.floor(Math.random()*KVS_ORDER_TYPES.length)],
+    orderStorage: KVS_STORAGE[Math.floor(Math.random()*KVS_STORAGE.length)] };
   if(!state.active) activateOrder(order); else state.queue.push(order);
   renderKVS();
 }
@@ -1974,6 +1978,8 @@ function orderExpired(){ penalize(150); getProductStat(state.active.recipe.name)
    no forman parte de lo que hay que ensamblar ni se evalúan.
 ============================================================ */
 const KVS_DRINKS = ["Coca-Cola","Sprite","Fanta"];
+const KVS_ORDER_TYPES = ["DT","Bag","Tray","Delivery"];
+const KVS_STORAGE = ["Paid","Stored"];
 function kvsSideItems(order){
   const tier = order.recipe.tier;
   const fries = tier==="simple" ? "Papas Ch" : (tier==="premium" ? "Papas L" : "Papas M");
@@ -1990,9 +1996,10 @@ function renderKVS(){
     const code="P"+String(it.o.no).padStart(2,"0");
 
     const head=document.createElement("div"); head.className="kvs-ticket-head";
-    const status=document.createElement("span"); status.textContent=it.active?"◆ Armando":"◆ En cola";
+    const side=document.createElement("span"); side.textContent="Side →";
+    const typeEl=document.createElement("span"); typeEl.textContent=it.o.orderType||"DT";
     const codeEl=document.createElement("span"); codeEl.className="kvs-ticket-code"; codeEl.textContent=code;
-    head.appendChild(status); head.appendChild(codeEl);
+    head.appendChild(side); head.appendChild(typeEl); head.appendChild(codeEl);
 
     const body=document.createElement("div"); body.className="kvs-ticket-body";
     const main=document.createElement("div"); main.className="kvs-item-main"; main.textContent="1 "+it.o.recipe.name;
@@ -2003,28 +2010,31 @@ function renderKVS(){
     });
 
     const foot=document.createElement("div"); foot.className="kvs-ticket-foot";
+    const storageEl=document.createElement("span"); storageEl.textContent=it.o.orderStorage||"Paid";
+    const timeEl=document.createElement("span");
     if(it.active && it.o.deadline){
       // Pedido activo con cronómetro: cuenta regresiva en vivo.
       const total=it.o.deadline-it.o.arrivedAt; const remaining=Math.max(0,it.o.deadline-Date.now());
       const pct=Math.max(0,Math.min(100,(remaining/total)*100));
       const secs=Math.ceil(remaining/1000);
       const mm=Math.floor(secs/60), ss=secs%60;
-      foot.textContent=mm+":"+String(ss).padStart(2,"0");
+      timeEl.textContent=mm+":"+String(ss).padStart(2,"0");
       if(pct<50) t.classList.add("warn"); if(pct<20) t.classList.add("crit");
     } else if(it.active){
       // Modo entrenamiento: sin cronómetro.
-      foot.textContent="SIN LÍMITE";
+      timeEl.textContent="SIN LÍMITE";
     } else if(!it.active && state.mode!=="entrenamiento"){
       // En cola: tiempo teórico que tendrá una vez activado, congelado.
       const speedMul = state.mode==="almuerzo"?0.6:1;
       const secs=Math.ceil((it.o.recipe.target*speedMul*2500)/1000);
       const mm=Math.floor(secs/60), ss=secs%60;
-      foot.textContent=mm+":"+String(ss).padStart(2,"0")+" ⏸";
+      timeEl.textContent=mm+":"+String(ss).padStart(2,"0")+" ⏸";
       t.classList.add("queued-static");
     } else {
-      foot.textContent="EN COLA";
+      timeEl.textContent="EN COLA";
       t.classList.add("queued-static");
     }
+    foot.appendChild(storageEl); foot.appendChild(timeEl);
 
     t.appendChild(head); t.appendChild(body); t.appendChild(foot);
     kvsRow.appendChild(t);
