@@ -2650,6 +2650,77 @@ const SPEECHS = [
    upsells:["Medición de resistencia con informe.","Revisión del diferencial existente (test).","Actualización de tablero si es muy viejo (misma visita)."]},
 ];
 
+// Versión PROFESIONAL de cada speech de trabajo (por rank). El "cercano" es el de arriba.
+const SPEECHS_PROF = {
+  1:"Buen día, soy [Nombre] de [Negocio], electricista matriculado. Para localizar el cortocircuito sin roturas innecesarias realizo un diagnóstico con instrumental; tiene un costo de visita de [$monto] que se descuenta del trabajo si lo contrata. ¿Percibe olor a quemado, chispas, o solo interrupción del suministro?",
+  2:"Buen día, soy [Nombre] de [Negocio]. Para orientarlo: ¿lo que salta es la térmica (la llave pequeña) o el disyuntor (el de mayor tamaño, con botón de test)? Son fallas distintas: la térmica actúa por sobrecarga y el disyuntor por fuga a tierra. ¿Coincide con el uso de algún artefacto en particular?",
+  4:"Buen día, soy [Nombre] de [Negocio]. Con gusto lo presupuesto: indíqueme cuántas bocas necesita y en qué ambiente, así detallo materiales y mano de obra. Si me envía una foto del tablero y del lugar, agilizo el cálculo.",
+  7:"Buen día, soy [Nombre] de [Negocio]. Para el aire acondicionado corresponde un circuito exclusivo, a fin de evitar que la protección actúe en verano. ¿Podría indicarme las frigorías/BTU del equipo y si el tablero dispone de espacio para un circuito adicional?",
+  6:"Buen día, soy [Nombre] de [Negocio]. La visita de diagnóstico tiene un costo de [$monto], que se descuenta del trabajo si lo contrata. Cuénteme qué está ocurriendo y evalúo si puedo adelantarle un rango de precio antes de la visita.",
+  8:"Buen día, soy [Nombre] de [Negocio]. Para la colocación de artefactos, indíqueme la cantidad y si ya los adquirió, y si se trata de reemplazo o de un punto nuevo.",
+  9:"Buen día, soy [Nombre] de [Negocio]. El termotanque eléctrico requiere un circuito propio con protección dedicada. ¿Podría indicarme la potencia del equipo y si el punto eléctrico ya existe o debe ejecutarse?",
+  10:"Buen día, soy [Nombre] de [Negocio]. La cocina eléctrica es una carga elevada y requiere circuito propio con cable de mayor sección. ¿Podría indicarme la potencia y si el tablero dispone de espacio para el circuito?",
+  14:"Buen día, soy [Nombre] de [Negocio]. Para el ventilador de techo con luz, el trabajo depende de si el punto requiere refuerzo por el peso. ¿En qué ambiente se instalará y ya dispone del artefacto?",
+  19:"Buen día, soy [Nombre] de [Negocio], electricista matriculado. La renovación de tablero es una mejora clave en instalaciones antiguas. ¿El tablero actual es de riel DIN o del tipo antiguo? ¿Cuenta con disyuntor diferencial?",
+  17:"Buen día, soy [Nombre] de [Negocio]. La puesta a tierra es la que permite que el disyuntor actúe correctamente. ¿Sabe si la vivienda cuenta con jabalina, o es una consulta que le surgió recientemente?",
+};
+
+// EMBUDO — bloques comerciales (ambos tonos). Placeholders: [Nombre] [Negocio]
+// [$monto] [alias] [contado] [sena] [validez] [link].
+const EMBUDO = [
+  {id:"e-fuera-horario", cat:"Contacto", nombre:"Saludo fuera de horario",
+   cercano:"¡Hola! Gracias por escribir a [Negocio] ⚡ Ahora estoy fuera de horario, pero dejame el detalle y te respondo a primera hora. Si es una urgencia (chispas, olor a quemado, algo caliente) decímelo ahora y te oriento por acá.",
+   prof:"Buen día. Gracias por comunicarse con [Negocio]. En este momento me encuentro fuera del horario de atención; déjeme el detalle de su consulta y le respondo a la brevedad. Si se trata de una urgencia (chispas, olor a quemado o calor), indíquemelo ahora y lo oriento de inmediato."},
+  {id:"e-costo-visita", cat:"Precio", nombre:"Explicar el costo de la visita",
+   cercano:"Entiendo que quieras un número. Para darte un precio justo necesito verlo — así evitamos sorpresas. La visita tiene un costo de [$monto] que incluye el diagnóstico, y si hacés el trabajo se descuenta del total. ¿Coordinamos?",
+   prof:"Comprendo su necesidad de un valor. Para brindarle un precio preciso requiero evaluar el problema en el lugar, evitando estimaciones erróneas. La visita tiene un costo de [$monto], que incluye el diagnóstico y se descuenta del total si contrata el trabajo. ¿Coordinamos una fecha?"},
+  {id:"e-agendar", cat:"Cierre", nombre:"Agendar (2 horarios)",
+   cercano:"Para dejártelo resuelto tengo lugar el jueves a la mañana o el viernes a la tarde. ¿Cuál te sirve? Te paso presupuesto por escrito y con garantía.",
+   prof:"Puedo coordinar la visita el jueves por la mañana o el viernes por la tarde. El trabajo se entrega con presupuesto y garantía por escrito. ¿Qué horario le resulta más conveniente?"},
+  {id:"e-presu3", cat:"Precio", nombre:"Presupuesto en 3 niveles",
+   cercano:"Te dejo 3 opciones para que elijas según lo que quieras invertir ahora: 🔹 Básica: resuelve lo puntual. 🔸 Recomendada: lo puntual + corrige lo relacionado que encontré. ⭐ Completa: además deja la instalación al día (diferencial / puesta a tierra). Cualquier duda te explico cada una.",
+   prof:"Le presento tres opciones para que elija según su preferencia de inversión: Básica (resuelve el problema puntual), Recomendada (lo anterior más la corrección de los hallazgos relacionados) y Completa (deja la instalación conforme a norma). Quedo a disposición para detallar cada alternativa."},
+  {id:"e-sena", cat:"Cobro", nombre:"Pedir la seña",
+   cercano:"Para arrancar te pido una seña de [sena]% — es para comprar los materiales y reservarte el día. El resto cuando termino y ves que quedó todo bien. Podés transferir al alias [alias].",
+   prof:"Para agendar el trabajo se abona una seña del [sena]% en concepto de materiales y reserva de turno. El saldo se cancela al finalizar, contra conformidad del trabajo. La seña puede transferirse al alias [alias]."},
+  {id:"e-medios", cat:"Cobro", nombre:"Medios de pago",
+   cercano:"Podés pagarme por transferencia (alias [alias]), en efectivo — si es contado te hago [contado]% de descuento — o con Mercado Pago si te queda cómodo. En trabajos grandes también tomo dólares, lo cotizamos al cambio del día. El presupuesto vale [validez] días por si cambian los precios.",
+   prof:"Aceptamos transferencia (alias [alias]), efectivo (con [contado]% de descuento por pago contado) y Mercado Pago. Para montos mayores puede abonarse en dólares, tomados a la cotización de referencia del día. El presupuesto tiene una validez de [validez] días por variación de precios."},
+  {id:"e-cobro", cat:"Cobro", nombre:"Recordatorio de cobro",
+   cercano:"Hola, ¿cómo andás? Te recuerdo el saldito pendiente del trabajo. Te paso alias por si te queda cómodo transferir: [alias]. ¡Gracias!",
+   prof:"Estimado/a, le recuerdo el saldo pendiente correspondiente al trabajo realizado. Puede abonarlo por transferencia (alias [alias]) o Mercado Pago. Quedo a disposición. Saludos, [Negocio]."},
+  {id:"e-seguimiento", cat:"Postventa", nombre:"Seguimiento + reseña",
+   cercano:"¡Hola! ¿Quedó todo funcionando bien? Si te sirvió, me ayudás un montón dejando una reseña acá: [link]. ¡Gracias y cualquier cosa me escribís!",
+   prof:"Estimado/a, quería confirmar que el trabajo quedó en correcto funcionamiento. Si quedó conforme, le agradecería una reseña en [link]. El trabajo cuenta con garantía. Quedo a disposición ante cualquier consulta."},
+  {id:"e-referidos", cat:"Incentivo", nombre:"Pedir referidos",
+   cercano:"Si te sirvió, pasá mi contacto: por cada vecino que me recomiendes tenés un descuento en tu próximo trabajo (y él también en el primero). ¡Gracias por la buena onda!",
+   prof:"Contamos con un programa de referidos: por cada cliente que nos recomiende, usted recibe un crédito para su próximo servicio y el nuevo cliente un beneficio en su primera contratación. Le agradezco su recomendación."},
+  {id:"e-seriedad", cat:"Confianza", nombre:"Presentarte con seriedad",
+   cercano:"Trabajo matriculado y te dejo todo por escrito, con garantía. Nada de parches: lo hago según norma para que te quede seguro y puedas quedarte tranquilo. Si querés te paso fotos de trabajos que hice en la zona.",
+   prof:"Soy electricista matriculado. Entrego presupuesto y garantía por escrito, y ejecuto conforme a la norma AEA 90364. De ser necesario, emito el certificado de la instalación. Puedo compartirle referencias de trabajos realizados en la zona."},
+  {id:"e-obj-caro", cat:"Objeción", nombre:"Objeción: es caro",
+   cercano:"Entiendo. La diferencia es que trabajo matriculado, con garantía por escrito y según norma — eso te cubre ante un problema o un trámite. Si querés, vemos la opción básica que resuelve lo urgente ahora.",
+   prof:"Comprendo su punto. La diferencia radica en que el trabajo es matriculado, con garantía por escrito y conforme a norma, lo que lo respalda ante un inconveniente o un trámite. Si lo prefiere, evaluamos la opción básica para resolver lo prioritario."},
+  {id:"e-obj-pensar", cat:"Objeción", nombre:"Objeción: lo voy a pensar",
+   cercano:"Dale, sin drama. El presupuesto te queda válido [validez] días. Si querés, arrancamos por lo urgente y el resto lo dejamos para más adelante. Cualquier duda, acá estoy.",
+   prof:"Por supuesto, tómese su tiempo. El presupuesto tiene una validez de [validez] días. Si lo desea, podemos comenzar por lo prioritario y programar el resto más adelante. Quedo a disposición."},
+  {id:"e-obj-barato", cat:"Objeción", nombre:"Objeción: conseguí más barato",
+   cercano:"Puede ser, hay de todo. Yo te dejo todo por escrito, matriculado y con garantía; si algo falla, respondo. Igual miramos si la opción básica se ajusta a lo que buscás.",
+   prof:"Es posible; existe una amplia variedad de precios. Mi propuesta incluye trabajo matriculado, presupuesto y garantía por escrito, y respaldo ante cualquier inconveniente. De todas formas, podemos revisar si la opción básica se ajusta a su presupuesto."},
+  {id:"e-obj-visita", cat:"Objeción", nombre:"Objeción: ¿por qué cobrás la visita?",
+   cercano:"Cubre el traslado y el diagnóstico en el lugar — y si hacés el trabajo, ese monto se descuenta del total. Es la forma de darte un precio real y no un número al aire.",
+   prof:"El costo de la visita cubre el traslado y el diagnóstico en el domicilio, y se descuenta del total si contrata el trabajo. Es lo que me permite brindarle un precio preciso en lugar de una estimación."},
+];
+
+function guionesBase(){
+  const trabajos = SPEECHS.map(s => ({
+    id:"t"+s.rank, cat:"Trabajo", nombre:s.nombre,
+    cercano:s.speech, prof:(SPEECHS_PROF[s.rank] || s.speech),
+    preguntas:s.preguntas, upsells:s.upsells,
+  }));
+  return trabajos.concat(EMBUDO);
+}
+
 // Clasificador por lenguaje real (sinónimos). El primero que matchea gana.
 const EMERGENCIA_CLAVES = ["quemado","olor a quemado","huele a quemado","chispa","chispas","humo","fuego","arde","se calienta","calienta","caliente al tacto","descarga","calambre"];
 const CLASIFICADOR = [
@@ -2683,10 +2754,16 @@ const CONFIG_NEGOCIO_DEFAULT = {
   zonas:["Hurlingham","Morón","Castelar","Haedo","Ituzaingó","Padua","Otra"],
   matriz:{"Hurlingham|Morón":12,"Hurlingham|Castelar":20,"Hurlingham|Haedo":15,"Hurlingham|Ituzaingó":18,"Morón|Castelar":12,"Morón|Haedo":10,"Castelar|Ituzaingó":10,"Haedo|Morón":10,"Padua|Castelar":12,"Padua|Ituzaingó":10},
   monotributo:{activo:true, categoria:"", tope_anual:0, dia_venc:20},
+  // Datos para los mensajes/speechs (los completa Marco).
+  guion:{alias:"", sena_pct:30, contado_pct:10, validez_dias:10, acepta_dolares:true, link_resena:""},
 };
 function getConfigNegocio(){
   try{ const g = JSON.parse(localStorage.getItem("eos_config_negocio")||"{}");
-    return {...CONFIG_NEGOCIO_DEFAULT, ...g, pesos:{...CONFIG_NEGOCIO_DEFAULT.pesos,...(g.pesos||{})}, cortes:{...CONFIG_NEGOCIO_DEFAULT.cortes,...(g.cortes||{})}};
+    return {...CONFIG_NEGOCIO_DEFAULT, ...g,
+      pesos:{...CONFIG_NEGOCIO_DEFAULT.pesos,...(g.pesos||{})},
+      cortes:{...CONFIG_NEGOCIO_DEFAULT.cortes,...(g.cortes||{})},
+      monotributo:{...CONFIG_NEGOCIO_DEFAULT.monotributo,...(g.monotributo||{})},
+      guion:{...CONFIG_NEGOCIO_DEFAULT.guion,...(g.guion||{})}};
   }catch(e){ return JSON.parse(JSON.stringify(CONFIG_NEGOCIO_DEFAULT)); }
 }
 function setConfigNegocio(c){ localStorage.setItem("eos_config_negocio", JSON.stringify(c)); }
@@ -2729,10 +2806,35 @@ function mergeProspectosLocales(){
 // ==================================================================
 function fillSpeech(txt){
   const c = getConfigNegocio();
+  const g = c.guion || {};
   return String(txt)
     .replace(/\[Nombre\]/g, c.titular || "Marco")
     .replace(/\[Negocio\]/g, c.negocio || "Electricista OS")
-    .replace(/\[\$monto\]/g, fmt(c.visita_monto || 40000));
+    .replace(/\[\$monto\]/g, fmt(c.visita_monto || 40000))
+    .replace(/\[alias\]/g, g.alias || "(tu alias/CBU)")
+    .replace(/\[contado\]/g, String(g.contado_pct ?? 10))
+    .replace(/\[sena\]/g, String(g.sena_pct ?? 30))
+    .replace(/\[validez\]/g, String(g.validez_dias ?? 10))
+    .replace(/\[link\]/g, g.link_resena || "(tu link de Google)");
+}
+// Tono elegido para los guiones ("cercano" | "profesional").
+function guionTono(){ try{ return localStorage.getItem("eos_guion_tono") || "cercano"; }catch(e){ return "cercano"; } }
+function setGuionTono(t){ localStorage.setItem("eos_guion_tono", t); }
+// Overrides de Marco por guión+tono.
+function _guionOverrides(){ try{ return JSON.parse(localStorage.getItem("eos_guiones") || "{}"); }catch(e){ return {}; } }
+function guionOverride(id, tono){ return _guionOverrides()[id + ":" + tono]; }
+function setGuionOverride(id, tono, texto){ const o=_guionOverrides(); if(texto==null||texto==="") delete o[id+":"+tono]; else o[id+":"+tono]=texto; localStorage.setItem("eos_guiones", JSON.stringify(o)); }
+// Texto crudo (plantilla) de un guión para un tono, respetando el override.
+function guionCrudo(item, tono){
+  const ov = guionOverride(item.id, tono);
+  if(ov != null) return ov;
+  return tono === "profesional" ? (item.prof || item.cercano) : item.cercano;
+}
+function guionTexto(item, tono){ return fillSpeech(guionCrudo(item, tono)); }
+// Texto del speech de un trabajo (usado por el intake), respetando tono + override.
+function speechTrabajoTexto(s, tono){
+  const item = {id:"t"+s.rank, cercano:s.speech, prof:(typeof SPEECHS_PROF!=="undefined" ? (SPEECHS_PROF[s.rank]||s.speech) : s.speech)};
+  return guionTexto(item, tono || guionTono());
 }
 
 function clasificarMensaje(texto){
@@ -2780,14 +2882,17 @@ function waAnalizar(){
     </div>
     ${speech? `
     <div class="card">
-      <div class="footnote" style="text-transform:uppercase; font-weight:700;">Speech sugerido</div>
-      <pre class="prompt-box" id="wa-speech-txt">${esc(fillSpeech(speech.speech))}</pre>
-      <button class="btn sm" data-action="copiar-texto" data-target="wa-speech-txt">Copiar speech</button>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700;">Speech sugerido (tono ${esc(guionTono())})</div>
+      <pre class="prompt-box" id="wa-speech-txt">${esc(speechTrabajoTexto(speech))}</pre>
+      <div class="row" style="justify-content:flex-start; gap:6px; margin-top:6px; flex-wrap:wrap;">
+        <button class="btn sm" data-action="copiar-texto" data-target="wa-speech-txt">Copiar</button>
+        <a class="btn sm primary" href="${esc(whatsappLink("", speechTrabajoTexto(speech)))}" target="_blank" rel="noopener">Mandar por WhatsApp</a>
+      </div>
       <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Preguntas de calificación</div>
       <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">
         ${speech.preguntas.map(q=>`<li>${esc(q)}</li>`).join("")}
       </ul>
-      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsell sugerido (uno, según respuesta)</div>
+      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsell recomendado (ofrecé UNO según lo que responda)</div>
       <div class="aviso">${esc(emergencia ? "En emergencia NO vender: solo seguridad. El upsell real es el chequeo de seguimiento después." : speech.upsells[0])}</div>
       <details style="margin-top:6px;"><summary style="cursor:pointer; font-size:13px; color:var(--accent-dark);">Ver los otros upsells</summary>
         <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${speech.upsells.slice(1).map(u=>`<li>${esc(u)}</li>`).join("")}</ul>
@@ -2826,28 +2931,137 @@ function waCrearProspecto(){
   render("prospectos");
 }
 
-function waMostrarSpeech(idx){
-  const s = SPEECHS[Number(idx)];
-  const box = document.getElementById("wa-biblioteca-detalle");
-  if(!s || !box) return;
+// Categorías del embudo — orden e ícono para agrupar la biblioteca.
+const GUION_CATS = [
+  {cat:"Trabajo",   ico:"🔧", desc:"Primer mensaje según lo que pide el cliente."},
+  {cat:"Contacto",  ico:"👋", desc:"Saludos y fuera de horario."},
+  {cat:"Precio",    ico:"💲", desc:"Explicar la visita y presupuestar en niveles."},
+  {cat:"Cierre",    ico:"✅", desc:"Agendar y confirmar."},
+  {cat:"Cobro",     ico:"💰", desc:"Seña, medios de pago y recordar el saldo."},
+  {cat:"Postventa", ico:"⭐", desc:"Seguimiento y pedir la reseña."},
+  {cat:"Incentivo", ico:"🎁", desc:"Referidos y fidelización."},
+  {cat:"Confianza", ico:"🛡️", desc:"Presentarte con seriedad."},
+  {cat:"Objeción",  ico:"🧯", desc:"Respuestas a 'es caro', 'lo pienso', etc."},
+];
+function guionCatIco(cat){ const c = GUION_CATS.find(x=>x.cat===cat); return c ? c.ico : "💬"; }
+
+// Guión actualmente abierto en la biblioteca (para re-abrirlo al cambiar tono/datos).
+let waGuionActual = null;
+
+// Re-render de la pestaña conservando el guión abierto (tras cambiar tono o datos).
+function waRefrescar(){
+  const id = waGuionActual;
+  render("whatsapp");
+  if(id) waMostrarGuion(id);
+}
+
+function waMostrarGuion(id){
+  waGuionActual = id;
+  const item = guionesBase().find(g=> g.id===id);
+  const box = document.getElementById("wa-guion-detalle");
+  if(!item || !box) return;
+  const tono = guionTono();
+  const filled = guionTexto(item, tono);
+  const crudo = guionCrudo(item, tono);
+  const editado = guionOverride(item.id, tono) != null;
   box.innerHTML = `
     <div class="card">
-      <h3>${esc(s.nombre)}</h3>
-      <pre class="prompt-box" id="wa-bib-txt">${esc(fillSpeech(s.speech))}</pre>
-      <button class="btn sm" data-action="copiar-texto" data-target="wa-bib-txt">Copiar speech</button>
-      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Preguntas</div>
-      <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${s.preguntas.map(q=>`<li>${esc(q)}</li>`).join("")}</ul>
-      <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsells</div>
-      <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${s.upsells.map(u=>`<li>${esc(u)}</li>`).join("")}</ul>
+      <div class="row" style="flex-wrap:wrap; gap:8px; align-items:center;">
+        <h3 style="margin:0;">${guionCatIco(item.cat)} ${esc(item.nombre)}</h3>
+        <span class="pill baja">${esc(item.cat)}</span>
+        ${editado ? `<span class="pill pendiente" title="Tenés una versión propia guardada">✏️ editado</span>` : ""}
+      </div>
+      <pre class="prompt-box" id="wa-guion-txt">${esc(filled)}</pre>
+      <div class="row" style="justify-content:flex-start; gap:6px; margin-top:6px; flex-wrap:wrap;">
+        <button class="btn sm" data-action="copiar-texto" data-target="wa-guion-txt">Copiar</button>
+        <a class="btn sm primary" href="${esc(whatsappLink("", filled))}" target="_blank" rel="noopener">Mandar por WhatsApp</a>
+        <button class="btn sm" data-action="guion-editar" data-id="${esc(item.id)}">Editar</button>
+        ${editado ? `<button class="btn sm ghost" data-action="guion-restaurar" data-id="${esc(item.id)}">Restaurar original</button>` : ""}
+      </div>
+      <div id="wa-guion-editor" hidden style="margin-top:10px;">
+        <label class="field-label" for="wa-guion-edit">Editá tu versión (${esc(tono)}). Podés dejar los comodines: [Nombre] [Negocio] [$monto] [alias] [sena] [contado] [validez] [link]</label>
+        <textarea id="wa-guion-edit" rows="6" style="width:100%; font-family:inherit;">${esc(crudo)}</textarea>
+        <div class="row" style="justify-content:flex-start; gap:6px; margin-top:6px;">
+          <button class="btn sm primary" data-action="guion-guardar" data-id="${esc(item.id)}">Guardar mi versión</button>
+          <button class="btn sm" data-action="guion-editar-cancelar">Cancelar</button>
+        </div>
+        <div class="footnote">Se guarda solo para el tono <strong>${esc(tono)}</strong>, en tu navegador.</div>
+      </div>
+      ${item.cat==="Trabajo" ? `
+        <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:14px;">Preguntas de calificación</div>
+        <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${(item.preguntas||[]).map(q=>`<li>${esc(q)}</li>`).join("")}</ul>
+        <div class="footnote" style="text-transform:uppercase; font-weight:700; margin-top:12px;">Upsells (ofrecé UNO según lo que responda)</div>
+        <ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-soft);">${(item.upsells||[]).map(u=>`<li>${esc(u)}</li>`).join("")}</ul>
+      ` : ""}
     </div>`;
+}
+// Compat: el intake viejo llamaba waMostrarSpeech por índice de SPEECHS.
+function waMostrarSpeech(idx){ const s = SPEECHS[Number(idx)]; if(s) waMostrarGuion("t"+s.rank); }
+
+function guardarDatosGuion(){
+  const c = getConfigNegocio();
+  c.guion = c.guion || {};
+  const val = id => (document.getElementById(id)||{}).value;
+  const num = (id, def) => { const v = Number(val(id)); return isNaN(v) ? def : v; };
+  const alias = val("gd-alias"); if(alias!=null) c.guion.alias = alias.trim();
+  const link  = val("gd-link");  if(link!=null)  c.guion.link_resena = link.trim();
+  c.guion.sena_pct    = num("gd-sena", c.guion.sena_pct);
+  c.guion.contado_pct = num("gd-contado", c.guion.contado_pct);
+  c.guion.validez_dias= num("gd-validez", c.guion.validez_dias);
+  const dol = document.getElementById("gd-dolares"); if(dol) c.guion.acepta_dolares = dol.checked;
+  setConfigNegocio(c);
+  toast("Datos guardados. Se completan solos en todos los mensajes.", "ok");
+  waRefrescar();
+}
+
+function renderDatosGuion(){
+  const g = getConfigNegocio().guion || {};
+  return `
+  <details class="card" ${(!g.alias) ? "open" : ""}>
+    <summary style="cursor:pointer; font-weight:600;">⚙️ Datos para tus mensajes ${g.alias ? "" : "· <span style='color:var(--bad)'>completá tu alias</span>"}</summary>
+    <div class="sub" style="margin:8px 0 2px;">Se completan solos donde el mensaje dice <code>[alias]</code>, <code>[sena]</code>, <code>[contado]</code>, <code>[validez]</code> o <code>[link]</code>. El nombre, negocio y costo de visita salen de Configuración.</div>
+    <div class="grid g2" style="margin-top:8px;">
+      <div><label class="field-label" for="gd-alias">Alias / CBU para cobrar</label><input id="gd-alias" value="${esc(g.alias||"")}" placeholder="marco.electricista.mp"></div>
+      <div><label class="field-label" for="gd-link">Link de reseña (Google)</label><input id="gd-link" value="${esc(g.link_resena||"")}" placeholder="https://g.page/..."></div>
+      <div><label class="field-label" for="gd-sena">Seña para arrancar (%)</label><input id="gd-sena" type="number" value="${esc(g.sena_pct ?? 30)}" min="0" max="100"></div>
+      <div><label class="field-label" for="gd-contado">Descuento contado (%)</label><input id="gd-contado" type="number" value="${esc(g.contado_pct ?? 10)}" min="0" max="100"></div>
+      <div><label class="field-label" for="gd-validez">Validez del presupuesto (días)</label><input id="gd-validez" type="number" value="${esc(g.validez_dias ?? 10)}" min="1"></div>
+      <div style="display:flex; align-items:flex-end;"><label class="chk-item"><input type="checkbox" id="gd-dolares" ${g.acepta_dolares ? "checked" : ""}> Acepto dólares en trabajos grandes</label></div>
+    </div>
+    <button class="btn primary" style="margin-top:10px;" data-action="guion-datos-guardar">Guardar datos</button>
+  </details>`;
+}
+
+function renderBibliotecaGuiones(){
+  const base = guionesBase();
+  const tono = guionTono();
+  const bloques = GUION_CATS.map(g=>{
+    const items = base.filter(it=> it.cat===g.cat);
+    if(!items.length) return "";
+    const chips = items.map(it=>{
+      const editado = guionOverride(it.id, tono) != null;
+      return `<button class="btn sm${it.id===waGuionActual ? " active" : ""}" data-action="guion-mostrar" data-id="${esc(it.id)}">${esc(it.nombre)}${editado ? " ✏️" : ""}</button>`;
+    }).join("");
+    return `
+    <div style="margin-top:12px;">
+      <div class="footnote" style="font-weight:700;">${g.ico} ${esc(g.cat.toUpperCase())} <span style="font-weight:400; text-transform:none;">· ${esc(g.desc)}</span></div>
+      <div class="row" style="flex-wrap:wrap; gap:6px; justify-content:flex-start; margin-top:6px;">${chips}</div>
+    </div>`;
+  }).join("");
+  return bloques;
 }
 
 function renderWhatsapp(){
+  const tono = guionTono();
+  const total = guionesBase().length;
   return `
   <div class="card banner-info">
-    <strong>💬 Entrada de WhatsApp (modo manual mejorado)</strong>
-    <div class="sub" style="margin:4px 0 0;">Pegá o reenviá el mensaje del cliente. El sistema clasifica el trabajo, detecta emergencias, te arma el speech + las preguntas + el upsell, y crea el prospecto. Cuando quieras, se conecta a WhatsApp automático sin rehacer nada.</div>
+    <strong>💬 WhatsApp — entrada de clientes + guiones de venta</strong>
+    <div class="sub" style="margin:4px 0 0;">Pegá el mensaje del cliente y el sistema clasifica el trabajo, detecta emergencias y te arma el guion + las preguntas + el upsell. Abajo tenés la biblioteca completa del embudo (contacto → precio → cierre → cobro → postventa) en dos tonos y editable.</div>
   </div>
+
+  ${renderDatosGuion()}
+
   <div class="card">
     <label class="field-label" for="wa-mensaje">Mensaje del cliente</label>
     <textarea id="wa-mensaje" rows="4" style="width:100%; font-family:inherit;" placeholder="Ej: hola, se me corta la luz de la cocina y siento olor a quemado cuando prendo el microondas"></textarea>
@@ -2855,12 +3069,18 @@ function renderWhatsapp(){
   </div>
   <div id="wa-resultado"></div>
 
-  <h3 class="seccion">Biblioteca de speechs (${SPEECHS.length})</h3>
+  <h3 class="seccion">Biblioteca de guiones (${total})</h3>
   <div class="card">
-    <div class="row" style="flex-wrap:wrap; gap:6px; justify-content:flex-start;">
-      ${SPEECHS.map((s,i)=>`<button class="btn sm" data-action="wa-mostrar-speech" data-id="${i}">${esc(s.nombre)}</button>`).join("")}
+    <div class="row" style="flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-start;">
+      <span class="field-label" style="margin:0;">Tono:</span>
+      <div class="row" style="gap:4px; justify-content:flex-start;">
+        <button class="btn sm${tono==="cercano" ? " active" : ""}" data-action="guion-tono" data-tono="cercano">🤝 Cercano</button>
+        <button class="btn sm${tono==="profesional" ? " active" : ""}" data-action="guion-tono" data-tono="profesional">👔 Profesional</button>
+      </div>
+      <span class="footnote" style="margin-left:auto;">Elegí el tono y tocá un guion para verlo, copiarlo, mandarlo o editarlo.</span>
     </div>
-    <div id="wa-biblioteca-detalle" style="margin-top:12px;"></div>
+    ${renderBibliotecaGuiones()}
+    <div id="wa-guion-detalle" style="margin-top:14px;"></div>
   </div>`;
 }
 
@@ -3952,6 +4172,13 @@ function handleAction(action, el, ev){
     case "wa-analizar": waAnalizar(); break;
     case "wa-crear-prospecto": waCrearProspecto(); break;
     case "wa-mostrar-speech": waMostrarSpeech(d.id); break;
+    case "guion-tono": setGuionTono(d.tono); waRefrescar(); break;
+    case "guion-mostrar": waMostrarGuion(d.id); break;
+    case "guion-editar": { const ed=document.getElementById("wa-guion-editor"); if(ed){ ed.hidden=false; const ta=document.getElementById("wa-guion-edit"); if(ta) ta.focus(); } break; }
+    case "guion-editar-cancelar": { const ed=document.getElementById("wa-guion-editor"); if(ed) ed.hidden=true; break; }
+    case "guion-guardar": { const ta=document.getElementById("wa-guion-edit"); if(ta){ setGuionOverride(d.id, guionTono(), ta.value.trim()); toast("Guardé tu versión de este mensaje.", "ok"); waMostrarGuion(d.id); } break; }
+    case "guion-restaurar": setGuionOverride(d.id, guionTono(), ""); toast("Volví al mensaje original.", "ok"); waMostrarGuion(d.id); break;
+    case "guion-datos-guardar": guardarDatosGuion(); break;
     case "cat-guardar-precios": catGuardarPrecios(); break;
     case "conv-evaluar": convEvaluar(); break;
     case "conv-proyectar": convProyectar(); break;
