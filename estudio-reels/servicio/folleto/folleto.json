@@ -1,0 +1,18 @@
+{
+  "_instrucciones": "Cambiá los 4 datos de ejemplo (nombre, instagram, whatsapp, foto) y después corré: node render-folleto.js. Lo demás es opcional. Detalle en LEEME.md.",
+
+  "nombre": "Tu Nombre",
+  "instagram": "@tu.usuario",
+  "whatsapp": "WhatsApp: tu número",
+  "foto": "tu-foto.jpg",
+
+  "whatsapp_link": "",
+  "rol": "Editor de reels para negocios",
+  "titular": ["Vos atendés.", "Yo hago", "tus *reels.*"],
+
+  "demos": [
+    { "rubro": "Restó", "imagen": "/home/user/demos/resto/portada.png" },
+    { "rubro": "Barbería", "imagen": "/home/user/demos/barberia/portada.png" },
+    { "rubro": "Pádel", "imagen": "/home/user/demos/padel/portada.png" }
+  ]
+}

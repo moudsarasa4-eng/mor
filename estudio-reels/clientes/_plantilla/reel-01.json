@@ -1,0 +1,14 @@
+{
+  "negocio": "Nombre del negocio",
+  "usuario": "@usuario",
+  "colores": {"fondo": "#111111", "texto": "#FFFFFF", "acento": "#2BEA7A"},
+  "fuente": "inter",
+  "musica": "base-energica-120.wav",
+  "ejemplo": false,
+  "escenas": [
+    {"segundos": 3, "media": "clientes/NEGOCIO/01.jpg", "titulo": "Gancho de *3* palabras", "subtitulo": "frase que aparece palabra por palabra"},
+    {"segundos": 3, "media": "clientes/NEGOCIO/02.mp4", "titulo": "Paso *1*", "subtitulo": "qué se ve acá"},
+    {"segundos": 3, "media": "clientes/NEGOCIO/03.jpg", "titulo": "El *resultado*", "subtitulo": "mandáselo a alguien que lo necesita"}
+  ],
+  "cierre": {"frase": "Turnos por mensaje", "boton": "LINK EN EL PERFIL"}
+}
