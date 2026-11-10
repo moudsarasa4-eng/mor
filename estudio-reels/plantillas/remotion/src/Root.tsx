@@ -5,6 +5,7 @@ import {Barberia, BarberiaCruda, BARBERIA_DUR, BARBERIA_CRUDA_DUR} from './demos
 import {Resto, RESTO_DUR} from './demos/Resto';
 import {Padel, PADEL_DUR} from './demos/Padel';
 import {ReelEstudio, ESTUDIO_DUR} from './estudio/ReelEstudio';
+import {ReelRecordar, RECORDAR_DUR} from './estudio/ReelRecordar';
 import {ReelNegocio, esquemaNegocio, ejemploNegocio, duracionNegocio} from './plantilla/ReelNegocio';
 import {ReelVendedor, VENDEDOR_DUR, esquemaVendedor, propsDueno, propsAnuncios} from './vendedor/ReelVendedor';
 
@@ -22,5 +23,6 @@ export const Root: React.FC = () => (
     <Composition id="ReelNegocio" component={ReelNegocio} durationInFrames={duracionNegocio(ejemploNegocio)} {...base} schema={esquemaNegocio} defaultProps={ejemploNegocio}
       calculateMetadata={({props}) => ({durationInFrames: duracionNegocio(props)})} />
     <Composition id="ReelEstudio" component={ReelEstudio} durationInFrames={ESTUDIO_DUR} {...base} />
+    <Composition id="ReelRecordar" component={ReelRecordar} durationInFrames={RECORDAR_DUR} {...base} />
   </>
 );
