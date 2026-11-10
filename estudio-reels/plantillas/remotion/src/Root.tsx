@@ -4,6 +4,7 @@ import {cargarFuentes} from './lib/fuentes';
 import {Barberia, BarberiaCruda, BARBERIA_DUR, BARBERIA_CRUDA_DUR} from './demos/Barberia';
 import {Resto, RESTO_DUR} from './demos/Resto';
 import {Padel, PADEL_DUR} from './demos/Padel';
+import {ReelEstudio, ESTUDIO_DUR} from './estudio/ReelEstudio';
 import {ReelNegocio, esquemaNegocio, ejemploNegocio, duracionNegocio} from './plantilla/ReelNegocio';
 import {ReelVendedor, VENDEDOR_DUR, esquemaVendedor, propsDueno, propsAnuncios} from './vendedor/ReelVendedor';
 
@@ -20,5 +21,6 @@ export const Root: React.FC = () => (
     <Composition id="ReelVendedorAnuncios" component={ReelVendedor} durationInFrames={VENDEDOR_DUR} {...base} schema={esquemaVendedor} defaultProps={propsAnuncios} />
     <Composition id="ReelNegocio" component={ReelNegocio} durationInFrames={duracionNegocio(ejemploNegocio)} {...base} schema={esquemaNegocio} defaultProps={ejemploNegocio}
       calculateMetadata={({props}) => ({durationInFrames: duracionNegocio(props)})} />
+    <Composition id="ReelEstudio" component={ReelEstudio} durationInFrames={ESTUDIO_DUR} {...base} />
   </>
 );
