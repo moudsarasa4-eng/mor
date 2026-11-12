@@ -7,6 +7,7 @@ import {Padel, PADEL_DUR} from './demos/Padel';
 import {ReelEstudio, ESTUDIO_DUR} from './estudio/ReelEstudio';
 import {ReelRecordar, RECORDAR_DUR} from './estudio/ReelRecordar';
 import {ReelExamen, EXAMEN_DUR} from './estudio/ReelExamen';
+import {Reel1Estetica, R1_DUR} from './serie/Reel1Estetica';
 import {ReelEditor, duracionEditor, REEL1, REEL2, REEL3, REEL4} from './editor/ReelEditor';
 import {ReelNegocio, esquemaNegocio, ejemploNegocio, duracionNegocio} from './plantilla/ReelNegocio';
 import {ReelVendedor, VENDEDOR_DUR, esquemaVendedor, propsDueno, propsAnuncios} from './vendedor/ReelVendedor';
@@ -31,5 +32,6 @@ export const Root: React.FC = () => (
     <Composition id="Editor2" component={ReelEditor} durationInFrames={duracionEditor(REEL2)} {...base} defaultProps={REEL2} />
     <Composition id="Editor3" component={ReelEditor} durationInFrames={duracionEditor(REEL3)} {...base} defaultProps={REEL3} />
     <Composition id="Editor4" component={ReelEditor} durationInFrames={duracionEditor(REEL4)} {...base} defaultProps={REEL4} />
+    <Composition id="Reel1Estetica" component={Reel1Estetica} durationInFrames={R1_DUR} {...base} />
   </>
 );
