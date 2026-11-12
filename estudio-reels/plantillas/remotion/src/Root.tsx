@@ -11,6 +11,7 @@ import {Reel1Estetica, R1_DUR} from './serie/Reel1Estetica';
 import {Reel2Gimnasios, Reel3Odontologia, Reel4Gastronomia, Reel5Inmobiliarias, R_DUR} from './serie/Reels2a5';
 import {Boceto} from './serie/Boceto';
 import {BocetoPremium} from './serie/BocetoPremium';
+import {ReelCarta, ReelPerfil, ReelHistorias, SERV_DUR} from './serie/ReelServicio';
 import {ReelEditor, duracionEditor, REEL1, REEL2, REEL3, REEL4} from './editor/ReelEditor';
 import {ReelNegocio, esquemaNegocio, ejemploNegocio, duracionNegocio} from './plantilla/ReelNegocio';
 import {ReelVendedor, VENDEDOR_DUR, esquemaVendedor, propsDueno, propsAnuncios} from './vendedor/ReelVendedor';
@@ -42,5 +43,8 @@ export const Root: React.FC = () => (
     <Composition id="Reel5Inmobiliarias" component={Reel5Inmobiliarias} durationInFrames={R_DUR} {...base} />
     <Composition id="Boceto" component={Boceto} durationInFrames={1} fps={30} width={1600} height={3400} />
     <Composition id="BocetoPremium" component={BocetoPremium} durationInFrames={1} fps={30} width={1600} height={3400} />
+    <Composition id="ReelCarta" component={ReelCarta} durationInFrames={SERV_DUR} {...base} />
+    <Composition id="ReelPerfil" component={ReelPerfil} durationInFrames={SERV_DUR} {...base} />
+    <Composition id="ReelHistorias" component={ReelHistorias} durationInFrames={SERV_DUR} {...base} />
   </>
 );
