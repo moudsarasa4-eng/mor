@@ -3,9 +3,9 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Celular} from '../componentes/Celular';
 import {resorte, tween} from '../lib/anim';
 import {FUENTE} from '../lib/fuentes';
-import {ARRIBA, Cierre, Corte, Feed, Frase, Paleta} from './Serie';
+import {ARRIBA, Cierre, Corte, Feed, Frase, Marca, Paleta, Planes} from './Serie';
 
-export const R1_DUR = 780; // 26 s
+export const R1_DUR = 810; // 27 s
 const P: Paleta = {fondo: '#FCE4EC', texto: '#111111', acento: '#E6007E'};
 
 // ---------------------------------------------------------------- pseudo-anuncio (HTML) dentro del celular
@@ -82,9 +82,9 @@ export const Reel1Estetica: React.FC = () => {
       {/* 3–7: así se ve hoy: foto quieta en un feed gris */}
       {f >= 90 && f < 210 ? (
         <>
-          <Frase p={P} en={90} hasta={150} tam={100} y={ARRIBA + 90} lineas={[['FOTO.', 'FOTO.', 'FOTO.']]} paso={10} />
-          <Frase p={P} en={150} tam={100} y={ARRIBA + 90} lineas={[['NADIE', {t: 'FRENA.', acento: true}]]} />
-          <Tel y={ARRIBA + 210} ui={false}>
+          <Frase p={P} en={90} hasta={150} tam={96} y={ARRIBA + 160} lineas={[['FOTO.', 'FOTO.', 'FOTO.']]} paso={10} />
+          <Frase p={P} en={150} tam={96} y={ARRIBA + 160} lineas={[['NADIE', {t: 'FRENA.', acento: true}]]} />
+          <Tel y={ARRIBA + 270} ui={false}>
             <AbsoluteFill style={{background: '#EDEDF0'}}>
               <Feed desde={90} vel={40} />
             </AbsoluteFill>
@@ -113,27 +113,23 @@ export const Reel1Estetica: React.FC = () => {
       {/* 10–18: así se vería: pseudo-anuncio dentro del celular */}
       {f >= 300 && f < 540 ? (
         <>
-          <Frase p={P} en={300} hasta={420} tam={88} y={ARRIBA + 120} lineas={[['ASÍ', 'SE', 'VERÍA'], ['TU', {t: 'REEL', acento: true}]]} />
-          <Frase p={P} en={420} tam={88} y={ARRIBA + 120} lineas={[['MISMO', 'TRABAJO.'], ['OTRA', {t: 'CLIENTA.', acento: true}]]} />
+          <Frase p={P} en={300} hasta={420} tam={84} y={ARRIBA + 165} lineas={[['ASÍ', 'SE', 'VERÍA'], ['TU', {t: 'REEL', acento: true}]]} />
+          <Frase p={P} en={420} tam={84} y={ARRIBA + 165} lineas={[['MISMO', 'TRABAJO.'], ['OTRA', {t: 'CLIENTA.', acento: true}]]} />
           <div style={{transform: `translateY(${(1 - resorte(f, fps, 300, 'pop')) * 900}px)`}}>
-            <Tel y={ARRIBA + 250}>
+            <Tel y={ARRIBA + 290}>
               <AnuncioUnas t={f - 300} />
             </Tel>
           </div>
         </>
       ) : null}
 
-      {/* 18–22: la propuesta */}
-      {f >= 540 && f < 660 ? (
-        <>
-          <Frase p={P} en={540} tam={140} y={ARRIBA + 330} lineas={[['VOS'], ['TRABAJÁS.']]} />
-          <Frase p={P} en={585} tam={140} y={ARRIBA + 760} lineas={[['YO', {t: 'EDITO'}], ['TUS', {t: 'REELS.', acento: true}]]} />
-        </>
-      ) : null}
+      {/* 18–23: planes */}
+      {f >= 540 && f < 690 ? <Planes p={P} en={540} /> : null}
 
       {/* 22–26: cierre */}
-      <Cierre p={P} palabra="UÑAS" en={660} dur={120} />
-      <Corte en={[90, 210, 300, 540, 660]} color={P.acento} />
+      <Cierre p={P} palabra="UÑAS" en={690} dur={120} />
+      <Corte en={[90, 210, 300, 540, 690]} color={P.acento} />
+      <Marca p={P} />
       {f >= R1_DUR - 8 ? (
         <AbsoluteFill style={{background: P.fondo, opacity: tween(f, [R1_DUR - 8, R1_DUR - 4], [0, 1])}}>
           <Frase p={P} en={R1_DUR - 4} tam={128} lineas={[['TU', 'TRABAJO'], ['ES', 'HERMOSO.']]} y={ARRIBA + 300} />

@@ -137,3 +137,40 @@ export const Corte: React.FC<{en: number[]; color: string}> = ({en, color}) => {
 };
 
 export const ruido = (s: string) => random(s);
+
+/** Marca fija desde el primer cuadro (arriba de la franja segura). */
+export const Marca: React.FC<{p: Paleta}> = ({p}) => (
+  <div style={{position: 'absolute', top: ARRIBA + 8, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 50}}>
+    <div style={{padding: '12px 30px', borderRadius: 40, background: p.acento, color: p.fondo, fontFamily: FUENTE.inter, fontWeight: 900, fontSize: 34, letterSpacing: '0.04em'}}>VIRALIZA TU NEGOCIO · EDITOR DE REELS</div>
+  </div>
+);
+
+export const PLANES = [
+  {n: 'BÁSICO', precio: '$25.000', reels: '4 REELS', det: '1 por semana'},
+  {n: 'MEDIO', precio: '$50.000', reels: '10 REELS', det: 'guion con gancho', rec: true},
+  {n: 'PREMIUM', precio: '$100.000', reels: '20 REELS', det: '5 por semana'},
+];
+
+/** Tres tarjetas de planes que entran una por una. */
+export const Planes: React.FC<{p: Paleta; en: number}> = ({p, en}) => {
+  const f = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  return (
+    <>
+      <Frase p={p} en={en} tam={84} y={ARRIBA + 170} lineas={[['PLANES', {t: 'POR MES', acento: true}]]} />
+      {PLANES.map((pl, i) => {
+        const s = resorte(f, fps, en + 10 + i * 18, 'pop');
+        return (
+          <div key={pl.n} style={{position: 'absolute', left: 80, right: 80, top: ARRIBA + 280 + i * 290, height: 250, borderRadius: 36, background: pl.rec ? p.acento : 'rgba(127,127,127,0.14)', border: pl.rec ? 'none' : `4px solid ${p.acento}`, color: pl.rec ? p.fondo : p.texto, fontFamily: FUENTE.inter, display: 'flex', alignItems: 'center', padding: '0 46px', justifyContent: 'space-between', opacity: Math.min(1, s * 2), transform: `translateX(${(1 - s) * (i % 2 ? 900 : -900)}px) scale(${pl.rec ? 1.03 : 1})`}}>
+            <div>
+              <div style={{fontWeight: 900, fontSize: 64, lineHeight: 1}}>{pl.n}</div>
+              <div style={{fontWeight: 700, fontSize: 36, opacity: 0.85, marginTop: 10}}>{pl.reels} · {pl.det}</div>
+            </div>
+            <div style={{fontWeight: 900, fontSize: 70}}>{pl.precio}</div>
+            {pl.rec ? <div style={{position: 'absolute', top: -26, right: 40, background: p.texto, color: p.fondo, fontWeight: 900, fontSize: 30, padding: '8px 22px', borderRadius: 30}}>RECOMENDADO</div> : null}
+          </div>
+        );
+      })}
+    </>
+  );
+};

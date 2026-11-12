@@ -3,7 +3,7 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Celular} from '../componentes/Celular';
 import {resorte, tween} from '../lib/anim';
 import {FUENTE} from '../lib/fuentes';
-import {ARRIBA, Cierre, Contador, Corte, Emoji, Feed, Frase, Paleta, Partida} from './Serie';
+import {ARRIBA, Cierre, Contador, Corte, Emoji, Feed, Frase, Marca, Paleta, Partida, Planes} from './Serie';
 
 // Misma estructura que el Reel 1: gancho → problema → SOY EDITOR DE REELS → anuncio de ejemplo en el celular
 // → VOS TRABAJÁS, YO EDITO → cierre. Duración 27 s (810 cuadros).
@@ -44,14 +44,10 @@ const Comunes: React.FC<{p: Paleta; palabra: string; gancho: React.ReactNode}> =
           <Linea p={p} desde={240} />
         </>
       ) : null}
-      {f >= 570 && f < 690 ? (
-        <>
-          <Frase p={p} en={570} tam={140} y={ARRIBA + 330} lineas={[['VOS'], ['TRABAJÁS.']]} />
-          <Frase p={p} en={615} tam={140} y={ARRIBA + 760} lineas={[['YO', 'EDITO'], ['TUS', {t: 'REELS.', acento: true}]]} />
-        </>
-      ) : null}
+      {f >= 570 && f < 690 ? <Planes p={p} en={570} /> : null}
       <Cierre p={p} palabra={palabra} en={690} dur={120} />
       <Corte en={[90, 240, 330, 570, 690]} color={p.acento} />
+      <Marca p={p} />
       {f >= R_DUR - 8 ? <AbsoluteFill style={{background: p.fondo, opacity: tween(f, [R_DUR - 8, R_DUR - 4], [0, 1])}}>{gancho}</AbsoluteFill> : null}
     </>
   );
@@ -109,7 +105,7 @@ const Gancho2: React.FC<{f: number}> = ({f}) => {
   const n = Math.min(q.length, Math.max(0, Math.floor((f - 8) / 2)));
   return (
     <>
-      <Frase p={P2} en={0} tam={104} y={ARRIBA + 220} lineas={[[{t: 'ENERO:', acento: true}, 'TODOS'], ['BUSCAN', 'DÓNDE', 'ENTRENAR.']]} />
+      <Frase p={P2} en={0} tam={100} y={ARRIBA + 270} lineas={[[{t: 'ENERO:', acento: true}, 'TODOS'], ['BUSCAN', 'DÓNDE', 'ENTRENAR.']]} />
       <div style={{position: 'absolute', left: 120, right: 120, top: ARRIBA + 520, height: 120, borderRadius: 60, background: '#1C1C1C', border: '3px solid #333', display: 'flex', alignItems: 'center', padding: '0 40px', gap: 24, fontFamily: FUENTE.inter, fontWeight: 700, fontSize: 52, color: '#fff'}}>
         <span>🔍</span>
         <span>{q.slice(0, n).toLowerCase()}</span>
@@ -127,7 +123,7 @@ export const Reel2Gimnasios: React.FC = () => {
       {f < 90 ? <Gancho2 f={f} /> : null}
       {f >= 90 && f < 240 ? (
         <>
-          <Frase p={P2} en={90} tam={100} y={ARRIBA + 110} lineas={[['ÚLTIMO', 'POSTEO:'], [{t: 'HACE', acento: true}, {t: 'MESES.', acento: true}]]} />
+          <Frase p={P2} en={90} tam={92} y={ARRIBA + 170} lineas={[['ÚLTIMO', 'POSTEO:'], [{t: 'HACE', acento: true}, {t: 'MESES.', acento: true}]]} />
           <div style={{position: 'absolute', left: 220, right: 220, top: ARRIBA + 330, height: 640, borderRadius: 40, background: '#2A2A2A'}}>
             <Emoji e="🕸️" x={320} y={240} tam={260} esc={0.6 + 0.4 * resorte(f, fps, 110, 'pop')} />
             {f >= 160 ? <div style={{position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FUENTE.inter, fontWeight: 900, fontSize: 420, color: '#FF4D5E', transform: `scale(${1 + 0.5 * Math.exp(-(f - 160) / 4)})`}}>✗</div> : null}
@@ -136,8 +132,8 @@ export const Reel2Gimnasios: React.FC = () => {
       ) : null}
       {f >= 330 && f < 570 ? (
         <>
-          <Frase p={P2} en={330} hasta={450} tam={74} y={ARRIBA + 150} lineas={[['ESTO', 'ES', 'LO', 'QUE'], [{t: 'VENDÉS.', acento: true}]]} />
-          <Frase p={P2} en={450} tam={74} y={ARRIBA + 150} lineas={[[{t: 'MOSTRALO.', acento: true}]]} />
+          <Frase p={P2} en={330} hasta={450} tam={70} y={ARRIBA + 175} lineas={[['ESTO', 'ES', 'LO', 'QUE'], [{t: 'VENDÉS.', acento: true}]]} />
+          <Frase p={P2} en={450} tam={70} y={ARRIBA + 175} lineas={[[{t: 'MOSTRALO.', acento: true}]]} />
           <div style={{transform: `translateY(${(1 - resorte(f, fps, 330, 'pop')) * 900}px)`}}>
             <Tel y={ARRIBA + 280} cuenta="tugym.ejemplo" color="#5A8A00" desc="Clase de las 7 💪">
               <Anuncio2 t={f - 330} />
@@ -216,10 +212,10 @@ export const Reel3Odontologia: React.FC = () => {
       ) : null}
       {f >= 330 && f < 570 ? (
         <>
-          <Frase p={P3} en={330} hasta={450} tam={74} y={ARRIBA + 150} lineas={[['TU', 'CARA.', 'TU', 'FORMA'], ['DE', {t: 'EXPLICAR.', acento: true}]]} />
+          <Frase p={P3} en={330} hasta={450} tam={70} y={ARRIBA + 175} lineas={[['TU', 'CARA.', 'TU', 'FORMA'], ['DE', {t: 'EXPLICAR.', acento: true}]]} />
           {f >= 450 ? (
             <>
-              <Frase p={P3} en={450} tam={74} y={ARRIBA + 150} lineas={[['OTRO', 'CONSULTORIO'], ['YA', 'LO', {t: 'HACE.', acento: true}]]} />
+              <Frase p={P3} en={450} tam={70} y={ARRIBA + 175} lineas={[['OTRO', 'CONSULTORIO'], ['YA', 'LO', {t: 'HACE.', acento: true}]]} />
             </>
           ) : null}
           <div style={{transform: `translateY(${(1 - resorte(f, fps, 330, 'pop')) * 900}px)`}}>
@@ -290,8 +286,8 @@ export const Reel4Gastronomia: React.FC = () => {
       ) : null}
       {f >= 330 && f < 570 ? (
         <>
-          <Frase p={P4} en={330} hasta={450} tam={74} y={ARRIBA + 150} lineas={[['EL', 'HAMBRE', 'ENTRA'], ['POR', 'LOS', {t: 'OJOS.', acento: true}]]} />
-          {f >= 450 ? <Frase p={P4} en={450} tam={74} y={ARRIBA + 150} lineas={[['COCINA', 'PEOR.'], ['TIENE', {t: 'FILA.', acento: true}]]} /> : null}
+          <Frase p={P4} en={330} hasta={450} tam={70} y={ARRIBA + 175} lineas={[['EL', 'HAMBRE', 'ENTRA'], ['POR', 'LOS', {t: 'OJOS.', acento: true}]]} />
+          {f >= 450 ? <Frase p={P4} en={450} tam={70} y={ARRIBA + 175} lineas={[['COCINA', 'PEOR.'], ['TIENE', {t: 'FILA.', acento: true}]]} /> : null}
           <div style={{transform: `translateY(${(1 - resorte(f, 30, 330, 'pop')) * 900}px)`}}>
             <Tel y={ARRIBA + 280} cuenta="turesto.ejemplo" color="#B5122B" desc="El plato estrella 🍝">
               <Anuncio4 t={f - 330} />
@@ -345,7 +341,7 @@ const Gancho5: React.FC<{f: number}> = ({f}) => (
       <Feed desde={0} vel={70} color="#3A4A66" />
     </AbsoluteFill>
     {f >= 50 ? <div style={{position: 'absolute', left: 290, right: 290, top: ARRIBA + 330, height: 560, borderRadius: 36, background: P5.acento, transform: `scale(${0.5 + 0.5 * Math.min(1, (f - 50) / 8)})`}} /> : null}
-    <Frase p={P5} en={0} tam={104} y={ARRIBA + 150} lineas={[['12', 'FOTOS', '=', 'SCROLL.']]} />
+    <Frase p={P5} en={0} tam={100} y={ARRIBA + 180} lineas={[['12', 'FOTOS', '=', 'SCROLL.']]} />
     {f >= 50 ? <Frase p={P5} en={50} tam={104} y={ARRIBA + 1020} lineas={[['1', 'REEL', '=', {t: 'CONSULTAS.', acento: true}]]} /> : null}
   </>
 );
@@ -371,8 +367,8 @@ export const Reel5Inmobiliarias: React.FC = () => {
       ) : null}
       {f >= 330 && f < 570 ? (
         <>
-          <Frase p={P5} en={330} hasta={450} tam={74} y={ARRIBA + 150} lineas={[['LO', 'QUE', 'LA', 'FOTO'], ['ESCONDE,', 'EL', 'REEL'], ['LO', {t: 'MUESTRA.', acento: true}]]} />
-          {f >= 450 ? <Frase p={P5} en={450} tam={74} y={ARRIBA + 150} lineas={[['TU', 'PROPIETARIO', 'TAMBIÉN'], ['MIRA', {t: 'INSTAGRAM', acento: true}, '👀']]} /> : null}
+          <Frase p={P5} en={330} hasta={450} tam={70} y={ARRIBA + 175} lineas={[['LO', 'QUE', 'LA', 'FOTO'], ['ESCONDE,', 'EL', 'REEL'], ['LO', {t: 'MUESTRA.', acento: true}]]} />
+          {f >= 450 ? <Frase p={P5} en={450} tam={70} y={ARRIBA + 175} lineas={[['TU', 'PROPIETARIO', 'TAMBIÉN'], ['MIRA', {t: 'INSTAGRAM', acento: true}, '👀']]} /> : null}
           <div style={{transform: `translateY(${(1 - resorte(f, fps, 330, 'pop')) * 900}px)`}}>
             <Tel y={ARRIBA + 280} cuenta="tuinmobiliaria.ejemplo" color="#FF8A1F" desc="3 ambientes con luz ☀️">
               <Anuncio5 t={f - 330} />
