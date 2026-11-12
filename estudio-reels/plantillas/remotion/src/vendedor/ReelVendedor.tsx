@@ -342,7 +342,7 @@ export const propsDueno: PropsVendedor = {
   fraseFuerte: ['GANÁ VENTAS', 'VIRALIZANDO', 'TUS REELS'],
   palabraVerde: 'VENTAS',
   subFrase: '',
-  editor: {nombre: 'Tu Nombre', usuario: '@tu.usuario', iniciales: 'TN'},
+  editor: {nombre: 'Viraliza tu perfil', usuario: '@viraliza.tu.perfil.arg', iniciales: 'VP'},
 };
 export const propsAnuncios: PropsVendedor = {
   fraseFuerte: ['REELS HECHOS', 'PARA QUE TE', 'COMPARTAN'],
